@@ -1,5 +1,6 @@
 package org.nextgate.nextgatebackend.authentication_service.service.impl;
 
+import lombok.extern.slf4j.Slf4j;
 import  org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import  org.nextgate.nextgatebackend.authentication_service.entity.TempTokenEntity;
 import  org.nextgate.nextgatebackend.authentication_service.enums.TempTokenPurpose;
@@ -13,6 +14,7 @@ import  org.nextgate.nextgatebackend.globeadvice.exceptions.VerificationExceptio
 import  org.nextgate.nextgatebackend.globesecurity.JWTProvider;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
+import org.nextgate.nextgatebackend.minio_service.service.MinioService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -27,6 +29,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class TempTokenServiceImpl implements TempTokenService {
@@ -51,6 +54,9 @@ public class TempTokenServiceImpl implements TempTokenService {
 
     @Value("${temp.token.resend.cooldown.minutes:2}")
     private int resendCooldownMinutes;
+
+    private final MinioService minioService;
+
 
     @Override
     @Transactional
@@ -105,7 +111,7 @@ public class TempTokenServiceImpl implements TempTokenService {
 
     @Override
     @Transactional
-    public AccountEntity validateTempTokenAndOTP(String tempToken, String otpCode) throws VerificationException, ItemNotFoundException, RandomExceptions {
+    public AccountEntity validateTempTokenAndOTP(String tempToken, String otpCode) throws VerificationException, RandomExceptions {
 
         // Hash the provided token to find it in a database
         String tokenHash = hashString(tempToken);
@@ -147,7 +153,7 @@ public class TempTokenServiceImpl implements TempTokenService {
         switch (tempTokenEntity.getPurpose()) {
 
             case REGISTRATION_OTP -> actAfterRegistrationOtpValid(account);
-            case LOGIN_OTP -> actAfterLoginOtpValid();
+            case LOGIN_OTP -> actAfterLoginOtpValid(account);
 
 
         }
@@ -157,7 +163,7 @@ public class TempTokenServiceImpl implements TempTokenService {
 
     @Override
     @Transactional
-    public String resendOTP(String tempToken) throws VerificationException, ItemNotFoundException, RandomExceptions {
+    public String resendOTP(String tempToken) throws VerificationException, RandomExceptions {
 
         // Validate and decode the temp token first
         Claims claims;
@@ -366,12 +372,24 @@ public class TempTokenServiceImpl implements TempTokenService {
         account.setIsEmailVerified(true);
         account.setEditedAt(LocalDateTime.now());
 
+        if(!account.isBucketCreated()){
+            createUserBucket(account);
+        }
+
         // Save the updated account
         accountRepo.save(account);
     }
 
-    private void actAfterLoginOtpValid() {
-        // Handle login OTP validation actions if needed
+    private void actAfterLoginOtpValid(AccountEntity account) {
+
+        account.setIsVerified(true);
+        account.setIsEmailVerified(true);
+
+        // Check if bucket needs to be created (for existing users who didn't have buckets)
+        if(!account.isBucketCreated()){
+            createUserBucket(account);
+            accountRepo.save(account);
+        }
     }
 
 
@@ -603,6 +621,26 @@ public class TempTokenServiceImpl implements TempTokenService {
     public boolean canResendByEmail(String email, TempTokenPurpose purpose) {
         // Use the same rate limiting logic as token-based resend
         return canResendOTP(email, purpose);
+    }
+
+    private void createUserBucket(AccountEntity account) {
+        try {
+            minioService.createOrganisationBucket(account.getId());
+
+            // Create basic folder structure
+            minioService.createFolderStructure(account.getId(), "profile");
+
+
+            // Mark bucket as created
+            account.setBucketCreated(true);
+
+            log.info("MinIO bucket created successfully for user: {}");
+
+        } catch (Exception e) {
+            log.error("Failed to create MinIO bucket for user: {}, Error: {}",
+                    account.getId(), e.getMessage());
+            // Keep bucketCreated as false for retry later
+        }
     }
 
 }
