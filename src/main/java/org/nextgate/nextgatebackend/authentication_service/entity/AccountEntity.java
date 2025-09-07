@@ -61,6 +61,9 @@ public class AccountEntity {
 
     private String lockedReason;
 
+    @Column(name = "is_bucket_created", nullable = false)
+    private boolean isBucketCreated;
+
     @ManyToMany(cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     @JoinTable(name = "account_roles",
             joinColumns = @JoinColumn(name = "account_id", referencedColumnName = "id"),
