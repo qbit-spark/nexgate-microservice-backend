@@ -40,10 +40,10 @@ public class TempTokenServiceImpl implements TempTokenService {
     @Value("${temp.token.expiry.minutes:10}")
     private int tempTokenExpiryMinutes;
 
-    @Value("${temp.token.rate.limit.count:3}")
+    @Value("${temp.token.rate.limit.count:5}")
     private int rateLimitCount;
 
-    @Value("${temp.token.rate.limit.window.minutes:15}")
+    @Value("${temp.token.rate.limit.window.minutes:10}")
     private int rateLimitWindowMinutes;
 
     @Value("${temp.token.resend.limit.count:5}")

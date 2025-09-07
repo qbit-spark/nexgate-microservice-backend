@@ -83,7 +83,7 @@ public class GlobeAuthMngController {
         // Create a login response with tokens and user data
         VerifiedAccountResponse verifiedAccountResponse = new VerifiedAccountResponse();
         verifiedAccountResponse.setAccessToken(accessToken);
-        verifiedAccountResponse.setRefreshToken(null);
+        verifiedAccountResponse.setRefreshToken(refreshToken);
         
         AccountResponse accountResponse = new AccountResponse();
         accountResponse.setFirstName(account.getFirstName());
