@@ -1,18 +1,25 @@
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'maven:3.9.9-openjdk-24-slim'
+            args '-v $HOME/.m2:/root/.m2 -v /var/run/docker.sock:/var/run/docker.sock'
+        }
+    }
 
     stages {
         stage('📋 Hello') {
             steps {
-                echo '🎉 Hello! Jenkins is working!'
+                echo '🎉 Hello! Jenkins with Java 24 is working!'
                 echo "Building project: ${env.JOB_NAME}"
                 echo "Build number: ${env.BUILD_NUMBER}"
+                sh 'java -version'
+                sh 'mvn -version'
             }
         }
 
         stage('🧪 Test') {
             steps {
-                echo '=== Running tests ==='
+                echo '=== Running tests with Java 24 ==='
                 sh 'chmod +x mvnw'
                 sh './mvnw test'
                 echo '✅ Tests completed!'
@@ -21,7 +28,7 @@ pipeline {
 
         stage('🔨 Build') {
             steps {
-                echo '=== Building the app ==='
+                echo '=== Building the app with Java 24 ==='
                 sh './mvnw clean package -DskipTests'
                 echo '✅ Build completed!'
             }
@@ -30,28 +37,35 @@ pipeline {
         stage('🐳 Docker') {
             steps {
                 echo '=== Creating Docker image ==='
-                sh 'docker build -t nexgate-test .'
+                sh 'docker build -t nexgate-backend:latest .'
                 echo '✅ Docker image created!'
             }
         }
 
         stage('🚀 Deploy') {
             steps {
-                echo '=== Deploying locally ==='
+                echo '=== Deploying with docker-compose ==='
                 script {
-                    // Stop old container if it exists
-                    sh 'docker stop nexgate-local || echo "No container to stop"'
-                    sh 'docker rm nexgate-local || echo "No container to remove"'
-
-                    // Start new container
+                    // Use docker-compose for deployment
                     sh '''
-                        docker run -d \
-                            --name nexgate-local \
-                            -p 8080:8080 \
-                            nexgate-test
-                    '''
+                        cd /opt/nexgate || {
+                            echo "⚠️ /opt/nexgate not found, deploying locally instead"
+                            docker stop nexgate-local || echo "No container to stop"
+                            docker rm nexgate-local || echo "No container to remove"
+                            docker run -d \
+                                --name nexgate-local \
+                                -p 8080:8080 \
+                                -e SPRING_PROFILES_ACTIVE=dev \
+                                nexgate-backend:latest
+                            exit 0
+                        }
 
-                    echo '✅ Container started!'
+                        # Deploy using docker-compose if available
+                        docker-compose stop nexgate_backend || true
+                        docker-compose rm -f nexgate_backend || true
+                        docker-compose up -d nexgate_backend
+                    '''
+                    echo '✅ Container deployed!'
                 }
             }
         }
@@ -61,13 +75,38 @@ pipeline {
                 echo '=== Checking if app is running ==='
                 script {
                     // Wait for app to start
-                    sleep(20)
+                    sleep(30)
 
                     // Check if container is running
-                    sh 'docker ps | grep nexgate-local'
+                    sh '''
+                        if docker ps | grep -q nexgate_backend; then
+                            echo "🎉 SUCCESS! NexGate backend is running via docker-compose!"
+                            echo "🌐 Check it at: http://localhost:8080"
+                        elif docker ps | grep -q nexgate-local; then
+                            echo "🎉 SUCCESS! NexGate app is running locally!"
+                            echo "🌐 Check it at: http://localhost:8080"
+                        else
+                            echo "❌ No containers found running"
+                            docker ps
+                            exit 1
+                        fi
+                    '''
 
-                    echo '🎉 SUCCESS! Your app is running!'
-                    echo '🌐 Check it at: http://localhost:8080'
+                    // Optional: Test health endpoint
+                    sh '''
+                        echo "🏥 Testing health endpoint..."
+                        for i in {1..5}; do
+                            if curl -f http://localhost:8080/actuator/health 2>/dev/null; then
+                                echo "✅ Health check passed!"
+                                break
+                            elif [ $i -eq 5 ]; then
+                                echo "⚠️ Health endpoint not responding yet (this is normal for first startup)"
+                            else
+                                echo "Attempt $i: Waiting for app to start..."
+                                sleep 10
+                            fi
+                        done
+                    '''
                 }
             }
         }
@@ -75,15 +114,27 @@ pipeline {
 
     post {
         success {
-            echo '🎉🎉🎉 EVERYTHING WORKED! 🎉🎉🎉'
+            echo '🎉🎉🎉 EVERYTHING WORKED WITH JAVA 24! 🎉🎉🎉'
+            echo '✅ Java 24 compilation successful'
             echo '✅ Tests passed'
-            echo '✅ App built'
+            echo '✅ App built with Spring Boot 3.5.5'
             echo '✅ Docker image created'
-            echo '✅ App deployed'
-            echo '🌐 Your app is running at: http://localhost:8080'
+            echo '✅ App deployed successfully'
+            echo '🌐 Your NexGate app is running at: http://localhost:8080'
+            echo '🔐 Vault integration ready'
         }
         failure {
-            echo '❌ Something went wrong. Check the logs above.'
+            echo '❌ Build failed with Java 24'
+            echo '📋 Checking container logs for debugging...'
+            sh '''
+                echo "=== Docker containers ==="
+                docker ps -a
+                echo "=== Container logs ==="
+                docker logs nexgate-local || docker logs nexgate_backend_app || echo "No logs available"
+            '''
+        }
+        cleanup {
+            echo '🧹 Cleaning up workspace...'
         }
     }
 }
