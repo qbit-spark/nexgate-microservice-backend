@@ -44,28 +44,34 @@ pipeline {
 
         stage('🚀 Deploy') {
             steps {
-                echo '=== Deploying with docker-compose ==='
+                echo '=== Deploying application ==='
                 script {
-                    // Use docker-compose for deployment
-                    sh '''
-                        cd /opt/nexgate || {
-                            echo "⚠️ /opt/nexgate not found, deploying locally instead"
-                            docker stop nexgate-local || echo "No container to stop"
-                            docker rm nexgate-local || echo "No container to remove"
-                            docker run -d \
-                                --name nexgate-local \
-                                -p 8080:8080 \
-                                -e SPRING_PROFILES_ACTIVE=dev \
-                                nexgate-backend:latest
-                            exit 0
-                        }
-
-                        # Deploy using docker-compose if available
-                        docker-compose stop nexgate_backend || true
-                        docker-compose rm -f nexgate_backend || true
-                        docker-compose up -d nexgate_backend
-                    '''
-                    echo '✅ Container deployed!'
+                    try {
+                        // Try docker-compose first
+                        sh '''
+                            if [ -d "/opt/nexgate" ]; then
+                                echo "Using docker-compose deployment..."
+                                cd /opt/nexgate
+                                docker-compose stop nexgate_backend || true
+                                docker-compose rm -f nexgate_backend || true
+                                docker-compose up -d nexgate_backend
+                            else
+                                echo "Using local deployment..."
+                                docker stop nexgate-local || true
+                                docker rm nexgate-local || true
+                                docker run -d \
+                                    --name nexgate-local \
+                                    -p 8080:8080 \
+                                    -e SPRING_PROFILES_ACTIVE=dev \
+                                    nexgate-backend:latest
+                            fi
+                        '''
+                        echo '✅ Container deployed!'
+                    } catch (Exception e) {
+                        echo "❌ Deployment failed: ${e.getMessage()}"
+                        currentBuild.result = 'FAILURE'
+                        throw e
+                    }
                 }
             }
         }
@@ -74,39 +80,46 @@ pipeline {
             steps {
                 echo '=== Checking if app is running ==='
                 script {
-                    // Wait for app to start
-                    sleep(30)
+                    try {
+                        // Wait for app to start
+                        sleep(30)
 
-                    // Check if container is running
-                    sh '''
-                        if docker ps | grep -q nexgate_backend; then
-                            echo "🎉 SUCCESS! NexGate backend is running via docker-compose!"
-                            echo "🌐 Check it at: http://localhost:8080"
-                        elif docker ps | grep -q nexgate-local; then
-                            echo "🎉 SUCCESS! NexGate app is running locally!"
-                            echo "🌐 Check it at: http://localhost:8080"
-                        else
-                            echo "❌ No containers found running"
-                            docker ps
-                            exit 1
-                        fi
-                    '''
+                        // Check if container is running
+                        sh '''
+                            if docker ps | grep -q "nexgate"; then
+                                echo "🎉 SUCCESS! NexGate app is running!"
+                                echo "🌐 Check it at: http://localhost:8080"
 
-                    // Optional: Test health endpoint
-                    sh '''
-                        echo "🏥 Testing health endpoint..."
-                        for i in {1..5}; do
-                            if curl -f http://localhost:8080/actuator/health 2>/dev/null; then
-                                echo "✅ Health check passed!"
-                                break
-                            elif [ $i -eq 5 ]; then
-                                echo "⚠️ Health endpoint not responding yet (this is normal for first startup)"
+                                # Test health endpoint (optional)
+                                echo "🏥 Testing health endpoint..."
+                                for i in {1..3}; do
+                                    if curl -f http://localhost:8080/actuator/health 2>/dev/null; then
+                                        echo "✅ Health check passed!"
+                                        break
+                                    else
+                                        echo "Attempt $i: Waiting for app..."
+                                        sleep 10
+                                    fi
+                                done
                             else
-                                echo "Attempt $i: Waiting for app to start..."
-                                sleep 10
+                                echo "❌ No NexGate containers found running"
+                                docker ps
+                                exit 1
                             fi
-                        done
-                    '''
+                        '''
+                    } catch (Exception e) {
+                        echo "❌ Health check failed: ${e.getMessage()}"
+                        // Show container logs for debugging
+                        sh '''
+                            echo "=== Container logs for debugging ==="
+                            docker logs nexgate-local 2>/dev/null || echo "No nexgate-local logs"
+                            docker logs nexgate_backend_app 2>/dev/null || echo "No nexgate_backend_app logs"
+                            echo "=== All containers ==="
+                            docker ps -a
+                        '''
+                        currentBuild.result = 'FAILURE'
+                        throw e
+                    }
                 }
             }
         }
@@ -121,20 +134,14 @@ pipeline {
             echo '✅ Docker image created'
             echo '✅ App deployed successfully'
             echo '🌐 Your NexGate app is running at: http://localhost:8080'
-            echo '🔐 Vault integration ready'
         }
         failure {
             echo '❌ Build failed with Java 24'
-            echo '📋 Checking container logs for debugging...'
-            sh '''
-                echo "=== Docker containers ==="
-                docker ps -a
-                echo "=== Container logs ==="
-                docker logs nexgate-local || docker logs nexgate_backend_app || echo "No logs available"
-            '''
+            // Note: Can't run 'sh' commands in post section with docker agent
+            // Debugging was moved to the stages above
         }
         cleanup {
-            echo '🧹 Cleaning up workspace...'
+            echo '🧹 Pipeline cleanup completed'
         }
     }
 }
