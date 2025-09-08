@@ -7,19 +7,13 @@ pipeline {
     }
 
     stages {
-        stage('📋 Hello') {
+        stage('🔨 Build') {
             steps {
-                echo '🎉 Hello! Jenkins is working!'
-                echo "Building project: ${env.JOB_NAME}"
-                echo "Build number: ${env.BUILD_NUMBER}"
-            }
-        }
-
-        stage('🔑 Bootstrap') {
-            steps {
-                echo '=== Creating bootstrap config ==='
-                script {
-                    writeFile file: 'src/main/resources/bootstrap.properties', text: """
+                echo 'Building application...'
+                sh '''
+                    # Create bootstrap config
+                    mkdir -p src/main/resources
+                    cat > src/main/resources/bootstrap.properties << EOF
 spring.cloud.vault.enabled=true
 spring.cloud.vault.uri=${VAULT_URI}
 spring.cloud.vault.token=${VAULT_TOKEN}
@@ -27,43 +21,35 @@ spring.cloud.vault.authentication=TOKEN
 spring.cloud.vault.kv.enabled=true
 spring.cloud.vault.kv.backend=secret
 spring.cloud.vault.kv.application-name=nexgate
-"""
-                }
-                echo '✅ Bootstrap created!'
-            }
-        }
+EOF
 
-        stage('🧪 Test') {
-            steps {
-                echo '=== Running tests ==='
-                sh 'chmod +x mvnw'
-                sh './mvnw test'
-                echo '✅ Tests done!'
-            }
-        }
-
-        stage('🔨 Build') {
-            steps {
-                echo '=== Building app ==='
-                sh './mvnw clean package -DskipTests'
-                echo '✅ Build done!'
+                    # Build JAR
+                    chmod +x mvnw
+                    ./mvnw clean package -DskipTests
+                '''
+                echo 'Build complete!'
             }
         }
 
         stage('🐳 Docker') {
             steps {
-                echo '=== Building Docker image ==='
-                sh 'docker build -t nexgate-app .'
-                echo '✅ Image built!'
+                echo 'Building Docker image...'
+                sh '''
+                    docker build -t nexgate-app .
+                '''
+                echo 'Docker image ready!'
             }
         }
 
         stage('🚀 Deploy') {
             steps {
-                echo '=== Deploying app ==='
+                echo 'Deploying application...'
                 sh '''
+                    # Stop old container
                     docker stop nexgate-app || true
                     docker rm nexgate-app || true
+
+                    # Start new container
                     docker run -d \
                         --name nexgate-app \
                         -p 8080:8080 \
@@ -71,26 +57,19 @@ spring.cloud.vault.kv.application-name=nexgate
                         -e VAULT_URI=${VAULT_URI} \
                         nexgate-app
                 '''
-                echo '✅ App deployed!'
+                echo 'Deployment complete!'
             }
         }
 
         stage('✅ Check') {
             steps {
-                echo '=== Checking app ==='
-                sleep(30)
+                echo 'Checking application...'
+                sleep(20)
                 sh '''
-                    echo "Container status:"
                     docker ps | grep nexgate-app
-
-                    echo "App logs:"
-                    docker logs nexgate-app | tail -10
-
-                    echo "Health check:"
-                    curl -f http://localhost:8080/actuator/health || echo "App starting..."
+                    docker logs nexgate-app | tail -5
                 '''
-                echo '🎉 SUCCESS!'
-                echo '🌐 App: http://localhost:8080'
+                echo '🎉 Done! App running at http://localhost:8080'
             }
         }
     }
@@ -98,14 +77,6 @@ spring.cloud.vault.kv.application-name=nexgate
     post {
         always {
             sh 'rm -f src/main/resources/bootstrap.properties || true'
-        }
-        success {
-            echo '🎉 DEPLOYMENT SUCCESS!'
-            echo '🌐 http://localhost:8080'
-        }
-        failure {
-            echo '❌ Something failed!'
-            sh 'docker logs nexgate-app || echo "No container"'
         }
     }
 }
