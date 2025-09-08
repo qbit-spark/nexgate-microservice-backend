@@ -4,42 +4,20 @@ pipeline {
     environment {
         VAULT_TOKEN = credentials('nexgate-vault-token')
         VAULT_URI = credentials('nexgate-vault-uri')
-        APP_NAME = 'nexgate-app'
-        APP_IMAGE = 'nexgate-app:latest'
     }
 
     stages {
         stage('📋 Hello') {
             steps {
-                echo '🎉 Nexgate Simple Deployment Pipeline!'
+                echo '🎉 Hello! Jenkins is working!'
                 echo "Building project: ${env.JOB_NAME}"
                 echo "Build number: ${env.BUILD_NUMBER}"
             }
         }
 
-        stage('🔍 Infrastructure Discovery') {
+        stage('🔑 Bootstrap') {
             steps {
-                echo '🔍 Discovering existing infrastructure...'
-                script {
-                    def networks = sh(
-                        script: 'docker network ls --filter name=nexgate --format "{{.Name}}"',
-                        returnStdout: true
-                    ).trim().split('\n')
-
-                    if (networks && networks[0]) {
-                        env.TARGET_NETWORK = networks[0]
-                        echo "✅ Found network: ${env.TARGET_NETWORK}"
-                    } else {
-                        env.TARGET_NETWORK = 'bridge'
-                        echo "⚠️ No nexgate network found, using default bridge"
-                    }
-                }
-            }
-        }
-
-        stage('🔑 Create Bootstrap Config') {
-            steps {
-                echo '🔑 Creating Vault bootstrap configuration...'
+                echo '=== Creating bootstrap config ==='
                 script {
                     writeFile file: 'src/main/resources/bootstrap.properties', text: """
 spring.cloud.vault.enabled=true
@@ -49,105 +27,70 @@ spring.cloud.vault.authentication=TOKEN
 spring.cloud.vault.kv.enabled=true
 spring.cloud.vault.kv.backend=secret
 spring.cloud.vault.kv.application-name=nexgate
-spring.cloud.vault.kv.default-context=application
-spring.cloud.vault.fail-fast=false
-spring.cloud.vault.connection-timeout=5000
-spring.cloud.vault.read-timeout=15000
 """
                 }
-                echo '✅ Bootstrap configuration created!'
+                echo '✅ Bootstrap created!'
             }
         }
 
         stage('🧪 Test') {
             steps {
-                echo '🧪 Running tests...'
-                sh '''
-                    chmod +x mvnw
-                    ./mvnw test -Dspring.profiles.active=test
-                '''
-                echo '✅ Tests completed!'
+                echo '=== Running tests ==='
+                sh 'chmod +x mvnw'
+                sh './mvnw test'
+                echo '✅ Tests done!'
             }
         }
 
         stage('🔨 Build') {
             steps {
-                echo '🔨 Building application...'
-                sh '''
-                    ./mvnw clean package -DskipTests
-                '''
-                echo '✅ Build completed!'
+                echo '=== Building app ==='
+                sh './mvnw clean package -DskipTests'
+                echo '✅ Build done!'
             }
         }
 
-        stage('🐳 Docker Build') {
+        stage('🐳 Docker') {
             steps {
-                echo '🐳 Building Docker image...'
-                sh '''
-                    docker build -t ${APP_IMAGE} .
-                '''
-                echo '✅ Docker image built!'
+                echo '=== Building Docker image ==='
+                sh 'docker build -t nexgate-app .'
+                echo '✅ Image built!'
             }
         }
 
         stage('🚀 Deploy') {
             steps {
-                echo '🚀 Deploying application...'
+                echo '=== Deploying app ==='
                 sh '''
-                    echo "🛑 Stopping existing application..."
-                    docker stop ${APP_NAME} || true
-                    docker rm ${APP_NAME} || true
-
-                    echo "🚀 Starting new application..."
+                    docker stop nexgate-app || true
+                    docker rm nexgate-app || true
                     docker run -d \
-                        --name ${APP_NAME} \
-                        --network ${TARGET_NETWORK} \
+                        --name nexgate-app \
                         -p 8080:8080 \
                         -e VAULT_TOKEN=${VAULT_TOKEN} \
                         -e VAULT_URI=${VAULT_URI} \
-                        -e SPRING_PROFILES_ACTIVE=docker \
-                        --restart unless-stopped \
-                        ${APP_IMAGE}
-
-                    echo "✅ Application deployed!"
+                        nexgate-app
                 '''
+                echo '✅ App deployed!'
             }
         }
 
-        stage('✅ Health Check') {
+        stage('✅ Check') {
             steps {
-                echo '✅ Running health checks...'
-                script {
-                    retry(6) {
-                        sleep(15)
-                        sh '''
-                            echo "=== Checking application health ==="
-                            curl -f http://localhost:8080/actuator/health
-
-                            echo "=== Recent logs ==="
-                            docker logs --tail=10 ${APP_NAME}
-                        '''
-                    }
-                }
-                echo '🎉 Application is healthy!'
-            }
-        }
-
-        stage('📊 Summary') {
-            steps {
-                echo '📊 Deployment summary...'
+                echo '=== Checking app ==='
+                sleep(30)
                 sh '''
-                    echo "🎉 DEPLOYMENT SUCCESSFUL!"
-                    echo ""
-                    echo "🌐 Application: http://localhost:8080"
-                    echo "🔐 Vault: ${VAULT_URI}"
-                    echo "🔧 Network: ${TARGET_NETWORK}"
-                    echo ""
-                    echo "🛠️ Management:"
-                    echo "  • Logs: docker logs -f ${APP_NAME}"
-                    echo "  • Restart: docker restart ${APP_NAME}"
-                    echo ""
+                    echo "Container status:"
+                    docker ps | grep nexgate-app
+
+                    echo "App logs:"
+                    docker logs nexgate-app | tail -10
+
+                    echo "Health check:"
+                    curl -f http://localhost:8080/actuator/health || echo "App starting..."
                 '''
+                echo '🎉 SUCCESS!'
+                echo '🌐 App: http://localhost:8080'
             }
         }
     }
@@ -157,14 +100,12 @@ spring.cloud.vault.read-timeout=15000
             sh 'rm -f src/main/resources/bootstrap.properties || true'
         }
         success {
-            echo '🎉 Deployment completed successfully!'
+            echo '🎉 DEPLOYMENT SUCCESS!'
+            echo '🌐 http://localhost:8080'
         }
         failure {
-            echo '❌ Deployment failed!'
-            sh '''
-                echo "=== Failure logs ==="
-                docker logs ${APP_NAME} || echo "No app logs available"
-            '''
+            echo '❌ Something failed!'
+            sh 'docker logs nexgate-app || echo "No container"'
         }
     }
 }
