@@ -29,16 +29,23 @@ EOF
 
                     # Clean up immediately after build
                     rm -f src/main/resources/bootstrap.properties
+
+                    echo "=== Build Complete ==="
+                    ls -la target/*.jar
                 '''
                 echo 'Build complete!'
             }
         }
 
-        stage('🐳 Docker') {
+        stage('🐳 Docker Build') {
             steps {
                 echo 'Building Docker image...'
                 sh '''
-                    docker build -t nexgate-app .
+                    echo "=== Building Docker Image ==="
+                    docker build -t nexgate-app:latest .
+
+                    echo "=== Image Created ==="
+                    docker images | grep nexgate-app
                 '''
                 echo 'Docker image ready!'
             }
@@ -48,40 +55,63 @@ EOF
             steps {
                 echo 'Deploying application...'
                 sh '''
-                    # Stop old container
-                    docker stop nexgate-app || true
-                    docker rm nexgate-app || true
+                    echo "=== Stopping Old Container ==="
+                    docker stop nexgate-app || echo "No container to stop"
+                    docker rm nexgate-app || echo "No container to remove"
 
-                    # Start new container
+                    echo "=== Starting New Container ==="
                     docker run -d \
                         --name nexgate-app \
+                        --restart unless-stopped \
                         -p 8080:8080 \
                         -e VAULT_TOKEN=${VAULT_TOKEN} \
                         -e VAULT_URI=${VAULT_URI} \
-                        nexgate-app
+                        nexgate-app:latest
+
+                    echo "=== Deployment Complete ==="
+                    sleep 5
+                    docker ps | grep nexgate-app
                 '''
                 echo 'Deployment complete!'
             }
         }
 
-        stage('✅ Check') {
+        stage('✅ Health Check') {
             steps {
-                echo 'Checking application...'
-                sleep(20)
+                echo 'Checking application health...'
                 sh '''
+                    echo "=== Waiting for App to Start ==="
+                    sleep 30
+
                     echo "=== Container Status ==="
                     docker ps | grep nexgate-app || echo "Container not running!"
 
-                    echo "=== Recent Logs ==="
-                    docker logs nexgate-app | tail -5 || echo "No logs available"
+                    echo "=== Application Logs ==="
+                    docker logs nexgate-app | tail -15
 
                     echo "=== Health Check ==="
-                    curl -f http://localhost:8080/actuator/health || curl -f http://localhost:8080/ || echo "App not responding"
+                    for i in {1..5}; do
+                        echo "Health check attempt $i/5..."
+                        if curl -f -s http://localhost:8080/actuator/health > /dev/null 2>&1; then
+                            echo "✅ App is healthy!"
+                            curl -s http://localhost:8080/actuator/health
+                            break
+                        elif curl -f -s http://localhost:8080/ > /dev/null 2>&1; then
+                            echo "✅ App is responding!"
+                            break
+                        else
+                            echo "⏳ App not ready yet, waiting..."
+                            sleep 10
+                        fi
+                    done
+
+                    echo "=== Final Status ==="
+                    docker ps
                 '''
-                echo '🎉 Done! App should be running at http://localhost:8080'
+                echo '🎉 Deployment Complete!'
+                echo '📱 Your app: http://localhost:8080'
+                echo '🔧 Jenkins: http://localhost:8081'
             }
         }
     }
-
-    // Remove post section entirely to avoid context issues
 }
