@@ -64,19 +64,22 @@ spring.cloud.vault.kv.default-context=application
 
         stage('🚀 Deploy') {
             steps {
-                echo '=== Deploying with Vault access ==='
+                echo '=== Deploying with Docker Compose ==='
                 sh '''
+                    # Navigate to your project directory first
+                    cd /path/to/your/nexgate-backend  # Adjust this path
+
                     docker stop nexgate-app || true
                     docker rm nexgate-app || true
                     docker run -d \
                         --name nexgate-app \
                         -p 8080:8080 \
-                        --network nexgate_network \
+                        --network nexgate-backend_nexgate_network \
                         -e VAULT_TOKEN=${VAULT_TOKEN} \
                         -e VAULT_URI=${VAULT_URI} \
                         nexgate-app
                 '''
-                echo '✅ Container started with Vault access!'
+                echo '✅ Container deployed!'
             }
         }
 
