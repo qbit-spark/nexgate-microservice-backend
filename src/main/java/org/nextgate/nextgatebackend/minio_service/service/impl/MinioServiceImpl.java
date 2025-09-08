@@ -38,6 +38,9 @@ public class MinioServiceImpl implements MinioService {
                                 .bucket(bucketName)
                                 .build()
                 );
+
+                setBucketPublicReadPolicy(bucketName);
+
                 log.info("Created organisation bucket: {}", bucketName);
             }
         } catch (Exception e) {
@@ -406,6 +409,38 @@ public class MinioServiceImpl implements MinioService {
         } catch (Exception e) {
             log.error("Failed to copy file in organisation MinIO bucket: {} -> {}", sourceKey, destinationKey, e);
             throw new RuntimeException("Failed to copy file in storage", e);
+        }
+    }
+
+    private void setBucketPublicReadPolicy(String bucketName) {
+        try {
+            // Create a policy that allows public read access to ALL files in the bucket
+            String policy = String.format("""
+            {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": "*",
+                        "Action": "s3:GetObject",
+                        "Resource": "arn:aws:s3:::%s/*"
+                    }
+                ]
+            }
+            """, bucketName);
+
+            minioClient.setBucketPolicy(
+                    SetBucketPolicyArgs.builder()
+                            .bucket(bucketName)
+                            .config(policy)
+                            .build()
+            );
+
+            log.info("Set full public read policy for bucket: {}", bucketName);
+
+        } catch (Exception e) {
+            log.warn("Failed to set public policy for bucket: {}", bucketName, e);
+            // Don't throw exception - bucket is still functional without public policy
         }
     }
 }
