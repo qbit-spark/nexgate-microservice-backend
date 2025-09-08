@@ -71,6 +71,7 @@ spring.cloud.vault.kv.default-context=application
                     docker run -d \
                         --name nexgate-app \
                         -p 8080:8080 \
+                        --network nexgate_network \
                         -e VAULT_TOKEN=${VAULT_TOKEN} \
                         -e VAULT_URI=${VAULT_URI} \
                         nexgate-app
