@@ -81,6 +81,19 @@ public class UserProfileServiceImpl implements UserProfileService {
             hasChanges = true;
         }
 
+        // Update phone number if provided and different
+        if (request.getPhoneNumber() != null && !request.getPhoneNumber().equals(account.getPhoneNumber())) {
+            validateAndUpdatePhoneNumber(account, request.getPhoneNumber());
+            hasChanges = true;
+        }
+
+        // Update profile picture URLs if provided and different
+        if (request.getProfilePictureUrls() != null) {
+            if (updateProfilePictureUrls(account, request.getProfilePictureUrls())) {
+                hasChanges = true;
+            }
+        }
+
         if (hasChanges) {
             account.setEditedAt(LocalDateTime.now());
             AccountEntity savedAccount = accountRepo.save(account);
@@ -209,8 +222,6 @@ public class UserProfileServiceImpl implements UserProfileService {
         account.setEditedAt(LocalDateTime.now());
         AccountEntity savedAccount = accountRepo.save(account);
 
-        log.info("Phone number {} verified successfully for user: {}",
-                validationUtils.maskPhoneNumber(account.getPhoneNumber()), accountId);
 
         return buildUserProfileResponse(savedAccount);
     }
@@ -383,6 +394,10 @@ public class UserProfileServiceImpl implements UserProfileService {
     }
 
     private UserProfileResponse buildUserProfileResponse(AccountEntity account) {
+
+        UserSecurityInfoResponse.SecurityStrength securityStrength = calculateSecurityStrength(account);
+
+
         return UserProfileResponse.builder()
                 .id(account.getId())
                 .userName(account.getUserName())
@@ -401,8 +416,130 @@ public class UserProfileServiceImpl implements UserProfileService {
                 .roles(account.getRoles().stream()
                         .map(Roles::getRoleName)
                         .collect(Collectors.toSet()))
+                .profilePictureUrls(account.getProfilePictureUrls())
+                .securityStrength(securityStrength)
                 .build();
     }
+
+    private boolean updateProfilePictureUrls(AccountEntity account, List<String> newUrls) {
+        // Validate and sanitize URLs
+        List<String> validatedUrls = validateProfilePictureUrls(newUrls);
+
+        // Check if URLs are actually different
+        List<String> currentUrls = account.getProfilePictureUrls();
+        if (currentUrls == null) {
+            currentUrls = new ArrayList<>();
+        }
+
+        // Compare lists (order matters)
+        if (!validatedUrls.equals(currentUrls)) {
+            account.setProfilePictureUrls(validatedUrls);
+            log.info("Updated profile picture URLs for user: {} - {} URLs",
+                    account.getUserName(), validatedUrls.size());
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Validate profile picture URLs
+     */
+    private List<String> validateProfilePictureUrls(List<String> urls) {
+        if (urls == null || urls.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        List<String> validatedUrls = new ArrayList<>();
+
+        for (String url : urls) {
+            if (url != null && !url.trim().isEmpty()) {
+                String sanitizedUrl = validationUtils.sanitizeInput(url.trim());
+
+                // Validate URL format
+                if (isValidImageUrl(sanitizedUrl)) {
+                    validatedUrls.add(sanitizedUrl);
+                } else {
+                    log.warn("Invalid profile picture URL rejected: {}", sanitizedUrl);
+                }
+            }
+        }
+
+        // Limit number of profile pictures (e.g., max 5)
+        if (validatedUrls.size() > 5) {
+            log.warn("Too many profile picture URLs provided ({}), limiting to 5", validatedUrls.size());
+            validatedUrls = validatedUrls.subList(0, 5);
+        }
+
+        return validatedUrls;
+    }
+
+    /**
+     * Validate image URL format and security
+     */
+    private boolean isValidImageUrl(String url) {
+        if (url == null || url.trim().isEmpty()) {
+            return false;
+        }
+
+        try {
+            // Basic URL format validation
+            if (!url.matches("^https?://.*\\.(jpg|jpeg|png|gif|webp)(?:\\?.*)?$")) {
+                return false;
+            }
+
+            // Security checks - prevent SSRF
+//            String lowerUrl = url.toLowerCase();
+//
+//            // Block local/private URLs
+//            if (lowerUrl.contains("localhost") ||
+//                    lowerUrl.contains("127.0.0.1") ||
+//                    lowerUrl.contains("192.168.") ||
+//                    lowerUrl.contains("10.") ||
+//                    lowerUrl.contains("172.")) {
+//                log.warn("Blocked potentially unsafe URL: {}", url);
+//                return false;
+//            }
+
+            // Check URL length
+            if (url.length() > 500) {
+                log.warn("URL too long: {} characters", url.length());
+                return false;
+            }
+
+            return true;
+
+        } catch (Exception e) {
+            log.warn("Error validating URL: {}", url, e);
+            return false;
+        }
+    }
+
+    /**
+     * Validate and update phone number
+     */
+    private void validateAndUpdatePhoneNumber(AccountEntity account, String phoneNumber)
+            throws RandomExceptions {
+
+        String sanitizedPhone = validationUtils.sanitizeInput(phoneNumber);
+
+        // Additional phone validation if needed
+        if (!validationUtils.isValidPhoneNumber(sanitizedPhone)) {
+            throw new RandomExceptions("Invalid phone number format");
+        }
+
+        // Check if the phone number is already taken by another user
+        if (accountRepo.existsByPhoneNumberAndIdNot(sanitizedPhone, account.getId())) {
+            throw new RandomExceptions("Phone number is already registered to another account");
+        }
+
+        account.setPhoneNumber(sanitizedPhone);
+        // Reset phone verification status when phone changes
+        account.setIsPhoneVerified(false);
+
+        log.info("Phone number updated for user: {}", account.getUserName());
+    }
+
 
     private void validateAndUpdateUsername(AccountEntity account, String newUsername) throws RandomExceptions {
         // Check if username is actually changing

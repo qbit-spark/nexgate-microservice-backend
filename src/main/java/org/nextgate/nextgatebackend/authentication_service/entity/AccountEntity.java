@@ -6,10 +6,12 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.nextgate.nextgatebackend.authentication_service.utils.StringListJsonConverter;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -69,6 +71,11 @@ public class AccountEntity {
             joinColumns = @JoinColumn(name = "account_id", referencedColumnName = "id"),
             inverseJoinColumns = @JoinColumn(name = "role_id", referencedColumnName = "roleId"))
     private Set<Roles> roles;
+
+    @Column(name = "profile_picture_urls", columnDefinition = "jsonb")
+    @Convert(converter = StringListJsonConverter.class)
+    private List<String> profilePictureUrls = new ArrayList<>();
+
 
 //    @JsonIgnore
 //    @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, fetch = FetchType.LAZY)

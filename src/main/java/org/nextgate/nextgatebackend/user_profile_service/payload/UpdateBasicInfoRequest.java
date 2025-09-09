@@ -4,6 +4,9 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
+import org.hibernate.validator.constraints.URL;
+
+import java.util.List;
 
 @Data
 public class UpdateBasicInfoRequest {
@@ -26,4 +29,14 @@ public class UpdateBasicInfoRequest {
 
     @Email(message = "Email should be valid")
     private String email;
+
+    @Pattern(
+            regexp = "^\\+[1-9]\\d{1,14}$",
+            message = "Phone number must be in valid international format (e.g., +1234567890)"
+    )
+    private String phoneNumber;
+
+    @Size(max = 5, message = "Maximum 5 profile pictures allowed")
+    private List<@URL @Size(max = 500) String> profilePictureUrls;
+
 }
