@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.SneakyThrows;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.authentication_service.repo.AccountRepo;
+import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemReadyExistException;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -28,7 +29,7 @@ public class CustomUserDetailsService implements UserDetailsService {
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
 
         AccountEntity user = accountRepo.findAccountEntitiesByUserName(username)
-                .orElseThrow(() -> new ItemReadyExistException("Invalid user token: Account does not exist."));
+                .orElseThrow(() -> new ItemNotFoundException("Invalid user token: Account does not exist."));
 
         Set<GrantedAuthority> authorities =
                 user.getRoles()
