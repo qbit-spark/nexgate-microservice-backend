@@ -1,5 +1,6 @@
 package org.nextgate.nextgatebackend.user_profile_service.service.impl;
 
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
@@ -39,17 +40,15 @@ public class UserProfileServiceImpl implements UserProfileService {
     private final UsernameHelper usernameHelper;
 
     @Override
-    public UserProfileResponse getCurrentUserProfile(UUID accountId) throws ItemNotFoundException {
-        AccountEntity account = getAccountById(accountId);
+    public UserProfileResponse getCurrentUserProfile(AccountEntity account) throws ItemNotFoundException {
         return buildUserProfileResponse(account);
     }
 
     @Override
     @Transactional
-    public UserProfileResponse updateBasicInfo(UUID accountId, UpdateBasicInfoRequest request)
+    public UserProfileResponse updateBasicInfo(AccountEntity account, UpdateBasicInfoRequest request)
             throws ItemNotFoundException, RandomExceptions {
 
-        AccountEntity account = getAccountById(accountId);
         boolean hasChanges = false;
 
         // Update username if provided and different
@@ -85,7 +84,6 @@ public class UserProfileServiceImpl implements UserProfileService {
         if (hasChanges) {
             account.setEditedAt(LocalDateTime.now());
             AccountEntity savedAccount = accountRepo.save(account);
-            log.info("Basic information updated for user: {}", accountId);
             return buildUserProfileResponse(savedAccount);
         }
 
@@ -94,17 +92,16 @@ public class UserProfileServiceImpl implements UserProfileService {
 
     @Override
     @Transactional
-    public void changePassword(UUID accountId, ChangePasswordRequest request)
+    public void changePassword(AccountEntity account, ChangePasswordRequest request, HttpServletRequest httpServletRequest)
             throws ItemNotFoundException, VerificationException, RandomExceptions {
 
-        AccountEntity account = getAccountById(accountId);
 
-        // Verify current password
+        // Verify the current password
         if (!passwordEncoder.matches(request.getCurrentPassword(), account.getPassword())) {
             throw new VerificationException("Current password is incorrect");
         }
 
-        // Ensure new password is different from current
+        // Ensure the new password is different from current
         if (passwordEncoder.matches(request.getNewPassword(), account.getPassword())) {
             throw new RandomExceptions("New password must be different from current password");
         }
@@ -122,33 +119,11 @@ public class UserProfileServiceImpl implements UserProfileService {
         account.setEditedAt(LocalDateTime.now());
         accountRepo.save(account);
 
-        log.info("Password changed successfully for user: {}", accountId);
 
         // Send password change notification email
-        sendPasswordChangeNotification(account);
+        sendPasswordChangeNotification(account, httpServletRequest);
     }
 
-    @Override
-    @Transactional
-    public UserProfileResponse changeUsername(UUID accountId, ChangeUsernameRequest request)
-            throws ItemNotFoundException, VerificationException, RandomExceptions {
-
-        AccountEntity account = getAccountById(accountId);
-
-        // Verify password
-        if (!passwordEncoder.matches(request.getPassword(), account.getPassword())) {
-            throw new VerificationException("Password is incorrect");
-        }
-
-        // Validate and update username
-        validateAndUpdateUsername(account, request.getNewUsername());
-
-        account.setEditedAt(LocalDateTime.now());
-        AccountEntity savedAccount = accountRepo.save(account);
-
-        log.info("Username changed to {} for user: {}", request.getNewUsername(), accountId);
-        return buildUserProfileResponse(savedAccount);
-    }
 
     @Override
     public UsernameValidationResponse validateUsername(String username) {
@@ -182,15 +157,15 @@ public class UserProfileServiceImpl implements UserProfileService {
 
         AccountEntity account = getAccountById(accountId);
 
-        // Validate phone number format
+        // Validate a phone number format
         if (!validationUtils.isValidPhoneNumber(request.getPhoneNumber())) {
             throw new RandomExceptions("Invalid phone number format. Use international format (e.g., +1234567890)");
         }
 
-        // Check if phone number is already in use by another account
+        // Check if the phone number is already in use by another account
         validatePhoneNumberAvailability(request.getPhoneNumber(), accountId);
 
-        // Update phone number temporarily (will be confirmed after verification)
+        // Update the phone number temporarily (will be confirmed after verification)
         account.setPhoneNumber(request.getPhoneNumber());
         account.setIsPhoneVerified(false);
         accountRepo.save(account);
@@ -208,14 +183,12 @@ public class UserProfileServiceImpl implements UserProfileService {
         log.info("Phone verification OTP: {} for user: {} (phone: {})",
                 otpCode, accountId, validationUtils.maskPhoneNumber(request.getPhoneNumber()));
 
-        PhoneVerificationResponse response = PhoneVerificationResponse.builder()
+        return PhoneVerificationResponse.builder()
                 .tempToken(tempToken)
                 .message("OTP sent to your phone number")
                 .expireAt(LocalDateTime.now().plusMinutes(10))
                 .phoneNumber(validationUtils.maskPhoneNumber(request.getPhoneNumber()))
                 .build();
-
-        return response;
     }
 
     @Override
@@ -546,15 +519,13 @@ public class UserProfileServiceImpl implements UserProfileService {
         return String.valueOf(otp);
     }
 
-    private void sendPasswordChangeNotification(AccountEntity account) {
+    private void sendPasswordChangeNotification(AccountEntity account, HttpServletRequest httpServletRequest) {
         try {
-            globeMailService.sendOTPEmail(
+            globeMailService.sendPasswordChangeEmail(
                     account.getEmail(),
-                    "",
-                    account.getFirstName(),
-                    "Password Changed Successfully",
-                    "Your password has been changed successfully on " + LocalDateTime.now() +
-                            ". If you didn't make this change, please contact support immediately."
+                    account.getFirstName(), "Password Change Alert",
+                    "Your password has been successfully changed.",
+                    httpServletRequest
             );
         } catch (Exception e) {
             log.warn("Failed to send password change notification email to user: {}", account.getId(), e);

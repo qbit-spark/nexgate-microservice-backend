@@ -1,8 +1,10 @@
 package org.nextgate.nextgatebackend.emails_service.impl;
 
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.nextgate.nextgatebackend.emails_service.GlobeMailService;
+import org.nextgate.nextgatebackend.user_profile_service.utils.SecurityInfoUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -15,6 +17,7 @@ import java.util.Map;
 public class GlobeMailIMPL implements GlobeMailService {
 
     private final EmailsHelperMethodsIMPL emailsHelperMethodsIMPL;
+    private final SecurityInfoUtils securityInfoUtils;
 
     @Override
     public void sendOTPEmail(String email, String otp, String userName, String textHeader, String instructions) throws Exception {
@@ -45,66 +48,43 @@ public class GlobeMailIMPL implements GlobeMailService {
     }
 
     @Override
-    public boolean sendOrganisationInvitationEmail(String email, String organisationName, String inviterName,
-                                                   String role, String invitationLink) throws Exception {
+    public void sendPasswordChangeEmail(String email, String userName, String header, String instructions,
+                                        HttpServletRequest request) throws Exception {
+
         try {
-            log.info("Sending organisation invitation email to: {} for organisation: {}", email, organisationName);
+            log.info("Sending password change notification email to: {} for user: {}", email, userName);
+
+            // Extract security information from request using SecurityInfoUtils
+            SecurityInfoUtils.SecurityInfo securityInfo = securityInfoUtils.extractSecurityInfo(request);
 
             Map<String, Object> templateVariables = new HashMap<>();
-            templateVariables.put("organisationName", organisationName);
-            templateVariables.put("inviterName", inviterName);
-            templateVariables.put("role", role);
-            templateVariables.put("invitationLink", invitationLink);
+            templateVariables.put("emailHeader", header);
+            templateVariables.put("userName", userName != null ? userName : "User");
+            templateVariables.put("instructionText", instructions);
 
+            // Security information
+            templateVariables.put("requestTime", securityInfo.getFormattedRequestTime());
+            templateVariables.put("ipAddress", securityInfo.getIpAddress());
+            templateVariables.put("deviceInfo", securityInfo.getDeviceInfo());
+            templateVariables.put("location", securityInfo.getLocation());
 
             // Send email using template
-            String subject = "You're invited to join " + organisationName;
+            String subject = "Password Changed Successfully - Nexgate";
             emailsHelperMethodsIMPL.sendTemplateEmail(
                     email,
                     subject,
-                    "organisation_invitation_email",
+                    "password_reset_email",
                     templateVariables
             );
 
-            log.info("Organisation invitation email sent successfully to: {}", email);
-            return true;
+            log.info("Password change notification email sent successfully to: {} from IP: {}",
+                    email, securityInfo.getMaskedIpAddress()); // Use masked IP for logging
 
         } catch (Exception e) {
-            log.error("Failed to send organisation invitation email to: {}", email, e);
-            throw new Exception("Failed to send invitation email: " + e.getMessage(), e);
+            log.error("Failed to send password change notification email to: {}", email, e);
+            throw new Exception("Failed to send password change notification email: " + e.getMessage(), e);
         }
     }
 
-    @Override
-    public void sendProjectTeamMemberAddedEmail(String email, String userName, String projectName, String role, String projectLink) throws Exception {
-        try {
-            log.info("Sending project team member added email to: {} for project: {}", email, projectName);
-
-            Map<String, Object> templateVariables = new HashMap<>();
-            templateVariables.put("userName", userName != null ? userName : "Team Member");
-            templateVariables.put("projectName", projectName);
-            templateVariables.put("role", role);
-            templateVariables.put("projectLink", projectLink);
-
-            // Add some additional context for the email
-            templateVariables.put("emailHeader", "Welcome to the Team!");
-            templateVariables.put("welcomeMessage", "You have been added to a new project");
-
-            // Send email using template
-            String subject = userName+" , welcome to Project! " + projectName;
-            emailsHelperMethodsIMPL.sendTemplateEmail(
-                    email,
-                    subject,
-                    "project_team_member_added_email",
-                    templateVariables
-            );
-
-            log.info("Project team member added email sent successfully to: {} for project: {}", email, projectName);
-
-        } catch (Exception e) {
-            log.error("Failed to send project team member added email to: {} for project: {}", email, projectName, e);
-            throw new Exception("Failed to send project team member added email: " + e.getMessage(), e);
-        }
-    }
 
 }

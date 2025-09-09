@@ -1,5 +1,7 @@
 package org.nextgate.nextgatebackend.user_profile_service.service;
 
+import jakarta.servlet.http.HttpServletRequest;
+import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.VerificationException;
@@ -16,32 +18,26 @@ public interface UserProfileService {
     /**
      * Get current user profile information
      */
-    UserProfileResponse getCurrentUserProfile(UUID accountId) throws ItemNotFoundException;
+    UserProfileResponse getCurrentUserProfile(AccountEntity account) throws ItemNotFoundException;
 
     /**
      * Update basic user information (name, email, username)
      * Requires re-verification if email is changed
      */
-    UserProfileResponse updateBasicInfo(UUID accountId, UpdateBasicInfoRequest request)
+    UserProfileResponse updateBasicInfo(AccountEntity account, UpdateBasicInfoRequest request)
             throws ItemNotFoundException, RandomExceptions;
 
     /**
      * Change user password with current password verification
      * Validates password strength and ensures new password is different
      */
-    void changePassword(UUID accountId, ChangePasswordRequest request)
+    void changePassword(AccountEntity account, ChangePasswordRequest request, HttpServletRequest httpServletRequest)
             throws ItemNotFoundException, VerificationException, RandomExceptions;
 
-    /**
-     * Change username with password verification
-     * Validates username format and availability
-     */
-    UserProfileResponse changeUsername(UUID accountId, ChangeUsernameRequest request)
-            throws ItemNotFoundException, VerificationException, RandomExceptions;
 
     /**
      * Validate username availability and format
-     * Returns suggestions if username is taken
+     * Returns suggestions if the username is taken
      */
     UsernameValidationResponse validateUsername(String username);
 
