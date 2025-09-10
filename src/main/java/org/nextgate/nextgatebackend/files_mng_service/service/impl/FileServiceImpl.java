@@ -311,6 +311,7 @@ public class FileServiceImpl implements FileService {
     private String generatePublicUrl(UUID accountId, String objectKey) {
         // Generate direct MinIO URL without expiration - all files are public
         String bucketName = minioService.getBucketName(accountId);
-        return String.format("http://localhost:9005/%s/%s", bucketName, objectKey);
+       // return String.format("http://localhost:9005/%s/%s", bucketName, objectKey);
+        return String.format("https://s3nexgate.glueauth.com/%s/%s", bucketName, objectKey);
     }
 }
