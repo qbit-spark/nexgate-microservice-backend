@@ -6,7 +6,7 @@ import lombok.Getter;
 public enum FileDirectory {
     PROFILE("profile"),
     CATEGORIES("categories"),
-    SHOPS("shops");
+    SHOPS("shops_mng");
 
     private final String path;
 
