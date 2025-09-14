@@ -1,6 +1,5 @@
 package org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.service.impl;
 
-import kotlin.jvm.internal.SerializedIr;
 import lombok.RequiredArgsConstructor;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.authentication_service.repo.AccountRepo;
@@ -29,7 +28,7 @@ public class ShopServiceImpl implements ShopService {
     private final ShopCategoryRepo shopCategoryRepo;
 
     @Override
-    public GlobeSuccessResponseBuilder createShop(CreateShopRequest request) throws ItemReadyExistException, ItemNotFoundException {
+    public ShopEntity createShop(CreateShopRequest request) throws ItemReadyExistException, ItemNotFoundException {
 
         // Get the current user (owner)
         AccountEntity owner = getAuthenticatedAccount();
@@ -54,6 +53,7 @@ public class ShopServiceImpl implements ShopService {
         shop.setStatus(ShopStatus.PENDING);
         shop.setIsDeleted(false);
         shop.setCategory(category);
+        shop.setOwner(owner);
 
         // Set optional fields
         shop.setTagline(request.getTagline());
@@ -76,10 +76,7 @@ public class ShopServiceImpl implements ShopService {
 
         ShopEntity savedShop = shopRepository.save(shop);
 
-        return GlobeSuccessResponseBuilder.success(
-                "Shop created successfully and is pending approval",
-                savedShop
-        );
+        return savedShop;
     }
 
     private AccountEntity getAuthenticatedAccount() throws ItemNotFoundException {
