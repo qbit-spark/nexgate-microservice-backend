@@ -6,11 +6,13 @@ import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.authentication_service.repo.AccountRepo;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemReadyExistException;
+import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
 import org.nextgate.nextgatebackend.shops_mng_service.categories.entity.ShopCategoryEntity;
 import org.nextgate.nextgatebackend.shops_mng_service.categories.repo.ShopCategoryRepo;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.entity.ShopEntity;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.enums.ShopStatus;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.payload.CreateShopRequest;
+import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.payload.UpdateShopRequest;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.repo.ShopRepo;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.service.ShopService;
 import org.springframework.data.domain.Page;
@@ -23,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -159,6 +162,92 @@ public class ShopServiceImpl implements ShopService {
         Pageable pageable = PageRequest.of(page, size);
         return shopRepository.findByIsDeletedFalseOrderByCreatedAtDesc(pageable);
     }
+
+
+    @Override
+    @Transactional
+    public ShopEntity updateShop(UUID shopId, UpdateShopRequest request) throws ItemNotFoundException, RandomExceptions {
+
+        AccountEntity user = getAuthenticatedAccount();
+
+        ShopEntity shop = shopRepository.findById(shopId)
+                .orElseThrow(() -> new ItemNotFoundException("Shop not found"));
+
+        if (shop.getIsDeleted()) {
+            throw new RandomExceptions("Cannot update a deleted shop");
+        }
+
+        if (!shop.getOwner().getId().equals(user.getId())) {
+            throw new RandomExceptions("Only shop owners can update their shops");
+        }
+
+        if (request.getCategoryId() != null) {
+            ShopCategoryEntity category = shopCategoryRepo.findById(request.getCategoryId())
+                    .orElseThrow(() -> new ItemNotFoundException("Shop category not found"));
+            shop.setCategory(category);
+        }
+
+        if (request.getShopName() != null) shop.setShopName(request.getShopName());
+        if (request.getShopDescription() != null) shop.setShopDescription(request.getShopDescription());
+        if (request.getTagline() != null) shop.setTagline(request.getTagline());
+        if (request.getLogoUrl() != null) shop.setLogoUrl(request.getLogoUrl());
+        if (request.getBannerUrl() != null) shop.setBannerUrl(request.getBannerUrl());
+        if (request.getShopImages() != null) shop.setShopImages(request.getShopImages());
+        if (request.getShopType() != null) shop.setShopType(request.getShopType());
+        if (request.getPhoneNumber() != null) shop.setPhoneNumber(request.getPhoneNumber());
+        if (request.getEmail() != null) shop.setEmail(request.getEmail());
+        if (request.getWebsiteUrl() != null) shop.setWebsiteUrl(request.getWebsiteUrl());
+        if (request.getSocialMediaLinks() != null) shop.setSocialMediaLinks(request.getSocialMediaLinks());
+        if (request.getAddress() != null) shop.setAddress(request.getAddress());
+        if (request.getCity() != null) shop.setCity(request.getCity());
+        if (request.getRegion() != null) shop.setRegion(request.getRegion());
+        if (request.getPostalCode() != null) shop.setPostalCode(request.getPostalCode());
+        if (request.getCountryCode() != null) shop.setCountryCode(request.getCountryCode());
+        if (request.getLatitude() != null) shop.setLatitude(request.getLatitude());
+        if (request.getLongitude() != null) shop.setLongitude(request.getLongitude());
+        if (request.getLocationNotes() != null) shop.setLocationNotes(request.getLocationNotes());
+        if (request.getPromotionText() != null) shop.setPromotionText(request.getPromotionText());
+
+        return shopRepository.save(shop);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ShopEntity getShopById(UUID shopId) throws ItemNotFoundException {
+        ShopEntity shop = shopRepository.findById(shopId)
+                .orElseThrow(() -> new ItemNotFoundException("Shop not found"));
+
+        if (shop.getIsDeleted()) {
+            throw new ItemNotFoundException("Shop not found");
+        }
+
+        return shop;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ShopEntity> getShopsByCategory(UUID categoryId) throws ItemNotFoundException {
+        if (!shopCategoryRepo.existsById(categoryId)) {
+            throw new ItemNotFoundException("Category not found");
+        }
+
+        return shopRepository.findByCategoryCategoryIdAndIsDeletedFalseOrderByCreatedAtDesc(categoryId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ShopEntity> getShopsByCategoryPaged(UUID categoryId, int page, int size) throws ItemNotFoundException {
+        if (!shopCategoryRepo.existsById(categoryId)) {
+            throw new ItemNotFoundException("Category not found");
+        }
+
+        if (page < 0) page = 0;
+        if (size <= 0) size = 10;
+
+        Pageable pageable = PageRequest.of(page, size);
+        return shopRepository.findByCategoryCategoryIdAndIsDeletedFalseOrderByCreatedAtDesc(categoryId, pageable);
+    }
+
 
     private AccountEntity getAuthenticatedAccount() throws ItemNotFoundException {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();

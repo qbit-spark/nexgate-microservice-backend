@@ -4,18 +4,21 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemReadyExistException;
+import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
 import org.nextgate.nextgatebackend.globeresponsebody.GlobeSuccessResponseBuilder;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.entity.ShopEntity;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.enums.ShopStatus;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.payload.CreateShopRequest;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.payload.ShopResponse;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.payload.ShopSummaryResponse;
+import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.payload.UpdateShopRequest;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.service.ShopService;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("api/v1/shops")
@@ -172,6 +175,56 @@ public class ShopController {
         };
 
         return GlobeSuccessResponseBuilder.success(message, responseData);
+    }
+
+    @PutMapping("/{shopId}")
+    public ResponseEntity<GlobeSuccessResponseBuilder> updateShop(
+            @PathVariable UUID shopId,
+            @Valid @RequestBody UpdateShopRequest request)
+            throws ItemNotFoundException, RandomExceptions {
+
+        ShopEntity updatedShop = shopService.updateShop(shopId, request);
+        ShopResponse shopResponse = buildShopResponse(updatedShop);
+
+        return ResponseEntity.ok(
+                GlobeSuccessResponseBuilder.success("Shop updated successfully", shopResponse)
+        );
+    }
+
+    @GetMapping("/{shopId}")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getShopById(
+            @PathVariable UUID shopId) throws ItemNotFoundException {
+
+        ShopEntity shop = shopService.getShopById(shopId);
+        ShopResponse shopResponse = buildShopResponse(shop);
+
+        return ResponseEntity.ok(
+                GlobeSuccessResponseBuilder.success("Shop retrieved successfully", shopResponse)
+        );
+    }
+
+    @GetMapping("/category/{categoryId}")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getShopsByCategory(
+            @PathVariable UUID categoryId) throws ItemNotFoundException {
+
+        List<ShopEntity> shops = shopService.getShopsByCategory(categoryId);
+        List<ShopResponse> shopResponses = shops.stream()
+                .map(this::buildShopResponse)
+                .toList();
+
+        return ResponseEntity.ok(
+                GlobeSuccessResponseBuilder.success("Shops by category retrieved successfully", shopResponses)
+        );
+    }
+
+    @GetMapping("/category/{categoryId}/paged")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getShopsByCategoryPaged(
+            @PathVariable UUID categoryId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) throws ItemNotFoundException {
+
+        Page<ShopEntity> shopPage = shopService.getShopsByCategoryPaged(categoryId, page, size);
+        return ResponseEntity.ok(buildPagedResponse(shopPage, "Shops by category retrieved successfully"));
     }
 
     private ShopSummaryResponse buildShopSummaryResponse(ShopEntity shop) {

@@ -26,4 +26,8 @@ public interface ShopRepo extends JpaRepository<ShopEntity, UUID> {
 
     // SEARCH
     Page<ShopEntity> findByIsDeletedFalseAndShopNameContainingIgnoreCaseOrderByCreatedAtDesc(String shopName, Pageable pageable);
+
+
+    List<ShopEntity> findByCategoryCategoryIdAndIsDeletedFalseOrderByCreatedAtDesc(UUID categoryId);
+    Page<ShopEntity> findByCategoryCategoryIdAndIsDeletedFalseOrderByCreatedAtDesc(UUID categoryId, Pageable pageable);
 }
