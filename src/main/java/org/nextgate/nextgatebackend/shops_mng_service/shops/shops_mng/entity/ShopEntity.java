@@ -19,6 +19,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+@Entity
+@Getter
+@Setter
+@AllArgsConstructor
+@NoArgsConstructor
 @Table(name = "shops", indexes = {
         @Index(name = "idx_shop_owner", columnList = "owner_id"),
         @Index(name = "idx_shop_category", columnList = "category_id"),
@@ -26,11 +31,6 @@ import java.util.UUID;
         @Index(name = "idx_shop_location", columnList = "latitude, longitude"),
         @Index(name = "idx_shop_slug", columnList = "shopSlug")
 })
-@Entity
-@Getter
-@Setter
-@AllArgsConstructor
-@NoArgsConstructor
 public class ShopEntity {
 
     @Id
@@ -42,13 +42,13 @@ public class ShopEntity {
     private String shopName;
 
     @Column(unique = true, nullable = false, length = 120)
-    private String shopSlug; // URL-friendly name (auto-generated from shopName)
+    private String shopSlug;
 
     @Column(length = 500)
     private String shopDescription;
 
     @Column(length = 50)
-    private String tagline; // Short catchy phrase
+    private String tagline;
 
     // Shop Images
     @Column(name = "shop_images", columnDefinition = "jsonb")
@@ -61,24 +61,23 @@ public class ShopEntity {
     @Column(name = "banner_url", columnDefinition = "TEXT")
     private String bannerUrl;
 
-    // Ownership & Category
+    // FIXED: Remove insertable = false, updatable = false
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "owner_id", referencedColumnName = "id", insertable = false, updatable = false)
+    @JoinColumn(name = "owner_id", referencedColumnName = "id")
     private AccountEntity owner;
 
-
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "category_id", referencedColumnName = "categoryId", insertable = false, updatable = false)
+    @JoinColumn(name = "category_id", referencedColumnName = "categoryId")
     private ShopCategoryEntity category;
 
     // Shop Type & Status
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private ShopType shopType = ShopType.PHYSICAL; // PHYSICAL, ONLINE, HYBRID
+    private ShopType shopType = ShopType.PHYSICAL;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private ShopStatus status = ShopStatus.PENDING; // PENDING, ACTIVE, SUSPENDED, CLOSED
+    private ShopStatus status = ShopStatus.PENDING;
 
     // Contact Information
     @Column(name = "phone_number", length = 20)
@@ -94,7 +93,7 @@ public class ShopEntity {
     @Convert(converter = StringListJsonConverter.class)
     private List<String> socialMediaLinks = new ArrayList<>();
 
-    // Location Information (for physical/hybrid shops)
+    // Location Information
     @Column(length = 200)
     private String address;
 
@@ -108,7 +107,7 @@ public class ShopEntity {
     private String postalCode;
 
     @Column(length = 3)
-    private String countryCode = "TZ"; // Default to Tanzania
+    private String countryCode = "TZ";
 
     @Column(precision = 10, scale = 8)
     private BigDecimal latitude;
@@ -117,7 +116,7 @@ public class ShopEntity {
     private BigDecimal longitude;
 
     @Column(name = "location_notes", columnDefinition = "TEXT")
-    private String locationNotes; // Additional directions/landmarks
+    private String locationNotes;
 
     // Business Information
     @Column(name = "registration_number", length = 50)
@@ -138,7 +137,7 @@ public class ShopEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "verification_badge")
-    private VerificationBadge verificationBadge; // BRONZE, SILVER, GOLD, PREMIUM
+    private VerificationBadge verificationBadge;
 
     @Column(name = "trust_score", precision = 3, scale = 2)
     private BigDecimal trustScore = BigDecimal.ZERO;
@@ -170,6 +169,7 @@ public class ShopEntity {
     @Column(name = "approved_by")
     private UUID approvedBy;
 
+    // Keep these as read-only since they reference the same foreign key
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "approved_by", referencedColumnName = "id", insertable = false, updatable = false)
     private AccountEntity approvedByUser;
