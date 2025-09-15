@@ -19,7 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-
 @Entity
 @Getter
 @Setter
@@ -164,11 +163,11 @@ public class ShopEntity {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "is_approved")
+    private boolean isApproved;
+
     @Column(name = "approved_at")
     private LocalDateTime approvedAt;
-
-    @Column(name = "approved_by")
-    private UUID approvedBy;
 
     // Keep these as read-only since they reference the same foreign key
     @ManyToOne(fetch = FetchType.LAZY)

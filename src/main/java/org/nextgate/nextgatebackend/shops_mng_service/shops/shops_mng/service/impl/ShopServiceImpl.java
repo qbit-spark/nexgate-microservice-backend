@@ -58,21 +58,14 @@ public class ShopServiceImpl implements ShopService {
         shop.setRegion(request.getRegion());
         shop.setStatus(ShopStatus.PENDING);
         shop.setIsDeleted(false);
-
-        System.out.println("Setting owners------->"+owner.getId());
-        System.out.println("Setting category ------->"+category.getCategoryName());
-
         shop.setCategory(category);
         shop.setOwner(owner);
-
-        System.out.println("Setting owners after------->"+owner.getId());
-        System.out.println("Setting category after ------->"+category.getCategoryName());
-
         shop.setTagline(request.getTagline());
         shop.setShopImages(request.getShopImages());
         shop.setBannerUrl(request.getBannerUrl());
         shop.setShopType(request.getShopType());
         shop.setEmail(request.getEmail());
+        shop.setApproved(true);
         shop.setWebsiteUrl(request.getWebsiteUrl());
         shop.setSocialMediaLinks(request.getSocialMediaLinks());
         shop.setAddress(request.getAddress());
@@ -95,17 +88,6 @@ public class ShopServiceImpl implements ShopService {
         return shopRepository.findByIsDeletedFalseOrderByCreatedAtDesc();
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public List<ShopEntity> getAllShopsByStatus(ShopStatus status) {
-        return shopRepository.findByIsDeletedFalseAndStatusOrderByCreatedAtDesc(status);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<ShopEntity> getAllFeaturedShops() {
-        return shopRepository.findByIsDeletedFalseAndIsFeaturedTrueOrderByCreatedAtDesc();
-    }
 
     @Override
     @Transactional(readOnly = true)
@@ -116,53 +98,6 @@ public class ShopServiceImpl implements ShopService {
         Pageable pageable = PageRequest.of(page, size);
         return shopRepository.findByIsDeletedFalseOrderByCreatedAtDesc(pageable);
     }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Page<ShopEntity> getAllShopsByStatusPaged(ShopStatus status, int page, int size) {
-        if (page < 0) page = 0;
-        if (size <= 0) size = 10;
-
-        Pageable pageable = PageRequest.of(page, size);
-        return shopRepository.findByIsDeletedFalseAndStatusOrderByCreatedAtDesc(status, pageable);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Page<ShopEntity> getAllFeaturedShopsPaged(int page, int size) {
-        if (page < 0) page = 0;
-        if (size <= 0) size = 10;
-
-        Pageable pageable = PageRequest.of(page, size);
-        return shopRepository.findByIsDeletedFalseAndIsFeaturedTrueOrderByCreatedAtDesc(pageable);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Page<ShopEntity> searchShopsByName(String searchTerm, int page, int size) {
-        if (page < 0) page = 0;
-        if (size <= 0) size = 10;
-
-        Pageable pageable = PageRequest.of(page, size);
-        return shopRepository.findByIsDeletedFalseAndShopNameContainingIgnoreCaseOrderByCreatedAtDesc(searchTerm, pageable);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<ShopEntity> getAllShopsSummary() {
-        return shopRepository.findByIsDeletedFalseOrderByCreatedAtDesc();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Page<ShopEntity> getAllShopsSummaryPaged(int page, int size) {
-        if (page < 0) page = 0;
-        if (size <= 0) size = 10;
-
-        Pageable pageable = PageRequest.of(page, size);
-        return shopRepository.findByIsDeletedFalseOrderByCreatedAtDesc(pageable);
-    }
-
 
     @Override
     @Transactional
@@ -225,6 +160,19 @@ public class ShopServiceImpl implements ShopService {
     }
 
     @Override
+    public ShopEntity getShopByIdDetailed(UUID shopId) throws ItemNotFoundException, RandomExceptions {
+        ShopEntity shop = shopRepository.findById(shopId)
+                .orElseThrow(() -> new ItemNotFoundException("Shop not found"));
+
+        AccountEntity user = getAuthenticatedAccount();
+        if (!shop.getOwner().getId().equals(user.getId()) && !(user.getRoles().contains("ROLE_SUPER_ADMIN") || user.getRoles().contains("ROLE_STAFF_ADMIN"))) {
+            throw new RandomExceptions("Only shop owners and administrators can access detailed shop information");
+        }
+
+        return shop;
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public List<ShopEntity> getShopsByCategory(UUID categoryId) throws ItemNotFoundException {
         if (!shopCategoryRepo.existsById(categoryId)) {
@@ -246,6 +194,34 @@ public class ShopServiceImpl implements ShopService {
 
         Pageable pageable = PageRequest.of(page, size);
         return shopRepository.findByCategoryCategoryIdAndIsDeletedFalseOrderByCreatedAtDesc(categoryId, pageable);
+
+    }
+
+    @Override
+    public ShopEntity approveShop(UUID shopId, boolean approve) throws ItemNotFoundException {
+
+        ShopEntity shop = shopRepository.findById(shopId)
+                .orElseThrow(() -> new ItemNotFoundException("Shop not found"));
+
+        shop.setApproved(approve);
+        shop.setApprovedByUser(getAuthenticatedAccount());
+
+        return shopRepository.save(shop);
+    }
+
+    @Override
+    public List<ShopEntity> getMyShops() throws ItemNotFoundException {
+        return shopRepository.findByOwner(getAuthenticatedAccount());
+    }
+
+    @Override
+    public Page<ShopEntity> getMyShopsPaged(int page, int size) throws ItemNotFoundException {
+        if (page < 0) page = 0;
+        if (size <= 0) size = 10;
+
+        Pageable pageable = PageRequest.of(page, size);
+        return shopRepository.findByOwner(getAuthenticatedAccount(), pageable);
+
     }
 
 

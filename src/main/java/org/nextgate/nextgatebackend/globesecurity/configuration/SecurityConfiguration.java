@@ -54,6 +54,9 @@ public class SecurityConfiguration {
                         // All public endpoints
                         .requestMatchers("/api/v1/shops/categories/all").permitAll()
                         .requestMatchers("/api/v1/shops/categories/all-paged").permitAll()
+                        .requestMatchers("/api/v1/shops/all-paged").permitAll()
+                        .requestMatchers("/api/v1/shops/all").permitAll()
+                        .requestMatchers("/api/v1/shops/{shopId}").permitAll()
 
 
                         .anyRequest().authenticated())

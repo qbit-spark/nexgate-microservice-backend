@@ -2,23 +2,29 @@ package org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.controlle
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
+import org.nextgate.nextgatebackend.authentication_service.entity.Roles;
+import org.nextgate.nextgatebackend.authentication_service.repo.AccountRepo;
+import org.nextgate.nextgatebackend.globeadvice.exceptions.AccessDeniedException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemReadyExistException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
 import org.nextgate.nextgatebackend.globeresponsebody.GlobeSuccessResponseBuilder;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.entity.ShopEntity;
-import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.enums.ShopStatus;
-import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.payload.CreateShopRequest;
-import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.payload.ShopResponse;
-import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.payload.ShopSummaryResponse;
-import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.payload.UpdateShopRequest;
+import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.payload.*;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.service.ShopService;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("api/v1/shops")
@@ -26,8 +32,8 @@ import java.util.UUID;
 public class ShopController {
 
     private final ShopService shopService;
+    private final AccountRepo accountRepo;
 
-    // CREATE SHOP
     @PostMapping
     public ResponseEntity<GlobeSuccessResponseBuilder> createShop(
             @Valid @RequestBody CreateShopRequest request)
@@ -36,19 +42,17 @@ public class ShopController {
         ShopEntity savedShop = shopService.createShop(request);
         ShopResponse shopResponse = buildShopResponse(savedShop);
 
-        System.out.println("Hello here its "+ savedShop.getOwner().getFirstName());
-
         return ResponseEntity.ok(
                 GlobeSuccessResponseBuilder.success("Shop created successfully", shopResponse)
         );
     }
 
-    // NON-PAGEABLE ENDPOINTS
-    @GetMapping
+
+    @GetMapping("/all")
     public ResponseEntity<GlobeSuccessResponseBuilder> getAllShops() {
         List<ShopEntity> shops = shopService.getAllShops();
-        List<ShopResponse> shopResponses = shops.stream()
-                .map(this::buildShopResponse)
+        List<ShopSummaryListResponse> shopResponses = shops.stream()
+                .map(this::buildShopSummaryListResponse)
                 .toList();
 
         return ResponseEntity.ok(
@@ -56,33 +60,8 @@ public class ShopController {
         );
     }
 
-    @GetMapping("/status/{status}")
-    public ResponseEntity<GlobeSuccessResponseBuilder> getAllShopsByStatus(
-            @PathVariable ShopStatus status) {
-        List<ShopEntity> shops = shopService.getAllShopsByStatus(status);
-        List<ShopResponse> shopResponses = shops.stream()
-                .map(this::buildShopResponse)
-                .toList();
 
-        return ResponseEntity.ok(
-                GlobeSuccessResponseBuilder.success("Shops with status " + status + " retrieved successfully", shopResponses)
-        );
-    }
-
-    @GetMapping("/featured")
-    public ResponseEntity<GlobeSuccessResponseBuilder> getAllFeaturedShops() {
-        List<ShopEntity> shops = shopService.getAllFeaturedShops();
-        List<ShopResponse> shopResponses = shops.stream()
-                .map(this::buildShopResponse)
-                .toList();
-
-        return ResponseEntity.ok(
-                GlobeSuccessResponseBuilder.success("Featured shops retrieved successfully", shopResponses)
-        );
-    }
-
-    // PAGEABLE ENDPOINTS
-    @GetMapping("/paged")
+    @GetMapping("/all-paged")
     public ResponseEntity<GlobeSuccessResponseBuilder> getAllShopsPaged(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
@@ -90,92 +69,6 @@ public class ShopController {
         return ResponseEntity.ok(buildPagedResponse(shopPage, "Shops retrieved successfully"));
     }
 
-    @GetMapping("/status/{status}/paged")
-    public ResponseEntity<GlobeSuccessResponseBuilder> getAllShopsByStatusPaged(
-            @PathVariable ShopStatus status,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        Page<ShopEntity> shopPage = shopService.getAllShopsByStatusPaged(status, page, size);
-        return ResponseEntity.ok(buildPagedResponse(shopPage, "Shops with status " + status + " retrieved successfully"));
-    }
-
-    @GetMapping("/featured/paged")
-    public ResponseEntity<GlobeSuccessResponseBuilder> getAllFeaturedShopsPaged(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        Page<ShopEntity> shopPage = shopService.getAllFeaturedShopsPaged(page, size);
-        return ResponseEntity.ok(buildPagedResponse(shopPage, "Featured shops retrieved successfully"));
-    }
-
-    @GetMapping("/search")
-    public ResponseEntity<GlobeSuccessResponseBuilder> searchShopsByName(
-            @RequestParam String term,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        Page<ShopEntity> shopPage = shopService.searchShopsByName(term, page, size);
-        return ResponseEntity.ok(buildPagedResponse(shopPage, "Shop search completed successfully"));
-    }
-
-    // UTILITY METHODS
-    private GlobeSuccessResponseBuilder buildPagedResponse(Page<ShopEntity> shopPage, String message) {
-        List<ShopResponse> shopResponses = shopPage.getContent().stream()
-                .map(this::buildShopResponse)
-                .toList();
-
-        var responseData = new Object() {
-            public final List<ShopResponse> shops = shopResponses;
-            public final int currentPage = shopPage.getNumber();
-            public final int pageSize = shopPage.getSize();
-            public final long totalElements = shopPage.getTotalElements();
-            public final int totalPages = shopPage.getTotalPages();
-            public final boolean hasNext = shopPage.hasNext();
-            public final boolean hasPrevious = shopPage.hasPrevious();
-            public final boolean isFirst = shopPage.isFirst();
-            public final boolean isLast = shopPage.isLast();
-        };
-
-        return GlobeSuccessResponseBuilder.success(message, responseData);
-    }
-
-    @GetMapping("/summary")
-    public ResponseEntity<GlobeSuccessResponseBuilder> getAllShopsSummary() {
-        List<ShopEntity> shops = shopService.getAllShopsSummary();
-        List<ShopSummaryResponse> summaryResponses = shops.stream()
-                .map(this::buildShopSummaryResponse)
-                .toList();
-
-        return ResponseEntity.ok(
-                GlobeSuccessResponseBuilder.success("Shop summaries retrieved successfully", summaryResponses)
-        );
-    }
-
-    @GetMapping("/summary/paged")
-    public ResponseEntity<GlobeSuccessResponseBuilder> getAllShopsSummaryPaged(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        Page<ShopEntity> shopPage = shopService.getAllShopsSummaryPaged(page, size);
-        return ResponseEntity.ok(buildSummaryPagedResponse(shopPage, "Shop summaries retrieved successfully"));
-    }
-
-    private GlobeSuccessResponseBuilder buildSummaryPagedResponse(Page<ShopEntity> shopPage, String message) {
-        List<ShopSummaryResponse> summaryResponses = shopPage.getContent().stream()
-                .map(this::buildShopSummaryResponse)
-                .toList();
-
-        var responseData = new Object() {
-            public final List<ShopSummaryResponse> shops = summaryResponses;
-            public final int currentPage = shopPage.getNumber();
-            public final int pageSize = shopPage.getSize();
-            public final long totalElements = shopPage.getTotalElements();
-            public final int totalPages = shopPage.getTotalPages();
-            public final boolean hasNext = shopPage.hasNext();
-            public final boolean hasPrevious = shopPage.hasPrevious();
-            public final boolean isFirst = shopPage.isFirst();
-            public final boolean isLast = shopPage.isLast();
-        };
-
-        return GlobeSuccessResponseBuilder.success(message, responseData);
-    }
 
     @PutMapping("/{shopId}")
     public ResponseEntity<GlobeSuccessResponseBuilder> updateShop(
@@ -191,17 +84,68 @@ public class ShopController {
         );
     }
 
-    @GetMapping("/{shopId}")
-    public ResponseEntity<GlobeSuccessResponseBuilder> getShopById(
-            @PathVariable UUID shopId) throws ItemNotFoundException {
 
-        ShopEntity shop = shopService.getShopById(shopId);
+    @GetMapping("/{shopId}/detailed")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getShopDetailedById(
+            @PathVariable UUID shopId) throws ItemNotFoundException, RandomExceptions {
+
+        ShopEntity shop = shopService.getShopByIdDetailed(shopId);
         ShopResponse shopResponse = buildShopResponse(shop);
 
         return ResponseEntity.ok(
                 GlobeSuccessResponseBuilder.success("Shop retrieved successfully", shopResponse)
         );
     }
+
+    @GetMapping("/{shopId}")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getShopById(
+            @PathVariable UUID shopId) throws ItemNotFoundException {
+
+        ShopEntity shop = shopService.getShopById(shopId);
+        ShopSummaryListResponse shopResponse = buildShopSummaryListResponse(shop);
+
+        return ResponseEntity.ok(
+                GlobeSuccessResponseBuilder.success("Shop retrieved successfully", shopResponse)
+        );
+    }
+
+    @GetMapping("/my-shops")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getMyShops() throws ItemNotFoundException {
+
+        List<ShopEntity> shops = shopService.getMyShops();
+
+        List<ShopSummaryListResponse> shopResponses = shops.stream()
+                .map(this::buildShopSummaryListResponse)
+                .toList();
+
+        return ResponseEntity.ok(
+                GlobeSuccessResponseBuilder.success("My shops retrieved successfully", shopResponses)
+        );
+
+    }
+
+    @GetMapping("/my-shops-paged")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getMyShopsPaged(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) throws ItemNotFoundException {
+
+        Page<ShopEntity> shopPage = shopService.getMyShopsPaged(page, size);
+
+        return ResponseEntity.ok(buildPagedSummaryResponse(shopPage, "My shops retrieved successfully"));
+    }
+
+    @PatchMapping("/{shopId}/approve-shop")
+    public ResponseEntity<GlobeSuccessResponseBuilder> approveShop(@PathVariable UUID shopId, @RequestParam boolean approve) throws ItemNotFoundException, AccessDeniedException {
+
+        validateRole(getAuthenticatedAccount(), "ROLE_SUPER_ADMIN","ROLE_STAFF_ADMIN");
+        ShopEntity approved = shopService.approveShop(shopId, approve);
+        ShopResponse shopResponse = buildShopResponse(approved);
+
+        return ResponseEntity.ok(
+                GlobeSuccessResponseBuilder.success("Shop approval status changed successfully", shopResponse)
+        );
+    }
+
 
     @GetMapping("/category/{categoryId}")
     public ResponseEntity<GlobeSuccessResponseBuilder> getShopsByCategory(
@@ -227,24 +171,6 @@ public class ShopController {
         return ResponseEntity.ok(buildPagedResponse(shopPage, "Shops by category retrieved successfully"));
     }
 
-    private ShopSummaryResponse buildShopSummaryResponse(ShopEntity shop) {
-        return ShopSummaryResponse.builder()
-                .shopId(shop.getShopId())
-                .shopName(shop.getShopName())
-                .shopSlug(shop.getShopSlug())
-                .shopDescription(shop.getShopDescription())
-                .tagline(shop.getTagline())
-                .logoUrl(shop.getLogoUrl())
-                .shopType(shop.getShopType())
-                .status(shop.getStatus())
-                .city(shop.getCity())
-                .region(shop.getRegion())
-                .categoryName(shop.getCategory().getCategoryName())
-                .ownerName(shop.getOwner().getFirstName() + " " + shop.getOwner().getLastName())
-                .isVerified(shop.getIsVerified())
-                .isFeatured(shop.getIsFeatured())
-                .build();
-    }
 
     private ShopResponse buildShopResponse(ShopEntity shop) {
         return ShopResponse.builder()
@@ -288,6 +214,120 @@ public class ShopController {
                 .createdAt(shop.getCreatedAt())
                 .updatedAt(shop.getUpdatedAt())
                 .approvedAt(shop.getApprovedAt())
+                .isApproved(shop.isApproved())
                 .build();
+    }
+
+    private ShopSummaryListResponse buildShopSummaryListResponse(ShopEntity shop) {
+        return ShopSummaryListResponse.builder()
+                .shopId(shop.getShopId())
+                .shopName(shop.getShopName())
+                .shopSlug(shop.getShopSlug())
+                .shopDescription(shop.getShopDescription())
+                .tagline(shop.getTagline())
+                .logoUrl(shop.getLogoUrl())
+                .bannerUrl(shop.getBannerUrl())
+                .shopImages(shop.getShopImages())
+                .ownerId(shop.getOwner().getId())
+                .ownerName(shop.getOwner().getFirstName() + " " + shop.getOwner().getLastName())
+                .categoryId(shop.getCategory().getCategoryId())
+                .categoryName(shop.getCategory().getCategoryName())
+                .shopType(shop.getShopType())
+                .status(shop.getStatus())
+                .phoneNumber(shop.getPhoneNumber())
+                .email(shop.getEmail())
+                .websiteUrl(shop.getWebsiteUrl())
+                .socialMediaLinks(shop.getSocialMediaLinks())
+                .address(shop.getAddress())
+                .city(shop.getCity())
+                .region(shop.getRegion())
+                .isVerified(shop.getIsVerified())
+                .verificationBadge(shop.getVerificationBadge())
+                .trustScore(shop.getTrustScore())
+                .lastSeenTime(shop.getLastSeenTime())
+                .createdAt(shop.getCreatedAt())
+                .updatedAt(shop.getUpdatedAt())
+                .approvedAt(shop.getApprovedAt())
+                .isApproved(shop.isApproved())
+
+                .build();
+    }
+
+    // UTILITY METHODS
+    private GlobeSuccessResponseBuilder buildPagedResponse(Page<ShopEntity> shopPage, String message) {
+        List<ShopResponse> shopResponses = shopPage.getContent().stream()
+                .map(this::buildShopResponse)
+                .toList();
+
+        var responseData = new Object() {
+            public final List<ShopResponse> shops = shopResponses;
+            public final int currentPage = shopPage.getNumber();
+            public final int pageSize = shopPage.getSize();
+            public final long totalElements = shopPage.getTotalElements();
+            public final int totalPages = shopPage.getTotalPages();
+            public final boolean hasNext = shopPage.hasNext();
+            public final boolean hasPrevious = shopPage.hasPrevious();
+            public final boolean isFirst = shopPage.isFirst();
+            public final boolean isLast = shopPage.isLast();
+        };
+
+        return GlobeSuccessResponseBuilder.success(message, responseData);
+    }
+
+
+    private AccountEntity getAuthenticatedAccount() throws ItemNotFoundException {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated()) {
+            UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+            String userName = userDetails.getUsername();
+            return accountRepo.findByUserName(userName)
+                    .orElseThrow(() -> new ItemNotFoundException("User not found"));
+        }
+
+        throw new ItemNotFoundException("User not authenticated");
+    }
+
+
+    public void validateRole(AccountEntity account, String... requiredRoles) throws AccessDeniedException {
+        if (account == null) {
+            throw new AccessDeniedException("Account not found");
+        }
+
+        if (account.getRoles() == null || account.getRoles().isEmpty()) {
+            throw new AccessDeniedException("Account has no roles assigned");
+        }
+
+        // Get account's role names
+        Set<String> accountRoleNames = account.getRoles().stream()
+                .map(Roles::getRoleName)
+                .collect(Collectors.toSet());
+
+        // Check if an account has any of the required roles
+        boolean hasRequiredRole = Arrays.stream(requiredRoles)
+                .anyMatch(accountRoleNames::contains);
+
+        if (!hasRequiredRole) {
+            throw new AccessDeniedException("Access denied. Insufficient permissions.");
+        }
+    }
+
+    private GlobeSuccessResponseBuilder buildPagedSummaryResponse(Page<ShopEntity> shopPage, String message) {
+        List<ShopSummaryListResponse> shopResponses = shopPage.getContent().stream()
+                .map(this::buildShopSummaryListResponse)  // Use summary builder instead
+                .toList();
+
+        var responseData = new Object() {
+            public final List<ShopSummaryListResponse> shops = shopResponses;
+            public final int currentPage = shopPage.getNumber();
+            public final int pageSize = shopPage.getSize();
+            public final long totalElements = shopPage.getTotalElements();
+            public final int totalPages = shopPage.getTotalPages();
+            public final boolean hasNext = shopPage.hasNext();
+            public final boolean hasPrevious = shopPage.hasPrevious();
+            public final boolean isFirst = shopPage.isFirst();
+            public final boolean isLast = shopPage.isLast();
+        };
+
+        return GlobeSuccessResponseBuilder.success(message, responseData);
     }
 }

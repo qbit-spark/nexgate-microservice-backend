@@ -22,7 +22,6 @@ public class NexgateBackendApplication implements CommandLineRunner {
     @Bean
     public WebClient webClient(WebClient.Builder builder) {return builder.build();}
 
-
     public static void main(String[] args) {
         SpringApplication.run(NexgateBackendApplication.class, args);
     }
