@@ -57,6 +57,8 @@ public class SecurityConfiguration {
                         .requestMatchers("/api/v1/shops/all-paged").permitAll()
                         .requestMatchers("/api/v1/shops/all").permitAll()
                         .requestMatchers("/api/v1/shops/{shopId}").permitAll()
+                        .requestMatchers("/api/v1/shops/category/{categoryId}/paged").permitAll()
+                        .requestMatchers("/api/v1/shops/category/{categoryId}").permitAll()
 
 
                         .anyRequest().authenticated())
