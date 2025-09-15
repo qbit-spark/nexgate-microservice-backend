@@ -152,14 +152,15 @@ public class ShopController {
             @PathVariable UUID categoryId) throws ItemNotFoundException {
 
         List<ShopEntity> shops = shopService.getShopsByCategory(categoryId);
-        List<ShopResponse> shopResponses = shops.stream()
-                .map(this::buildShopResponse)
+        List<ShopSummaryListResponse> shopResponses = shops.stream()
+                .map(this::buildShopSummaryListResponse)
                 .toList();
 
         return ResponseEntity.ok(
                 GlobeSuccessResponseBuilder.success("Shops by category retrieved successfully", shopResponses)
         );
     }
+
 
     @GetMapping("/category/{categoryId}/paged")
     public ResponseEntity<GlobeSuccessResponseBuilder> getShopsByCategoryPaged(
