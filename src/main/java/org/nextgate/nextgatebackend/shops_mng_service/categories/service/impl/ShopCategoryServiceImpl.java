@@ -14,15 +14,16 @@ import org.nextgate.nextgatebackend.shops_mng_service.categories.service.ShopCat
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -39,8 +40,7 @@ public class ShopCategoryServiceImpl implements ShopCategoryService {
             throws ItemReadyExistException, ItemNotFoundException {
 
         // Check if a category already exists
-        ShopCategoryEntity existingCategory = shopCategoryRepo.findByCategoryNameAndIsDeletedFalse(request.getCategoryName());
-        if (existingCategory != null) {
+        if (shopCategoryRepo.existsByCategoryName(request.getCategoryName())) {
             throw new ItemReadyExistException("Category with this name already exists");
         }
 
@@ -48,17 +48,17 @@ public class ShopCategoryServiceImpl implements ShopCategoryService {
         ShopCategoryEntity newCategory = new ShopCategoryEntity();
         newCategory.setCategoryName(request.getCategoryName());
         newCategory.setCategoryDescription(request.getCategoryDescription());
+        newCategory.setCategoryIconUrl(request.getCategoryIconUrl());
         newCategory.setCreatedTime(LocalDateTime.now());
         newCategory.setEditedTime(LocalDateTime.now());
         newCategory.setIsActive(true);
-        newCategory.setIsDeleted(false);
+
 
         UUID accountId = getAuthenticatedAccount().getAccountId();
         newCategory.setCreatedBy(accountId);
         newCategory.setEditedBy(accountId);
 
         ShopCategoryEntity savedCategory = shopCategoryRepo.save(newCategory);
-        log.info("Created shop category: {} by user: {}", savedCategory.getCategoryName(), accountId);
 
         return GlobeSuccessResponseBuilder.builder()
                 .message("Shop category created successfully")
@@ -67,45 +67,20 @@ public class ShopCategoryServiceImpl implements ShopCategoryService {
                 .build();
     }
 
-    @Override
-    public GlobeSuccessResponseBuilder deleteShopCategory(String categoryName) throws ItemNotFoundException {
-
-        ShopCategoryEntity category = shopCategoryRepo.findByCategoryNameAndIsDeletedFalse(categoryName);
-        if (category == null) {
-            throw new ItemNotFoundException("Shop category not found");
-        }
-
-        // Soft delete
-        category.setIsDeleted(true);
-        category.setIsActive(false);
-        category.setEditedTime(LocalDateTime.now());
-        category.setEditedBy(getAuthenticatedAccount().getAccountId());
-
-        shopCategoryRepo.save(category);
-        log.info("Deleted shop category: {}", categoryName);
-
-        return GlobeSuccessResponseBuilder.builder()
-                .message("Shop category deleted successfully")
-                .success(true)
-                .build();
-    }
 
     @Override
-    public GlobeSuccessResponseBuilder updateShopCategory(String categoryName, CreateShopCategoryRequest request)
+    public GlobeSuccessResponseBuilder updateShopCategory(UUID categoryId, CreateShopCategoryRequest request)
             throws ItemNotFoundException, ItemReadyExistException {
 
-        ShopCategoryEntity category = shopCategoryRepo.findByCategoryNameAndIsDeletedFalse(categoryName);
-        if (category == null) {
-            throw new ItemNotFoundException("Shop category not found");
-        }
+        ShopCategoryEntity category = shopCategoryRepo.findById(categoryId).orElseThrow(
+                () -> new ItemNotFoundException("Shop category not found")
+        );
 
         // Check if a new name already exists (if different from the current)
-        if (!categoryName.equals(request.getCategoryName())) {
-            ShopCategoryEntity existingCategory = shopCategoryRepo.findByCategoryNameAndIsDeletedFalse(request.getCategoryName());
-            if (existingCategory != null) {
-                throw new ItemReadyExistException("Category with this name already exists");
-            }
+        if (!category.getCategoryName().equals(request.getCategoryName()) && shopCategoryRepo.existsByCategoryName(request.getCategoryName())) {
+            throw new ItemReadyExistException("Category with this name already exists");
         }
+
 
         // Update category
         category.setCategoryName(request.getCategoryName());
@@ -114,7 +89,6 @@ public class ShopCategoryServiceImpl implements ShopCategoryService {
         category.setEditedBy(getAuthenticatedAccount().getAccountId());
 
         ShopCategoryEntity updatedCategory = shopCategoryRepo.save(category);
-        log.info("Updated shop category: {}", categoryName);
 
         return GlobeSuccessResponseBuilder.builder()
                 .message("Shop category updated successfully")
@@ -127,26 +101,9 @@ public class ShopCategoryServiceImpl implements ShopCategoryService {
     @Transactional(readOnly = true)
     public GlobeSuccessResponseBuilder getShopCategory(UUID shopCategoryId) throws ItemNotFoundException {
 
-        Optional<ShopCategoryEntity> categoryOpt = shopCategoryRepo.findById(shopCategoryId);
-        if (categoryOpt.isEmpty() || categoryOpt.get().getIsDeleted()) {
-            throw new ItemNotFoundException("Shop category not found");
-        }
-
-        return GlobeSuccessResponseBuilder.builder()
-                .message("Shop category fetched successfully")
-                .success(true)
-                .data(categoryOpt.get())
-                .build();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public GlobeSuccessResponseBuilder getShopCategoryByName(String categoryName) throws ItemNotFoundException {
-
-        ShopCategoryEntity category = shopCategoryRepo.findByCategoryNameAndIsDeletedFalse(categoryName);
-        if (category == null) {
-            throw new ItemNotFoundException("Shop category not found");
-        }
+        ShopCategoryEntity category = shopCategoryRepo.findById(shopCategoryId).orElseThrow(
+                () -> new ItemNotFoundException("Shop category not found")
+        );
 
         return GlobeSuccessResponseBuilder.builder()
                 .message("Shop category fetched successfully")
@@ -155,13 +112,18 @@ public class ShopCategoryServiceImpl implements ShopCategoryService {
                 .build();
     }
 
-    // NON-PAGEABLE LIST METHODS
 
     @Override
     @Transactional(readOnly = true)
-    public GlobeSuccessResponseBuilder getAllShopCategories() {
+    public GlobeSuccessResponseBuilder getAllShopCategories(Boolean isActive) {
 
-        List<ShopCategoryEntity> categories = shopCategoryRepo.findByIsDeletedFalse();
+        List<ShopCategoryEntity> categories;
+
+        if (isActive != null) {
+            categories = shopCategoryRepo.findByIsActive(isActive);
+        } else {
+            categories = shopCategoryRepo.findAll();
+        }
 
         return GlobeSuccessResponseBuilder.builder()
                 .message("All shop categories fetched successfully")
@@ -170,98 +132,67 @@ public class ShopCategoryServiceImpl implements ShopCategoryService {
                 .build();
     }
 
-    @Transactional(readOnly = true)
-    public GlobeSuccessResponseBuilder getAllActiveShopCategories() {
-
-        List<ShopCategoryEntity> categories = shopCategoryRepo.findByIsDeletedFalseAndIsActiveTrue();
-
-        return GlobeSuccessResponseBuilder.builder()
-                .message("All active shop categories fetched successfully")
-                .success(true)
-                .data(categories)
-                .build();
-    }
-
-    // PAGEABLE LIST METHODS
 
     @Override
     @Transactional(readOnly = true)
-    public GlobeSuccessResponseBuilder getAllShopCategoriesPaged(int page, int size) {
+    public Page<ShopCategoryEntity> getAllShopCategoriesPaged(Boolean isActive, int page, int size) {
 
-        // Validate pagination parameters
-        if (page < 0) page = 0;
-        if (size <= 0) size = 10;
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdTime"));
 
-        Pageable pageable = PageRequest.of(page, size);
-        Page<ShopCategoryEntity> categoryPage = shopCategoryRepo.findByIsDeletedFalseOrderByCreatedTimeDesc(pageable);
-
-        return buildPagedResponse(categoryPage, "Shop categories fetched successfully");
+        if (isActive != null) {
+            return shopCategoryRepo.findByIsActive(isActive, pageable);
+        } else {
+            return shopCategoryRepo.findAll(pageable);
+        }
     }
 
-    @Transactional(readOnly = true)
-    public GlobeSuccessResponseBuilder getAllActiveShopCategoriesPaged(int page, int size) {
+    @Override
+    public GlobeSuccessResponseBuilder deleteShopCategory(UUID shopCategoryId) throws ItemNotFoundException {
+        ShopCategoryEntity category = shopCategoryRepo.findById(shopCategoryId).orElseThrow(
+                () -> new ItemNotFoundException("Shop category not found")
+        );
 
-        // Validate pagination parameters
-        if (page < 0) page = 0;
-        if (size <= 0) size = 10;
+        //Check it is ready inactive
+        if (!category.getIsActive()) {
+            throw new ItemNotFoundException("Shop category is already inactive");
+        }
 
-        Pageable pageable = PageRequest.of(page, size);
-        Page<ShopCategoryEntity> categoryPage = shopCategoryRepo.findByIsDeletedFalseAndIsActiveTrueOrderByCategoryNameAsc(pageable);
-
-        return buildPagedResponse(categoryPage, "Active shop categories fetched successfully");
-    }
-
-    @Transactional(readOnly = true)
-    public GlobeSuccessResponseBuilder getAllShopCategoriesOrderedByName(int page, int size) {
-
-        // Validate pagination parameters
-        if (page < 0) page = 0;
-        if (size <= 0) size = 10;
-
-        Pageable pageable = PageRequest.of(page, size);
-        Page<ShopCategoryEntity> categoryPage = shopCategoryRepo.findByIsDeletedFalseOrderByCategoryNameAsc(pageable);
-
-        return buildPagedResponse(categoryPage, "Shop categories fetched successfully (ordered by name)");
-    }
-
-    @Transactional(readOnly = true)
-    public GlobeSuccessResponseBuilder searchShopCategoriesByName(String searchTerm, int page, int size) {
-
-        // Validate pagination parameters
-        if (page < 0) page = 0;
-        if (size <= 0) size = 10;
-
-        Pageable pageable = PageRequest.of(page, size);
-        Page<ShopCategoryEntity> categoryPage = shopCategoryRepo
-                .findByIsDeletedFalseAndCategoryNameContainingIgnoreCase(searchTerm, pageable);
-
-        return buildPagedResponse(categoryPage, "Shop categories search completed successfully");
-    }
-
-    // UTILITY METHODS
-
-    private GlobeSuccessResponseBuilder buildPagedResponse(Page<ShopCategoryEntity> categoryPage, String message) {
-
-        var responseData = new Object() {
-            public final List<ShopCategoryEntity> categories = categoryPage.getContent();
-            public final int currentPage = categoryPage.getNumber();
-            public final int pageSize = categoryPage.getSize();
-            public final long totalElements = categoryPage.getTotalElements();
-            public final int totalPages = categoryPage.getTotalPages();
-            public final boolean hasNext = categoryPage.hasNext();
-            public final boolean hasPrevious = categoryPage.hasPrevious();
-            public final boolean isFirst = categoryPage.isFirst();
-            public final boolean isLast = categoryPage.isLast();
-        };
-
-        log.info("Fetched {} categories for page {}", categoryPage.getContent().size(), categoryPage.getNumber());
+        category.setIsActive(false);
+        category.setEditedTime(LocalDateTime.now());
+        category.setEditedBy(getAuthenticatedAccount().getAccountId());
+        shopCategoryRepo.save(category);
 
         return GlobeSuccessResponseBuilder.builder()
-                .message(message)
+                .message("Shop category deleted successfully")
                 .success(true)
-                .data(responseData)
+                .data("Shop category deleted successfully")
                 .build();
     }
+
+    @Override
+    public GlobeSuccessResponseBuilder activateShopCategory(UUID shopCategoryId) throws ItemNotFoundException {
+
+        ShopCategoryEntity category = shopCategoryRepo.findById(shopCategoryId).orElseThrow(
+                () -> new ItemNotFoundException("Shop category not found")
+        );
+
+        //Check it is ready inactive
+        if (category.getIsActive()) {
+            throw new ItemNotFoundException("Shop category is already active, cannot activate again");
+        }
+
+        category.setIsActive(true);
+        category.setEditedTime(LocalDateTime.now());
+        category.setEditedBy(getAuthenticatedAccount().getAccountId());
+        shopCategoryRepo.save(category);
+
+        return GlobeSuccessResponseBuilder.builder()
+                .message("Shop category activated successfully")
+                .success(true)
+                .data("Shop category activated successfully")
+                .build();
+    }
+
 
     private AccountEntity getAuthenticatedAccount() throws ItemNotFoundException {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -273,4 +204,5 @@ public class ShopCategoryServiceImpl implements ShopCategoryService {
         }
         throw new ItemNotFoundException("User not authenticated");
     }
+
 }

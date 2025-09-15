@@ -26,14 +26,12 @@ public class ShopCategoryEntity {
     private String categoryName;
     private String categoryDescription;
 
-    @Column(name = "icon_urls", columnDefinition = "jsonb")
-    @Convert(converter = StringListJsonConverter.class)
-    private List<String> categoryIconUrl = new ArrayList<>();
+    @Column(name = "icon_url", columnDefinition = "TEXT")
+    private String categoryIconUrl;
 
     private LocalDateTime createdTime;
     private LocalDateTime editedTime;
     private Boolean isActive;
-    private Boolean isDeleted;
     private UUID createdBy;
     private UUID editedBy;
 }

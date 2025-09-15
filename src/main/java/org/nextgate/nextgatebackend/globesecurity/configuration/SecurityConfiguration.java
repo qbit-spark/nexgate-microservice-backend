@@ -51,10 +51,10 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/**").permitAll()
 
+                        // All public endpoints
+                        .requestMatchers("/api/v1/shops/categories/all").permitAll()
+                        .requestMatchers("/api/v1/shops/categories/all-paged").permitAll()
 
-                        .requestMatchers("/jobrunr").permitAll()
-
-                        .requestMatchers("/api/v1/clients/**").permitAll()
 
                         .anyRequest().authenticated())
                 .httpBasic(Customizer.withDefaults())

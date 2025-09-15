@@ -1,32 +1,31 @@
 package org.nextgate.nextgatebackend.shops_mng_service.categories.repo;
 
-import jakarta.validation.constraints.NotNull;
 import org.nextgate.nextgatebackend.shops_mng_service.categories.entity.ShopCategoryEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
+import jakarta.persistence.criteria.Predicate;
 
 public interface ShopCategoryRepo extends JpaRepository<ShopCategoryEntity, UUID> {
 
     // BASIC FINDERS
-    ShopCategoryEntity findByCategoryNameAndIsDeletedFalse(String categoryName);
+    Optional<ShopCategoryEntity> findByCategoryId(UUID categoryId);
 
     // EXISTENCE CHECK
-    boolean existsByCategoryNameAndIsDeletedFalse(String categoryName);
+    boolean existsByCategoryName(String categoryName);
 
     // NON-PAGEABLE LISTS
-    List<ShopCategoryEntity> findByIsDeletedFalse();
-    List<ShopCategoryEntity> findByIsDeletedFalseAndIsActiveTrue();
+    List<ShopCategoryEntity> findByIsActive(Boolean isActive);
 
-    // PAGEABLE LISTS
-    Page<ShopCategoryEntity> findByIsDeletedFalseOrderByCreatedTimeDesc(Pageable pageable);
-    Page<ShopCategoryEntity> findByIsDeletedFalseAndIsActiveTrueOrderByCategoryNameAsc(Pageable pageable);
-    Page<ShopCategoryEntity> findByIsDeletedFalseOrderByCategoryNameAsc(Pageable pageable);
+    Page<ShopCategoryEntity> findByIsActive(Boolean isActive, Pageable pageable);
 
-    // SEARCH
-    Page<ShopCategoryEntity> findByIsDeletedFalseAndCategoryNameContainingIgnoreCase(String categoryName, Pageable pageable);
 
 }
