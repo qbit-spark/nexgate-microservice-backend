@@ -7,6 +7,7 @@ import org.nextgate.nextgatebackend.files_mng_service.payload.FileResponse;
 import org.nextgate.nextgatebackend.files_mng_service.payload.FileUploadResponse;
 import org.nextgate.nextgatebackend.files_mng_service.service.FileService;
 import org.nextgate.nextgatebackend.minio_service.service.MinioService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -26,6 +27,9 @@ public class FileServiceImpl implements FileService {
     private final MinioService minioService;
 
     private static final long MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
+
+    @Value("${files-server-url}")
+    private String files_server_url;
 
     // File type mappings
     private static final Set<String> IMAGE_TYPES = Set.of("image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp", "image/bmp", "image/svg+xml");
@@ -311,6 +315,6 @@ public class FileServiceImpl implements FileService {
     private String generatePublicUrl(UUID accountId, String objectKey) {
         // Generate direct MinIO URL without expiration - all files are public
         String bucketName = minioService.getBucketName(accountId);
-        return String.format("http://localhost:9005/%s/%s", bucketName, objectKey);
+        return String.format(files_server_url+"/%s/%s", bucketName, objectKey);
     }
 }

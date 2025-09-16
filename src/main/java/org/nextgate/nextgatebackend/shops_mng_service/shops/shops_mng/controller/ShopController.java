@@ -63,7 +63,7 @@ public class ShopController {
 
     @GetMapping("/all-paged")
     public ResponseEntity<GlobeSuccessResponseBuilder> getAllShopsPaged(
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
         Page<ShopEntity> shopPage = shopService.getAllShopsPaged(page, size);
         return ResponseEntity.ok(buildPagedResponse(shopPage, "Shops retrieved successfully"));
@@ -126,7 +126,7 @@ public class ShopController {
 
     @GetMapping("/my-shops-paged")
     public ResponseEntity<GlobeSuccessResponseBuilder> getMyShopsPaged(
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) throws ItemNotFoundException {
 
         Page<ShopEntity> shopPage = shopService.getMyShopsPaged(page, size);
@@ -165,7 +165,7 @@ public class ShopController {
     @GetMapping("/category/{categoryId}/paged")
     public ResponseEntity<GlobeSuccessResponseBuilder> getShopsByCategoryPaged(
             @PathVariable UUID categoryId,
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) throws ItemNotFoundException {
 
         Page<ShopEntity> shopPage = shopService.getShopsByCategoryPaged(categoryId, page, size);

@@ -26,4 +26,6 @@ public class ReviewResponse {
     private ReviewStatus status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private boolean isMyReview; // Add this field
+
 }

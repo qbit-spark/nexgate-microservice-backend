@@ -136,8 +136,11 @@ public class ShopCategoryServiceImpl implements ShopCategoryService {
     @Override
     @Transactional(readOnly = true)
     public Page<ShopCategoryEntity> getAllShopCategoriesPaged(Boolean isActive, int page, int size) {
+        // Convert 1-based page to 0-based and add validation
+        if (page < 1) page = 1;
+        if (size <= 0) size = 10;
 
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdTime"));
+        Pageable pageable = PageRequest.of(page - 1, size, Sort.by(Sort.Direction.DESC, "createdTime"));
 
         if (isActive != null) {
             return shopCategoryRepo.findByIsActive(isActive, pageable);

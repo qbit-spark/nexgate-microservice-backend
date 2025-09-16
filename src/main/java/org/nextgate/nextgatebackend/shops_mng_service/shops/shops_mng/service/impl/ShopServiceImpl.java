@@ -92,10 +92,10 @@ public class ShopServiceImpl implements ShopService {
     @Override
     @Transactional(readOnly = true)
     public Page<ShopEntity> getAllShopsPaged(int page, int size) {
-        if (page < 0) page = 0;
+        if (page < 1) page = 1;
         if (size <= 0) size = 10;
 
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = PageRequest.of(page - 1, size);
         return shopRepository.findByIsDeletedFalseOrderByCreatedAtDesc(pageable);
     }
 
@@ -189,10 +189,11 @@ public class ShopServiceImpl implements ShopService {
             throw new ItemNotFoundException("Category not found");
         }
 
-        if (page < 0) page = 0;
+        if (page < 1) page = 1;
         if (size <= 0) size = 10;
 
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = PageRequest.of(page - 1, size); // Subtract 1 here
+
         return shopRepository.findByCategoryCategoryIdAndIsDeletedFalseOrderByCreatedAtDesc(categoryId, pageable);
 
     }
@@ -216,10 +217,10 @@ public class ShopServiceImpl implements ShopService {
 
     @Override
     public Page<ShopEntity> getMyShopsPaged(int page, int size) throws ItemNotFoundException {
-        if (page < 0) page = 0;
+        if (page < 1) page = 1;
         if (size <= 0) size = 10;
 
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = PageRequest.of(page - 1, size); // Subtract 1 here
         return shopRepository.findByOwner(getAuthenticatedAccount(), pageable);
 
     }

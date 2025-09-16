@@ -14,7 +14,7 @@ import java.util.UUID;
 
 public interface ShopReviewService {
 
-    ShopReviewEntity createReview(CreateReviewRequest request) throws ItemNotFoundException, ItemReadyExistException, RandomExceptions;
+    ShopReviewEntity createReview(UUID shopId, CreateReviewRequest request) throws ItemNotFoundException, ItemReadyExistException, RandomExceptions;
 
     ShopReviewEntity updateReview(UUID shopId, UpdateReviewRequest request) throws ItemNotFoundException, RandomExceptions;
 
@@ -23,10 +23,6 @@ public interface ShopReviewService {
     List<ShopReviewEntity> getActiveReviewsByShop(UUID shopId) throws ItemNotFoundException;
 
     Page<ShopReviewEntity> getActiveReviewsByShopPaged(UUID shopId, int page, int size) throws ItemNotFoundException;
-
-    List<ShopReviewEntity> getReviewsByUser(UUID userId) throws ItemNotFoundException;
-
-    Page<ShopReviewEntity> getReviewsByUserPaged(UUID userId, int page, int size) throws ItemNotFoundException;
 
     ShopReviewEntity getUserReviewForShop(UUID shopId) throws ItemNotFoundException;
 

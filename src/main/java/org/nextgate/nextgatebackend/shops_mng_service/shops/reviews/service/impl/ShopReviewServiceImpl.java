@@ -40,11 +40,11 @@ public class ShopReviewServiceImpl implements ShopReviewService {
 
     @Override
     @Transactional
-    public ShopReviewEntity createReview(CreateReviewRequest request) throws ItemNotFoundException, ItemReadyExistException, RandomExceptions {
+    public ShopReviewEntity createReview(UUID shopId, CreateReviewRequest request) throws ItemNotFoundException, ItemReadyExistException, RandomExceptions {
 
         AccountEntity user = getAuthenticatedAccount();
 
-        ShopEntity shop = shopRepo.findById(request.getShopId())
+        ShopEntity shop = shopRepo.findById(shopId)
                 .orElseThrow(() -> new ItemNotFoundException("Shop not found"));
 
         if (shop.getIsDeleted()) {
@@ -55,7 +55,7 @@ public class ShopReviewServiceImpl implements ShopReviewService {
             throw new RandomExceptions("Shop owners cannot review their own shops");
         }
 
-        if (shopReviewRepo.existsByShopShopIdAndUserIdAndIsDeletedFalse(request.getShopId(), user.getId())) {
+        if (shopReviewRepo.existsByShopShopIdAndUserIdAndIsDeletedFalse(shopId, user.getId())) {
             throw new ItemReadyExistException("You have already reviewed this shop. Use update to change your review.");
         }
 
@@ -118,47 +118,19 @@ public class ShopReviewServiceImpl implements ShopReviewService {
             throw new ItemNotFoundException("Shop not found");
         }
 
-        if (page < 0) page = 0;
+        if (page < 1) page = 1;
         if (size <= 0) size = 10;
 
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = PageRequest.of(page - 1, size); // Subtract 1 here
+
         return shopReviewRepo.findByShopShopIdAndIsDeletedFalseAndStatusOrderByCreatedAtDesc(shopId, ReviewStatus.ACTIVE, pageable);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<ShopReviewEntity> getReviewsByUser(UUID userId) throws ItemNotFoundException {
-
-        if (!accountRepo.existsById(userId)) {
-            throw new ItemNotFoundException("User not found");
-        }
-
-        return shopReviewRepo.findByUserIdAndIsDeletedFalseOrderByCreatedAtDesc(userId);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Page<ShopReviewEntity> getReviewsByUserPaged(UUID userId, int page, int size) throws ItemNotFoundException {
-
-        if (!accountRepo.existsById(userId)) {
-            throw new ItemNotFoundException("User not found");
-        }
-
-        if (page < 0) page = 0;
-        if (size <= 0) size = 10;
-
-        Pageable pageable = PageRequest.of(page, size);
-        return shopReviewRepo.findByUserIdAndIsDeletedFalseOrderByCreatedAtDesc(userId, pageable);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
     public ShopReviewEntity getUserReviewForShop(UUID shopId) throws ItemNotFoundException {
-
         AccountEntity user = getAuthenticatedAccount();
-
-        return shopReviewRepo.findByShopShopIdAndUserIdAndIsDeletedFalse(shopId, user.getId())
-                .orElseThrow(() -> new ItemNotFoundException("You have not reviewed this shop yet"));
+        return shopReviewRepo.findByShopShopIdAndUserIdAndIsDeletedFalse(shopId, user.getId()).orElse(null);
     }
 
     @Override

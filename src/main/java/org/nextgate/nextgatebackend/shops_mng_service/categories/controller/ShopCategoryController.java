@@ -52,7 +52,7 @@ public class ShopCategoryController {
     @GetMapping("/all-paged")
     public ResponseEntity<GlobeSuccessResponseBuilder> getAllCategoriesPaged(
             @RequestParam(required = false) Boolean isActive,
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
 
         Page<ShopCategoryEntity> response = shopCategoryService.getAllShopCategoriesPaged(isActive, page, size);

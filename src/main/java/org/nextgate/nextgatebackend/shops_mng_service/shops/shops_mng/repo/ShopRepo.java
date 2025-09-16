@@ -23,4 +23,5 @@ public interface ShopRepo extends JpaRepository<ShopEntity, UUID> {
 
     List<ShopEntity> findByOwner(AccountEntity owner);
     Page<ShopEntity> findByOwner(AccountEntity owner, Pageable pageable);
+
 }

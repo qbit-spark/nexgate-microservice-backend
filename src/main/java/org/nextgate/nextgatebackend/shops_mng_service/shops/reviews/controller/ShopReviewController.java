@@ -2,6 +2,8 @@ package org.nextgate.nextgatebackend.shops_mng_service.shops.reviews.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
+import org.nextgate.nextgatebackend.authentication_service.repo.AccountRepo;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemReadyExistException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
@@ -14,24 +16,28 @@ import org.nextgate.nextgatebackend.shops_mng_service.shops.reviews.paylaod.Upda
 import org.nextgate.nextgatebackend.shops_mng_service.shops.reviews.service.ShopReviewService;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("api/v1/shops/reviews")
+@RequestMapping("api/v1/shops/reviews/{shopId}")
 @RequiredArgsConstructor
 public class ShopReviewController {
 
     private final ShopReviewService shopReviewService;
+    private final AccountRepo accountRepo;
 
     @PostMapping
     public ResponseEntity<GlobeSuccessResponseBuilder> createReview(
-            @Valid @RequestBody CreateReviewRequest request)
+            @Valid @RequestBody CreateReviewRequest request, @PathVariable UUID shopId)
             throws ItemNotFoundException, ItemReadyExistException, RandomExceptions {
 
-        ShopReviewEntity review = shopReviewService.createReview(request);
+        ShopReviewEntity review = shopReviewService.createReview(shopId, request);
         ReviewResponse response = buildReviewResponse(review);
 
         return ResponseEntity.ok(
@@ -39,7 +45,7 @@ public class ShopReviewController {
         );
     }
 
-    @PutMapping("/shop/{shopId}")
+    @PutMapping
     public ResponseEntity<GlobeSuccessResponseBuilder> updateReview(
             @PathVariable UUID shopId,
             @Valid @RequestBody UpdateReviewRequest request)
@@ -53,7 +59,7 @@ public class ShopReviewController {
         );
     }
 
-    @DeleteMapping("/shop/{shopId}")
+    @DeleteMapping
     public ResponseEntity<GlobeSuccessResponseBuilder> deleteReview(
             @PathVariable UUID shopId)
             throws ItemNotFoundException, RandomExceptions {
@@ -65,13 +71,15 @@ public class ShopReviewController {
         );
     }
 
-    @GetMapping("/shop/{shopId}")
+    @GetMapping("/active-reviews-by-shop")
     public ResponseEntity<GlobeSuccessResponseBuilder> getActiveReviewsByShop(
             @PathVariable UUID shopId) throws ItemNotFoundException {
 
+        AccountEntity currentUser = getAuthenticatedAccount();
         List<ShopReviewEntity> reviews = shopReviewService.getActiveReviewsByShop(shopId);
+
         List<ReviewResponse> responses = reviews.stream()
-                .map(this::buildReviewResponse)
+                .map(review -> buildReviewResponse(review, currentUser.getId())) // Use the overloaded method
                 .toList();
 
         return ResponseEntity.ok(
@@ -79,53 +87,35 @@ public class ShopReviewController {
         );
     }
 
-    @GetMapping("/shop/{shopId}/paged")
+    @GetMapping("/paged")
     public ResponseEntity<GlobeSuccessResponseBuilder> getActiveReviewsByShopPaged(
             @PathVariable UUID shopId,
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) throws ItemNotFoundException {
 
         Page<ShopReviewEntity> reviewPage = shopReviewService.getActiveReviewsByShopPaged(shopId, page, size);
         return ResponseEntity.ok(buildPagedResponse(reviewPage, "Shop reviews retrieved successfully"));
     }
 
-    @GetMapping("/user/{userId}")
-    public ResponseEntity<GlobeSuccessResponseBuilder> getReviewsByUser(
-            @PathVariable UUID userId) throws ItemNotFoundException {
 
-        List<ShopReviewEntity> reviews = shopReviewService.getReviewsByUser(userId);
-        List<ReviewResponse> responses = reviews.stream()
-                .map(this::buildReviewResponse)
-                .toList();
 
-        return ResponseEntity.ok(
-                GlobeSuccessResponseBuilder.success("User reviews retrieved successfully", responses)
-        );
-    }
-
-    @GetMapping("/user/{userId}/paged")
-    public ResponseEntity<GlobeSuccessResponseBuilder> getReviewsByUserPaged(
-            @PathVariable UUID userId,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) throws ItemNotFoundException {
-
-        Page<ShopReviewEntity> reviewPage = shopReviewService.getReviewsByUserPaged(userId, page, size);
-        return ResponseEntity.ok(buildPagedResponse(reviewPage, "User reviews retrieved successfully"));
-    }
-
-    @GetMapping("/my-review/shop/{shopId}")
+    @GetMapping("/my-review")
     public ResponseEntity<GlobeSuccessResponseBuilder> getMyReviewForShop(
             @PathVariable UUID shopId) throws ItemNotFoundException {
 
         ShopReviewEntity review = shopReviewService.getUserReviewForShop(shopId);
-        ReviewResponse response = buildReviewResponse(review);
+
+        ReviewResponse response = null;
+        if (review != null) {
+            response = buildReviewResponse(review);
+        }
 
         return ResponseEntity.ok(
                 GlobeSuccessResponseBuilder.success("Your review retrieved successfully", response)
         );
     }
 
-    @GetMapping("/summary/shop/{shopId}")
+    @GetMapping("/summary-shop-review")
     public ResponseEntity<GlobeSuccessResponseBuilder> getShopReviewSummary(
             @PathVariable UUID shopId) throws ItemNotFoundException {
 
@@ -156,6 +146,7 @@ public class ShopReviewController {
         return GlobeSuccessResponseBuilder.success(message, responseData);
     }
 
+    // Existing method - keep as is for backward compatibility
     private ReviewResponse buildReviewResponse(ShopReviewEntity review) {
         return ReviewResponse.builder()
                 .reviewId(review.getReviewId())
@@ -168,5 +159,32 @@ public class ShopReviewController {
                 .createdAt(review.getCreatedAt())
                 .updatedAt(review.getUpdatedAt())
                 .build();
+    }
+
+    // New overloaded method with current user ID
+    private ReviewResponse buildReviewResponse(ShopReviewEntity review, UUID currentUserId) {
+        return ReviewResponse.builder()
+                .reviewId(review.getReviewId())
+                .shopId(review.getShop().getShopId())
+                .shopName(review.getShop().getShopName())
+                .userId(review.getUser().getId())
+                .userName(review.getUser().getFirstName() + " " + review.getUser().getLastName())
+                .reviewText(review.getReviewText())
+                .status(review.getStatus())
+                .createdAt(review.getCreatedAt())
+                .updatedAt(review.getUpdatedAt())
+                .isMyReview(review.getUser().getId().equals(currentUserId))
+                .build();
+    }
+
+    private AccountEntity getAuthenticatedAccount() throws ItemNotFoundException {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated()) {
+            UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+            String userName = userDetails.getUsername();
+            return accountRepo.findByUserName(userName)
+                    .orElseThrow(() -> new ItemNotFoundException("User not found"));
+        }
+        throw new ItemNotFoundException("User not authenticated");
     }
 }
