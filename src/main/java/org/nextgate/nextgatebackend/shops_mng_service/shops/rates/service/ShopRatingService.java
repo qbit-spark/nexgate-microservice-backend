@@ -14,15 +14,13 @@ import java.util.UUID;
 
 public interface ShopRatingService {
 
-    ShopRatingEntity createRating(CreateRatingRequest request) throws ItemNotFoundException, ItemReadyExistException, RandomExceptions;
+    ShopRatingEntity createRating(UUID shopId, CreateRatingRequest request) throws ItemNotFoundException, ItemReadyExistException, RandomExceptions;
 
     ShopRatingEntity updateRating(UUID shopId, UpdateRatingRequest request) throws ItemNotFoundException, RandomExceptions;
 
     void deleteRating(UUID shopId) throws ItemNotFoundException, RandomExceptions;
 
     List<ShopRatingEntity> getRatingsByShop(UUID shopId) throws ItemNotFoundException;
-
-    List<ShopRatingEntity> getRatingsByUser(UUID userId) throws ItemNotFoundException;
 
     ShopRatingEntity getUserRatingForShop(UUID shopId) throws ItemNotFoundException;
 

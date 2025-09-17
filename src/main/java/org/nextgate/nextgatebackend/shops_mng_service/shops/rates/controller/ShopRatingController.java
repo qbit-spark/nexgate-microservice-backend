@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("api/v1/shops/ratings")
+@RequestMapping("api/v1/shops/ratings/{shopId}")
 @RequiredArgsConstructor
 public class ShopRatingController {
 
@@ -27,10 +27,10 @@ public class ShopRatingController {
 
     @PostMapping
     public ResponseEntity<GlobeSuccessResponseBuilder> createRating(
-            @Valid @RequestBody CreateRatingRequest request)
+            @Valid @RequestBody CreateRatingRequest request, @PathVariable UUID shopId)
             throws ItemNotFoundException, ItemReadyExistException, RandomExceptions {
 
-        ShopRatingEntity rating = shopRatingService.createRating(request);
+        ShopRatingEntity rating = shopRatingService.createRating(shopId, request);
         RatingResponse response = buildRatingResponse(rating);
 
         return ResponseEntity.ok(
@@ -38,7 +38,7 @@ public class ShopRatingController {
         );
     }
 
-    @PutMapping("/shop/{shopId}")
+    @PutMapping
     public ResponseEntity<GlobeSuccessResponseBuilder> updateRating(
             @PathVariable UUID shopId,
             @Valid @RequestBody UpdateRatingRequest request)
@@ -52,7 +52,7 @@ public class ShopRatingController {
         );
     }
 
-    @DeleteMapping("/shop/{shopId}")
+    @DeleteMapping
     public ResponseEntity<GlobeSuccessResponseBuilder> deleteRating(
             @PathVariable UUID shopId)
             throws ItemNotFoundException, RandomExceptions {
@@ -64,7 +64,7 @@ public class ShopRatingController {
         );
     }
 
-    @GetMapping("/shop/{shopId}")
+    @GetMapping
     public ResponseEntity<GlobeSuccessResponseBuilder> getRatingsByShop(
             @PathVariable UUID shopId) throws ItemNotFoundException {
 
@@ -78,21 +78,8 @@ public class ShopRatingController {
         );
     }
 
-    @GetMapping("/user/{userId}")
-    public ResponseEntity<GlobeSuccessResponseBuilder> getRatingsByUser(
-            @PathVariable UUID userId) throws ItemNotFoundException {
 
-        List<ShopRatingEntity> ratings = shopRatingService.getRatingsByUser(userId);
-        List<RatingResponse> responses = ratings.stream()
-                .map(this::buildRatingResponse)
-                .toList();
-
-        return ResponseEntity.ok(
-                GlobeSuccessResponseBuilder.success("User ratings retrieved successfully", responses)
-        );
-    }
-
-    @GetMapping("/my-rating/shop/{shopId}")
+    @GetMapping("/my-rating")
     public ResponseEntity<GlobeSuccessResponseBuilder> getMyRatingForShop(
             @PathVariable UUID shopId) throws ItemNotFoundException {
 
@@ -104,7 +91,7 @@ public class ShopRatingController {
         );
     }
 
-    @GetMapping("/summary/shop/{shopId}")
+    @GetMapping("/summary")
     public ResponseEntity<GlobeSuccessResponseBuilder> getShopRatingSummary(
             @PathVariable UUID shopId) throws ItemNotFoundException {
 

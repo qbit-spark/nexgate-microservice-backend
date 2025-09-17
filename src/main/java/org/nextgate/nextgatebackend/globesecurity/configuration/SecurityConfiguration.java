@@ -59,6 +59,7 @@ public class SecurityConfiguration {
                         .requestMatchers("/api/v1/shops/{shopId}").permitAll()
                         .requestMatchers("/api/v1/shops/category/{categoryId}/paged").permitAll()
                         .requestMatchers("/api/v1/shops/category/{categoryId}").permitAll()
+                        .requestMatchers("/api/v1/shops/reviews/{shopId}/active-reviews-by-shop").permitAll()
 
 
                         .anyRequest().authenticated())

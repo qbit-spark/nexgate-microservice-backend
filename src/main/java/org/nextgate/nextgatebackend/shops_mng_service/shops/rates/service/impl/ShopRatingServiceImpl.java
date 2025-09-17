@@ -38,11 +38,11 @@ public class ShopRatingServiceImpl implements ShopRatingService {
 
     @Override
     @Transactional
-    public ShopRatingEntity createRating(CreateRatingRequest request) throws ItemNotFoundException, ItemReadyExistException, RandomExceptions {
+    public ShopRatingEntity createRating(UUID shopId, CreateRatingRequest request) throws ItemNotFoundException, ItemReadyExistException, RandomExceptions {
 
         AccountEntity user = getAuthenticatedAccount();
 
-        ShopEntity shop = shopRepo.findById(request.getShopId())
+        ShopEntity shop = shopRepo.findById(shopId)
                 .orElseThrow(() -> new ItemNotFoundException("Shop not found"));
 
         if (shop.getIsDeleted()) {
@@ -53,7 +53,7 @@ public class ShopRatingServiceImpl implements ShopRatingService {
             throw new RandomExceptions("Shop owners cannot rate their own shops");
         }
 
-        if (shopRatingRepo.existsByShopShopIdAndUserIdAndIsDeletedFalse(request.getShopId(), user.getId())) {
+        if (shopRatingRepo.existsByShopShopIdAndUserIdAndIsDeletedFalse(shopId, user.getId())) {
             throw new ItemReadyExistException("You have already rated this shop. Use update to change your rating.");
         }
 
@@ -105,17 +105,6 @@ public class ShopRatingServiceImpl implements ShopRatingService {
         }
 
         return shopRatingRepo.findByShopShopIdAndIsDeletedFalseOrderByCreatedAtDesc(shopId);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<ShopRatingEntity> getRatingsByUser(UUID userId) throws ItemNotFoundException {
-
-        if (!accountRepo.existsById(userId)) {
-            throw new ItemNotFoundException("User not found");
-        }
-
-        return shopRatingRepo.findByUserIdAndIsDeletedFalseOrderByCreatedAtDesc(userId);
     }
 
     @Override
