@@ -25,4 +25,7 @@ public interface ShopRatingService {
     ShopRatingEntity getUserRatingForShop(UUID shopId) throws ItemNotFoundException;
 
     ShopRatingSummaryResponse getShopRatingSummary(UUID shopId) throws ItemNotFoundException;
+
+    Double getShopAverageRating(UUID shopId);
+    Long getShopTotalRatings(UUID shopId);
 }

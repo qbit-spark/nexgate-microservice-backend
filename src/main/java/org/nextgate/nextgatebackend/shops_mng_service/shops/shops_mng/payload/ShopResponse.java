@@ -4,10 +4,10 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.nextgate.nextgatebackend.shops_mng_service.shops.reviews.paylaod.ReviewResponse;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.enums.ShopStatus;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.enums.ShopType;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.enums.VerificationBadge;
-
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -78,4 +78,12 @@ public class ShopResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime approvedAt;
+
+    // NEW: Rating Summary Fields
+    private Double averageRating;
+    private Long totalRatings;
+
+    // NEW: Review Summary Fields
+    private Long totalActiveReviews;
+    private List<ReviewResponse> reviews;
 }

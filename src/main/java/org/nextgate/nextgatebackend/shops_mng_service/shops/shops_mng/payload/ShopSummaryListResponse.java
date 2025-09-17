@@ -13,7 +13,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
-
 @Data
 @Builder
 @NoArgsConstructor
@@ -50,7 +49,6 @@ public class ShopSummaryListResponse {
     private String city;
     private String region;
 
-
     // Trust & verification
     private Boolean isVerified;
     private VerificationBadge verificationBadge;
@@ -64,4 +62,10 @@ public class ShopSummaryListResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime approvedAt;
+
+    // NEW: Rating and Review Summary Fields
+    private Double averageRating;
+    private Long totalRatings;
+    private Long totalActiveReviews;
+    private List<ReviewSummary> topReviews; // THIS IS THE CORRECT TYPE
 }

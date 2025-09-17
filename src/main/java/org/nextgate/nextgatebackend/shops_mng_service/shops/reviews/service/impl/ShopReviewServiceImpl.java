@@ -155,6 +155,12 @@ public class ShopReviewServiceImpl implements ShopReviewService {
                 .build();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Long getShopActiveReviewCount(UUID shopId) {
+        return shopReviewRepo.countByShopShopIdAndIsDeletedFalseAndStatus(shopId, ReviewStatus.ACTIVE);
+    }
+
     private AccountEntity getAuthenticatedAccount() throws ItemNotFoundException {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.isAuthenticated()) {

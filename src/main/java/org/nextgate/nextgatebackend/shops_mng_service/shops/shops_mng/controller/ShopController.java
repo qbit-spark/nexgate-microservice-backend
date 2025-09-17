@@ -10,6 +10,11 @@ import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemReadyExistException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
 import org.nextgate.nextgatebackend.globeresponsebody.GlobeSuccessResponseBuilder;
+import org.nextgate.nextgatebackend.shops_mng_service.shops.rates.entity.ShopRatingEntity;
+import org.nextgate.nextgatebackend.shops_mng_service.shops.rates.service.ShopRatingService;
+import org.nextgate.nextgatebackend.shops_mng_service.shops.reviews.entity.ShopReviewEntity;
+import org.nextgate.nextgatebackend.shops_mng_service.shops.reviews.paylaod.ReviewResponse;
+import org.nextgate.nextgatebackend.shops_mng_service.shops.reviews.service.ShopReviewService;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.entity.ShopEntity;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.payload.*;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.service.ShopService;
@@ -33,6 +38,8 @@ public class ShopController {
 
     private final ShopService shopService;
     private final AccountRepo accountRepo;
+    private final ShopRatingService shopRatingService;
+    private final ShopReviewService shopReviewService;
 
     @PostMapping
     public ResponseEntity<GlobeSuccessResponseBuilder> createShop(
@@ -47,7 +54,6 @@ public class ShopController {
         );
     }
 
-
     @GetMapping("/all")
     public ResponseEntity<GlobeSuccessResponseBuilder> getAllShops() {
         List<ShopEntity> shops = shopService.getAllShops();
@@ -60,15 +66,13 @@ public class ShopController {
         );
     }
 
-
     @GetMapping("/all-paged")
     public ResponseEntity<GlobeSuccessResponseBuilder> getAllShopsPaged(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
         Page<ShopEntity> shopPage = shopService.getAllShopsPaged(page, size);
-        return ResponseEntity.ok(buildPagedResponse(shopPage, "Shops retrieved successfully"));
+        return ResponseEntity.ok(buildPagedSummaryResponse(shopPage, "Shops retrieved successfully"));
     }
-
 
     @PutMapping("/{shopId}")
     public ResponseEntity<GlobeSuccessResponseBuilder> updateShop(
@@ -83,7 +87,6 @@ public class ShopController {
                 GlobeSuccessResponseBuilder.success("Shop updated successfully", shopResponse)
         );
     }
-
 
     @GetMapping("/{shopId}/detailed")
     public ResponseEntity<GlobeSuccessResponseBuilder> getShopDetailedById(
@@ -121,7 +124,6 @@ public class ShopController {
         return ResponseEntity.ok(
                 GlobeSuccessResponseBuilder.success("My shops retrieved successfully", shopResponses)
         );
-
     }
 
     @GetMapping("/my-shops-paged")
@@ -146,7 +148,6 @@ public class ShopController {
         );
     }
 
-
     @GetMapping("/category/{categoryId}")
     public ResponseEntity<GlobeSuccessResponseBuilder> getShopsByCategory(
             @PathVariable UUID categoryId) throws ItemNotFoundException {
@@ -161,7 +162,6 @@ public class ShopController {
         );
     }
 
-
     @GetMapping("/category/{categoryId}/paged")
     public ResponseEntity<GlobeSuccessResponseBuilder> getShopsByCategoryPaged(
             @PathVariable UUID categoryId,
@@ -169,11 +169,29 @@ public class ShopController {
             @RequestParam(defaultValue = "10") int size) throws ItemNotFoundException {
 
         Page<ShopEntity> shopPage = shopService.getShopsByCategoryPaged(categoryId, page, size);
-        return ResponseEntity.ok(buildPagedResponse(shopPage, "Shops by category retrieved successfully"));
+        return ResponseEntity.ok(buildPagedSummaryResponse(shopPage, "Shops by category retrieved successfully"));
     }
 
-
+    // RESPONSE BUILDERS
     private ShopResponse buildShopResponse(ShopEntity shop) {
+        // Get rating data
+        Double averageRating = shopRatingService.getShopAverageRating(shop.getShopId());
+        Long totalRatings = shopRatingService.getShopTotalRatings(shop.getShopId());
+
+        // Get review data
+        Long totalActiveReviews = shopReviewService.getShopActiveReviewCount(shop.getShopId());
+        List<ShopReviewEntity> reviewEntities;
+        try {
+            reviewEntities = shopReviewService.getActiveReviewsByShop(shop.getShopId());
+        } catch (ItemNotFoundException e) {
+            reviewEntities = List.of(); // Empty list if no reviews found
+        }
+
+        // Convert review entities to response objects
+        List<ReviewResponse> reviews = reviewEntities.stream()
+                .map(this::buildReviewResponseForShop)
+                .toList();
+
         return ShopResponse.builder()
                 .shopId(shop.getShopId())
                 .shopName(shop.getShopName())
@@ -216,10 +234,21 @@ public class ShopController {
                 .updatedAt(shop.getUpdatedAt())
                 .approvedAt(shop.getApprovedAt())
                 .isApproved(shop.isApproved())
+                // NEW: Rating and Review Summary
+                .averageRating(averageRating)
+                .totalRatings(totalRatings)
+                .totalActiveReviews(totalActiveReviews)
+                .reviews(reviews)
                 .build();
     }
 
     private ShopSummaryListResponse buildShopSummaryListResponse(ShopEntity shop) {
+        // Get rating and review data for summary
+        Double averageRating = shopRatingService.getShopAverageRating(shop.getShopId());
+        Long totalRatings = shopRatingService.getShopTotalRatings(shop.getShopId());
+        Long totalActiveReviews = shopReviewService.getShopActiveReviewCount(shop.getShopId());
+        List<ReviewSummary> topReviews = getTop5ReviewsForShop(shop.getShopId());
+
         return ShopSummaryListResponse.builder()
                 .shopId(shop.getShopId())
                 .shopName(shop.getShopName())
@@ -250,7 +279,50 @@ public class ShopController {
                 .updatedAt(shop.getUpdatedAt())
                 .approvedAt(shop.getApprovedAt())
                 .isApproved(shop.isApproved())
+                // NEW: Rating and Review Summary
+                .averageRating(averageRating)
+                .totalRatings(totalRatings)
+                .totalActiveReviews(totalActiveReviews)
+                .topReviews(topReviews)
+                .build();
+    }
 
+    // HELPER METHODS
+    private ReviewResponse buildReviewResponseForShop(ShopReviewEntity review) {
+        return ReviewResponse.builder()
+                .reviewId(review.getReviewId())
+                .shopId(review.getShop().getShopId())
+                .shopName(review.getShop().getShopName())
+                .userId(review.getUser().getId())
+                .userName(review.getUser().getFirstName() + " " + review.getUser().getLastName())
+                .reviewText(review.getReviewText())
+                .status(review.getStatus())
+                .createdAt(review.getCreatedAt())
+                .updatedAt(review.getUpdatedAt())
+                .build();
+    }
+
+    private List<ReviewSummary> getTop5ReviewsForShop(UUID shopId) {
+        try {
+            List<ShopReviewEntity> reviews = shopReviewService.getActiveReviewsByShop(shopId)
+                    .stream()
+                    .limit(5)
+                    .toList();
+
+            return reviews.stream()
+                    .map(this::buildReviewSummary)
+                    .toList();
+        } catch (ItemNotFoundException e) {
+            return List.of(); // Return empty list if no reviews found
+        }
+    }
+
+    private ReviewSummary buildReviewSummary(ShopReviewEntity review) {
+        return ReviewSummary.builder()
+                .reviewId(review.getReviewId())
+                .userName(review.getUser().getFirstName() + " " + review.getUser().getLastName())
+                .reviewText(review.getReviewText())
+                .createdAt(review.getCreatedAt())
                 .build();
     }
 
@@ -275,6 +347,25 @@ public class ShopController {
         return GlobeSuccessResponseBuilder.success(message, responseData);
     }
 
+    private GlobeSuccessResponseBuilder buildPagedSummaryResponse(Page<ShopEntity> shopPage, String message) {
+        List<ShopSummaryListResponse> shopResponses = shopPage.getContent().stream()
+                .map(this::buildShopSummaryListResponse)
+                .toList();
+
+        var responseData = new Object() {
+            public final List<ShopSummaryListResponse> shops = shopResponses;
+            public final int currentPage = shopPage.getNumber();
+            public final int pageSize = shopPage.getSize();
+            public final long totalElements = shopPage.getTotalElements();
+            public final int totalPages = shopPage.getTotalPages();
+            public final boolean hasNext = shopPage.hasNext();
+            public final boolean hasPrevious = shopPage.hasPrevious();
+            public final boolean isFirst = shopPage.isFirst();
+            public final boolean isLast = shopPage.isLast();
+        };
+
+        return GlobeSuccessResponseBuilder.success(message, responseData);
+    }
 
     private AccountEntity getAuthenticatedAccount() throws ItemNotFoundException {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -287,7 +378,6 @@ public class ShopController {
 
         throw new ItemNotFoundException("User not authenticated");
     }
-
 
     public void validateRole(AccountEntity account, String... requiredRoles) throws AccessDeniedException {
         if (account == null) {
@@ -310,25 +400,5 @@ public class ShopController {
         if (!hasRequiredRole) {
             throw new AccessDeniedException("Access denied. Insufficient permissions.");
         }
-    }
-
-    private GlobeSuccessResponseBuilder buildPagedSummaryResponse(Page<ShopEntity> shopPage, String message) {
-        List<ShopSummaryListResponse> shopResponses = shopPage.getContent().stream()
-                .map(this::buildShopSummaryListResponse)  // Use summary builder instead
-                .toList();
-
-        var responseData = new Object() {
-            public final List<ShopSummaryListResponse> shops = shopResponses;
-            public final int currentPage = shopPage.getNumber();
-            public final int pageSize = shopPage.getSize();
-            public final long totalElements = shopPage.getTotalElements();
-            public final int totalPages = shopPage.getTotalPages();
-            public final boolean hasNext = shopPage.hasNext();
-            public final boolean hasPrevious = shopPage.hasPrevious();
-            public final boolean isFirst = shopPage.isFirst();
-            public final boolean isLast = shopPage.isLast();
-        };
-
-        return GlobeSuccessResponseBuilder.success(message, responseData);
     }
 }

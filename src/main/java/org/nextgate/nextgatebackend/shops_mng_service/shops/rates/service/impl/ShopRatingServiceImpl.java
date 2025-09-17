@@ -154,6 +154,28 @@ public class ShopRatingServiceImpl implements ShopRatingService {
                 .build();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Double getShopAverageRating(UUID shopId) {
+        List<ShopRatingEntity> ratings = shopRatingRepo.findByShopShopIdAndIsDeletedFalse(shopId);
+
+        if (ratings.isEmpty()) {
+            return 0.0;
+        }
+
+        int sum = ratings.stream()
+                .mapToInt(ShopRatingEntity::getRatingValue)
+                .sum();
+
+        return Math.round((double) sum / ratings.size() * 10.0) / 10.0;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Long getShopTotalRatings(UUID shopId) {
+        return shopRatingRepo.countByShopShopIdAndIsDeletedFalse(shopId);
+    }
+
     private AccountEntity getAuthenticatedAccount() throws ItemNotFoundException {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.isAuthenticated()) {

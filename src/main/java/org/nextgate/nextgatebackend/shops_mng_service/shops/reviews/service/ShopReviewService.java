@@ -27,4 +27,7 @@ public interface ShopReviewService {
     ShopReviewEntity getUserReviewForShop(UUID shopId) throws ItemNotFoundException;
 
     ShopReviewSummaryResponse getShopReviewSummary(UUID shopId) throws ItemNotFoundException;
+
+    Long getShopActiveReviewCount(UUID shopId);
+
 }
