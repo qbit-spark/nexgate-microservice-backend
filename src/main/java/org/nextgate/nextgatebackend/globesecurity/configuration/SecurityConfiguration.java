@@ -60,7 +60,8 @@ public class SecurityConfiguration {
                         .requestMatchers("/api/v1/shops/category/{categoryId}/paged").permitAll()
                         .requestMatchers("/api/v1/shops/category/{categoryId}").permitAll()
                         .requestMatchers("/api/v1/shops/reviews/{shopId}/active-reviews-by-shop").permitAll()
-
+                        .requestMatchers("/api/v1/products/categories/all").permitAll()
+                        .requestMatchers("/api/v1/products/categories/parent-categories").permitAll()
 
                         .anyRequest().authenticated())
                 .httpBasic(Customizer.withDefaults())
