@@ -9,6 +9,7 @@ import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemReadyExistExcepti
 import org.nextgate.nextgatebackend.globeresponsebody.GlobeSuccessResponseBuilder;
 import org.nextgate.nextgatebackend.products_mng_service.categories.entity.ProductCategoryEntity;
 import org.nextgate.nextgatebackend.products_mng_service.categories.payload.CreateProductCategoryRequest;
+import org.nextgate.nextgatebackend.products_mng_service.categories.payload.ProductCategoryResponse;
 import org.nextgate.nextgatebackend.products_mng_service.categories.repo.ProductCategoryRepo;
 import org.nextgate.nextgatebackend.products_mng_service.categories.service.ProductCategoryService;
 import org.springframework.data.domain.Page;
@@ -34,13 +35,17 @@ public class ProductCategoryServiceImpl implements ProductCategoryService {
     private final AccountRepo accountRepo;
 
     @Override
+    @Transactional
     public GlobeSuccessResponseBuilder createProductCategory(CreateProductCategoryRequest request)
             throws ItemReadyExistException, ItemNotFoundException {
 
-        // Check if category already exists
+        // Check if category name already exists
         if (productCategoryRepo.existsByCategoryName(request.getCategoryName())) {
             throw new ItemReadyExistException("Product category with this name already exists");
         }
+
+        // Get authenticated user
+        AccountEntity user = getAuthenticatedAccount();
 
         // Create new category
         ProductCategoryEntity category = new ProductCategoryEntity();
@@ -56,73 +61,88 @@ public class ProductCategoryServiceImpl implements ProductCategoryService {
         }
 
         category.setIsActive(true);
-        UUID accountId = getAuthenticatedAccount().getAccountId();
-        category.setCreatedBy(accountId);
-        category.setEditedBy(accountId);
+        category.setCreatedBy(user.getId());
+        category.setEditedBy(user.getId());
 
+        // Save category
         ProductCategoryEntity savedCategory = productCategoryRepo.save(category);
+        ProductCategoryResponse response = buildCategoryResponse(savedCategory);
 
-        return GlobeSuccessResponseBuilder.builder()
-                .message("Product category created successfully")
-                .success(true)
-                .data(savedCategory)
-                .build();
+        log.info("Product category created successfully: {} by user: {}",
+                savedCategory.getCategoryName(), user.getUserName());
+
+        return GlobeSuccessResponseBuilder.success(
+                "Product category created successfully",
+                response
+        );
     }
 
     @Override
+    @Transactional
     public GlobeSuccessResponseBuilder updateProductCategory(UUID categoryId, CreateProductCategoryRequest request)
             throws ItemNotFoundException, ItemReadyExistException {
 
+        // Find existing category
         ProductCategoryEntity category = productCategoryRepo.findById(categoryId)
                 .orElseThrow(() -> new ItemNotFoundException("Product category not found"));
 
-        // Check if new name already exists (if different from current)
+        // Check if new name already exists (if name is being changed)
         if (!category.getCategoryName().equals(request.getCategoryName()) &&
                 productCategoryRepo.existsByCategoryName(request.getCategoryName())) {
             throw new ItemReadyExistException("Product category with this name already exists");
         }
 
-        // Update category
+        // Get authenticated user
+        AccountEntity user = getAuthenticatedAccount();
+
+        // Update category fields
         category.setCategoryName(request.getCategoryName());
         category.setCategoryDescription(request.getCategoryDescription());
         category.setCategoryIconUrl(request.getCategoryIconUrl());
 
-        // Handle parent category
+        // Handle parent category update
         if (request.getParentCategoryId() != null) {
             ProductCategoryEntity parentCategory = productCategoryRepo.findById(request.getParentCategoryId())
                     .orElseThrow(() -> new ItemNotFoundException("Parent category not found"));
             category.setParentCategory(parentCategory);
         } else {
-            category.setParentCategory(null);
+            category.setParentCategory(null); // Remove parent if not provided
         }
 
-        category.setEditedBy(getAuthenticatedAccount().getAccountId());
+        category.setEditedBy(user.getId());
 
+        // Save updated category
         ProductCategoryEntity updatedCategory = productCategoryRepo.save(category);
+        ProductCategoryResponse response = buildCategoryResponse(updatedCategory);
 
-        return GlobeSuccessResponseBuilder.builder()
-                .message("Product category updated successfully")
-                .success(true)
-                .data(updatedCategory)
-                .build();
+        log.info("Product category updated successfully: {} by user: {}",
+                updatedCategory.getCategoryName(), user.getUserName());
+
+        return GlobeSuccessResponseBuilder.success(
+                "Product category updated successfully",
+                response
+        );
     }
 
     @Override
     @Transactional(readOnly = true)
     public GlobeSuccessResponseBuilder getProductCategory(UUID categoryId) throws ItemNotFoundException {
+
         ProductCategoryEntity category = productCategoryRepo.findById(categoryId)
                 .orElseThrow(() -> new ItemNotFoundException("Product category not found"));
 
-        return GlobeSuccessResponseBuilder.builder()
-                .message("Product category retrieved successfully")
-                .success(true)
-                .data(category)
-                .build();
+        ProductCategoryResponse response = buildCategoryResponse(category);
+
+        return GlobeSuccessResponseBuilder.success(
+                "Product category retrieved successfully",
+                response
+        );
     }
 
     @Override
     @Transactional(readOnly = true)
     public GlobeSuccessResponseBuilder getAllProductCategories(Boolean isActive) {
+
         List<ProductCategoryEntity> categories;
 
         if (isActive != null) {
@@ -131,16 +151,20 @@ public class ProductCategoryServiceImpl implements ProductCategoryService {
             categories = productCategoryRepo.findAll(Sort.by(Sort.Direction.DESC, "createdTime"));
         }
 
-        return GlobeSuccessResponseBuilder.builder()
-                .message("Product categories retrieved successfully")
-                .success(true)
-                .data(categories)
-                .build();
+        List<ProductCategoryResponse> responses = categories.stream()
+                .map(this::buildCategoryResponse)
+                .toList();
+
+        return GlobeSuccessResponseBuilder.success(
+                "Product categories retrieved successfully",
+                responses
+        );
     }
 
     @Override
     @Transactional(readOnly = true)
     public Page<ProductCategoryEntity> getAllProductCategoriesPaged(Boolean isActive, int page, int size) {
+
         if (page < 1) page = 1;
         if (size <= 0) size = 10;
 
@@ -156,34 +180,44 @@ public class ProductCategoryServiceImpl implements ProductCategoryService {
     @Override
     @Transactional(readOnly = true)
     public GlobeSuccessResponseBuilder getParentCategories() {
+
         List<ProductCategoryEntity> parentCategories =
                 productCategoryRepo.findByParentCategoryIsNullAndIsActiveTrueOrderByCreatedTimeDesc();
 
-        return GlobeSuccessResponseBuilder.builder()
-                .message("Parent categories retrieved successfully")
-                .success(true)
-                .data(parentCategories)
-                .build();
+        List<ProductCategoryResponse> responses = parentCategories.stream()
+                .map(this::buildCategoryResponse)
+                .toList();
+
+        return GlobeSuccessResponseBuilder.success(
+                "Parent categories retrieved successfully",
+                responses
+        );
     }
 
     @Override
     @Transactional(readOnly = true)
     public GlobeSuccessResponseBuilder getChildCategories(UUID parentId) throws ItemNotFoundException {
+
         ProductCategoryEntity parentCategory = productCategoryRepo.findById(parentId)
                 .orElseThrow(() -> new ItemNotFoundException("Parent category not found"));
 
         List<ProductCategoryEntity> childCategories =
                 productCategoryRepo.findByParentCategoryAndIsActiveTrueOrderByCreatedTimeDesc(parentCategory);
 
-        return GlobeSuccessResponseBuilder.builder()
-                .message("Child categories retrieved successfully")
-                .success(true)
-                .data(childCategories)
-                .build();
+        List<ProductCategoryResponse> responses = childCategories.stream()
+                .map(this::buildCategoryResponse)
+                .toList();
+
+        return GlobeSuccessResponseBuilder.success(
+                "Child categories retrieved successfully",
+                responses
+        );
     }
 
     @Override
+    @Transactional
     public GlobeSuccessResponseBuilder deleteProductCategory(UUID categoryId) throws ItemNotFoundException {
+
         ProductCategoryEntity category = productCategoryRepo.findById(categoryId)
                 .orElseThrow(() -> new ItemNotFoundException("Product category not found"));
 
@@ -192,19 +226,26 @@ public class ProductCategoryServiceImpl implements ProductCategoryService {
             throw new ItemNotFoundException("Product category is already inactive");
         }
 
+        // Get authenticated user
+        AccountEntity user = getAuthenticatedAccount();
+
+        // Soft delete - mark as inactive
         category.setIsActive(false);
-        category.setEditedBy(getAuthenticatedAccount().getAccountId());
+        category.setEditedBy(user.getId());
         productCategoryRepo.save(category);
 
-        return GlobeSuccessResponseBuilder.builder()
-                .message("Product category deleted successfully")
-                .success(true)
-                .data("Product category deleted successfully")
-                .build();
+        log.info("Product category deleted successfully: {} by user: {}",
+                category.getCategoryName(), user.getUserName());
+
+        return GlobeSuccessResponseBuilder.success(
+                "Product category deleted successfully"
+        );
     }
 
     @Override
+    @Transactional
     public GlobeSuccessResponseBuilder activateProductCategory(UUID categoryId) throws ItemNotFoundException {
+
         ProductCategoryEntity category = productCategoryRepo.findById(categoryId)
                 .orElseThrow(() -> new ItemNotFoundException("Product category not found"));
 
@@ -213,15 +254,43 @@ public class ProductCategoryServiceImpl implements ProductCategoryService {
             throw new ItemNotFoundException("Product category is already active");
         }
 
+        // Get authenticated user
+        AccountEntity user = getAuthenticatedAccount();
+
+        // Activate category
         category.setIsActive(true);
-        category.setEditedBy(getAuthenticatedAccount().getAccountId());
+        category.setEditedBy(user.getId());
         productCategoryRepo.save(category);
 
-        return GlobeSuccessResponseBuilder.builder()
-                .message("Product category activated successfully")
-                .success(true)
-                .data("Product category activated successfully")
-                .build();
+        log.info("Product category activated successfully: {} by user: {}",
+                category.getCategoryName(), user.getUserName());
+
+        return GlobeSuccessResponseBuilder.success(
+                "Product category activated successfully"
+        );
+    }
+
+    // HELPER METHODS
+
+    private ProductCategoryResponse buildCategoryResponse(ProductCategoryEntity category) {
+        ProductCategoryResponse.ProductCategoryResponseBuilder builder = ProductCategoryResponse.builder()
+                .categoryId(category.getCategoryId())
+                .categoryName(category.getCategoryName())
+                .categoryDescription(category.getCategoryDescription())
+                .categoryIconUrl(category.getCategoryIconUrl())
+                .createdTime(category.getCreatedTime())
+                .editedTime(category.getEditedTime())
+                .isActive(category.getIsActive())
+                .createdBy(category.getCreatedBy())
+                .editedBy(category.getEditedBy());
+
+        // Safely handle parent category information
+        if (category.getParentCategory() != null) {
+            builder.parentCategoryId(category.getParentCategory().getCategoryId())
+                    .parentCategoryName(category.getParentCategory().getCategoryName());
+        }
+
+        return builder.build();
     }
 
     private AccountEntity getAuthenticatedAccount() throws ItemNotFoundException {

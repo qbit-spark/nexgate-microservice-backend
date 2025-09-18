@@ -17,7 +17,8 @@ public interface ProductCategoryService {
     GlobeSuccessResponseBuilder updateProductCategory(UUID categoryId, CreateProductCategoryRequest request)
             throws ItemNotFoundException, ItemReadyExistException;
 
-    GlobeSuccessResponseBuilder getProductCategory(UUID categoryId) throws ItemNotFoundException;
+    GlobeSuccessResponseBuilder getProductCategory(UUID categoryId)
+            throws ItemNotFoundException;
 
     GlobeSuccessResponseBuilder getAllProductCategories(Boolean isActive);
 
@@ -25,9 +26,12 @@ public interface ProductCategoryService {
 
     GlobeSuccessResponseBuilder getParentCategories();
 
-    GlobeSuccessResponseBuilder getChildCategories(UUID parentId) throws ItemNotFoundException;
+    GlobeSuccessResponseBuilder getChildCategories(UUID parentId)
+            throws ItemNotFoundException;
 
-    GlobeSuccessResponseBuilder deleteProductCategory(UUID categoryId) throws ItemNotFoundException;
+    GlobeSuccessResponseBuilder deleteProductCategory(UUID categoryId)
+            throws ItemNotFoundException;
 
-    GlobeSuccessResponseBuilder activateProductCategory(UUID categoryId) throws ItemNotFoundException;
+    GlobeSuccessResponseBuilder activateProductCategory(UUID categoryId)
+            throws ItemNotFoundException;
 }

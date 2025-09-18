@@ -1,5 +1,7 @@
+// src/main/java/org/nextgate/nextgatebackend/products_mng_service/categories/entity/ProductCategoryEntity.java
 package org.nextgate.nextgatebackend.products_mng_service.categories.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -15,6 +17,7 @@ import java.util.UUID;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class ProductCategoryEntity {
 
     @Id
@@ -32,6 +35,7 @@ public class ProductCategoryEntity {
     // Hierarchical categories - parent category
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_category_id")
+    @JsonIgnoreProperties({"parentCategory", "hibernateLazyInitializer", "handler"}) // Prevent circular reference
     private ProductCategoryEntity parentCategory;
 
     private LocalDateTime createdTime;

@@ -22,7 +22,7 @@ public class ProductCategoryController {
 
     private final ProductCategoryService productCategoryService;
 
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    //@PreAuthorize("hasRole('SUPER_ADMIN')")
     @PostMapping
     public GlobeSuccessResponseBuilder createCategory(@Valid @RequestBody CreateProductCategoryRequest request)
             throws ItemReadyExistException, ItemNotFoundException {
