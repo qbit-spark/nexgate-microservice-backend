@@ -16,6 +16,7 @@ import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.payload.Up
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.repo.ShopRepo;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.service.ShopService;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
@@ -24,6 +25,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -238,6 +241,43 @@ public class ShopServiceImpl implements ShopService {
 
     }
 
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ShopEntity> getFeaturedShops() {
+        List<ShopEntity> allShops = shopRepository.findByIsDeletedFalseAndIsApprovedTrueOrderByCreatedAtDesc();
+
+        // Shuffle the list to randomize
+        List<ShopEntity> shuffledShops = new ArrayList<>(allShops);
+        Collections.shuffle(shuffledShops);
+
+        // Return up to 20 random shops
+        return shuffledShops.stream()
+                .limit(20)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ShopEntity> getFeaturedShopsPaged(int page, int size) {
+        if (page < 1) page = 1;
+        if (size <= 0) size = 10;
+
+        // Get all shops and shuffle them
+        List<ShopEntity> allShops = shopRepository.findByIsDeletedFalseAndIsApprovedTrueOrderByCreatedAtDesc();
+        List<ShopEntity> shuffledShops = new ArrayList<>(allShops);
+        Collections.shuffle(shuffledShops);
+
+        // Manual pagination on the shuffled list
+        int start = (page - 1) * size;
+        int end = Math.min(start + size, shuffledShops.size());
+
+        List<ShopEntity> pageContent = start < shuffledShops.size() ?
+                shuffledShops.subList(start, end) : new ArrayList<>();
+
+        // Create a Page object manually
+        return new PageImpl<>(pageContent, PageRequest.of(page - 1, size), shuffledShops.size());
+    }
 
     private AccountEntity getAuthenticatedAccount() throws ItemNotFoundException {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();

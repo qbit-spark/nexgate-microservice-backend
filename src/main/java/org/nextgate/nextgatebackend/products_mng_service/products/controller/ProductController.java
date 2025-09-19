@@ -7,6 +7,7 @@ import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemReadyExistExcepti
 import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
 import org.nextgate.nextgatebackend.globeresponsebody.GlobeSuccessResponseBuilder;
 import org.nextgate.nextgatebackend.products_mng_service.products.payload.CreateProductRequest;
+import org.nextgate.nextgatebackend.products_mng_service.products.payload.UpdateProductRequest;
 import org.nextgate.nextgatebackend.products_mng_service.products.service.ProductService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,10 +22,6 @@ public class ProductController {
 
     private final ProductService productService;
 
-    /**
-     * Create a new product for a specific shop
-     * Only shop owners can create products for their shops
-     */
     @PostMapping
     public ResponseEntity<GlobeSuccessResponseBuilder> createProduct(
             @PathVariable UUID shopId,
@@ -35,4 +32,17 @@ public class ProductController {
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
+
+    @PutMapping("/{productId}")
+    public ResponseEntity<GlobeSuccessResponseBuilder> updateProduct(
+            @PathVariable UUID productId,
+            @PathVariable UUID shopId,
+            @Valid @RequestBody UpdateProductRequest request)
+            throws ItemNotFoundException, ItemReadyExistException, RandomExceptions {
+
+        GlobeSuccessResponseBuilder response = productService.updateProduct(productId, request);
+
+        return ResponseEntity.ok(response);
+    }
+
 }

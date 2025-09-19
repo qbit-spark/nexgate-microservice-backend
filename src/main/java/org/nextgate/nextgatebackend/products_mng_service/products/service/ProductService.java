@@ -29,8 +29,8 @@ public interface ProductService {
 //    /**
 //     * Update an existing product - Only shop owner can update their products
 //     */
-//    GlobeSuccessResponseBuilder updateProduct(UUID productId, UpdateProductRequest request)
-//            throws ItemNotFoundException, ItemReadyExistException, RandomExceptions;
+    GlobeSuccessResponseBuilder updateProduct(UUID productId, UpdateProductRequest request)
+            throws ItemNotFoundException, ItemReadyExistException, RandomExceptions;
 //
 //    /**
 //     * Get detailed product information - For shop owners and admins

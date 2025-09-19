@@ -20,6 +20,7 @@ public interface ProductRepo extends JpaRepository<ProductEntity, UUID> {
     // ========================
 
     Optional<ProductEntity> findByProductIdAndIsDeletedFalse(UUID productId);
+    Optional<ProductEntity> findByProductIdAndShop_shopIdAndIsDeletedFalse(UUID productId, UUID shopId);
 
     Optional<ProductEntity> findByProductSlugAndIsDeletedFalse(String productSlug);
 

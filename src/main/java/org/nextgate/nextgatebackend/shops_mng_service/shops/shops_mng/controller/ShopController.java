@@ -172,6 +172,28 @@ public class ShopController {
         return ResponseEntity.ok(buildPagedSummaryResponse(shopPage, "Shops by category retrieved successfully"));
     }
 
+    @GetMapping("/featured")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getFeaturedShops() {
+        List<ShopEntity> featuredShops = shopService.getFeaturedShops();
+        List<ShopSummaryListResponse> shopResponses = featuredShops.stream()
+                .map(this::buildShopSummaryListResponse)
+                .toList();
+
+        return ResponseEntity.ok(
+                GlobeSuccessResponseBuilder.success("Featured shops retrieved successfully", shopResponses)
+        );
+    }
+
+    @GetMapping("/featured-paged")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getFeaturedShopsPaged(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        Page<ShopEntity> shopPage = shopService.getFeaturedShopsPaged(page, size);
+        return ResponseEntity.ok(buildPagedSummaryResponse(shopPage, "Featured shops retrieved successfully"));
+    }
+
+
+
     // RESPONSE BUILDERS
     private ShopResponse buildShopResponse(ShopEntity shop) {
         // Get rating data

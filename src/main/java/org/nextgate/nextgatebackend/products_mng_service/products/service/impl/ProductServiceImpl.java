@@ -13,6 +13,7 @@ import org.nextgate.nextgatebackend.products_mng_service.categories.repo.Product
 import org.nextgate.nextgatebackend.products_mng_service.products.entity.ProductEntity;
 import org.nextgate.nextgatebackend.products_mng_service.products.payload.CreateProductRequest;
 import org.nextgate.nextgatebackend.products_mng_service.products.payload.ProductResponse;
+import org.nextgate.nextgatebackend.products_mng_service.products.payload.UpdateProductRequest;
 import org.nextgate.nextgatebackend.products_mng_service.products.repo.ProductRepo;
 import org.nextgate.nextgatebackend.products_mng_service.products.service.ProductService;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.entity.ShopEntity;
@@ -27,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 @Service
 @RequiredArgsConstructor
@@ -157,8 +159,128 @@ public class ProductServiceImpl implements ProductService {
         );
     }
 
-    // HELPER METHODS
+    @Override
+    @Transactional
+    public GlobeSuccessResponseBuilder updateProduct(UUID productId, UpdateProductRequest request)
+            throws ItemNotFoundException, ItemReadyExistException, RandomExceptions {
 
+        // Get authenticated user
+        AccountEntity user = getAuthenticatedAccount();
+
+        // Find existing product
+        ProductEntity product = productRepo.findByProductIdAndIsDeletedFalse(productId)
+                .orElseThrow(() -> new ItemNotFoundException("Product not found"));
+
+        // Verify user owns the shop that owns this product
+        if (!product.getShop().getOwner().getId().equals(user.getId())) {
+            throw new RandomExceptions("You can only update products from shops you own");
+        }
+
+        // Check if shop is still approved and active
+        if (product.getShop().getIsDeleted()) {
+            throw new RandomExceptions("Cannot update products from deleted shops");
+        }
+
+        if (!product.getShop().isApproved()) {
+            throw new RandomExceptions("Cannot update products from unapproved shops");
+        }
+
+        // Check product name uniqueness if name is being changed
+        if (request.getProductName() != null &&
+                !product.getProductName().equals(request.getProductName())) {
+
+            if (productRepo.existsByProductNameAndBrandAndPriceAndShopAndIsDeletedFalse(
+                    request.getProductName(),
+                    request.getBrand() != null ? request.getBrand() : product.getBrand(),
+                    request.getPrice() != null ? request.getPrice() : product.getPrice(),
+                    product.getShop())) {
+                throw new ItemReadyExistException("A product with the same name, brand, and price already exists in this shop");
+            }
+
+            // Update name and regenerate slug only if name changed
+            product.setProductName(request.getProductName());
+            String newSlug = generateUniqueSlugForShop(request.getProductName(), product.getShop().getShopId());
+            product.setProductSlug(newSlug);
+        }
+
+        // Check SKU uniqueness if SKU is being changed
+        if (request.getSku() != null && !request.getSku().trim().isEmpty()) {
+            if (!product.getSku().equals(request.getSku()) &&
+                    productRepo.existsBySkuAndIsDeletedFalse(request.getSku())) {
+                throw new ItemReadyExistException("A product with this SKU already exists");
+            }
+            product.setSku(request.getSku());
+        }
+
+        // Validate category if being changed
+        if (request.getCategoryId() != null) {
+            ProductCategoryEntity category = productCategoryRepo.findById(request.getCategoryId())
+                    .orElseThrow(() -> new ItemNotFoundException("Product category not found"));
+
+            if (!category.getIsActive()) {
+                throw new RandomExceptions("Cannot assign products to inactive categories");
+            }
+
+            product.setCategory(category);
+        }
+
+        // Update fields using utility method (much cleaner!)
+        updateIfNotNull(product::setProductDescription, request.getProductDescription());
+        updateIfNotNull(product::setShortDescription, request.getShortDescription());
+        updateIfNotNull(product::setProductImages, request.getProductImages());
+
+        // Pricing updates
+        updateIfNotNull(product::setPrice, request.getPrice());
+        updateIfNotNull(product::setComparePrice, request.getComparePrice());
+
+        // Inventory updates
+        updateIfNotNull(product::setStockQuantity, request.getStockQuantity());
+        updateIfNotNull(product::setLowStockThreshold, request.getLowStockThreshold());
+        updateIfNotNull(product::setTrackInventory, request.getTrackInventory());
+
+        // Product details
+        updateIfNotNull(product::setBrand, request.getBrand());
+
+        // Physical properties
+        updateIfNotNull(product::setWeight, request.getWeight());
+        updateIfNotNull(product::setLength, request.getLength());
+        updateIfNotNull(product::setWidth, request.getWidth());
+        updateIfNotNull(product::setHeight, request.getHeight());
+
+        // Status and condition
+        updateIfNotNull(product::setCondition, request.getCondition());
+        updateIfNotNull(product::setStatus, request.getStatus());
+
+        // SEO and tags
+        updateIfNotNull(product::setTags, request.getTags());
+        updateIfNotNull(product::setMetaTitle, request.getMetaTitle());
+        updateIfNotNull(product::setMetaDescription, request.getMetaDescription());
+
+        // Features
+        updateIfNotNull(product::setIsFeatured, request.getIsFeatured());
+        updateIfNotNull(product::setIsDigital, request.getIsDigital());
+        updateIfNotNull(product::setRequiresShipping, request.getRequiresShipping());
+
+        // Update system fields
+        product.setEditedBy(user.getId());
+
+        // Save updated product
+        ProductEntity updatedProduct = productRepo.save(product);
+        ProductResponse response = buildProductResponse(updatedProduct);
+
+        log.info("Product updated successfully: {} in shop: {} by user: {}",
+                updatedProduct.getProductName(),
+                updatedProduct.getShop().getShopName(),
+                user.getUserName());
+
+        return GlobeSuccessResponseBuilder.success(
+                "Product updated successfully",
+                response
+        );
+    }
+
+
+    // HELPER METHODS
     private ProductResponse buildProductResponse(ProductEntity product) {
         return ProductResponse.builder()
                 .productId(product.getProductId())
@@ -257,4 +379,11 @@ public class ProductServiceImpl implements ProductService {
                 .replaceAll("^-|-$", "");
     }
 
+
+    //Handle updates if value is not null
+    private <T> void updateIfNotNull(Consumer<T> setter, T value) {
+        if (value != null) {
+            setter.accept(value);
+        }
+    }
 }

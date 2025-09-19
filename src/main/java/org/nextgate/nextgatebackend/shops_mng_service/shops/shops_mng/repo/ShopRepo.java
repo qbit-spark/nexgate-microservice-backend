@@ -25,4 +25,7 @@ public interface ShopRepo extends JpaRepository<ShopEntity, UUID> {
     Page<ShopEntity> findByOwner(AccountEntity owner, Pageable pageable);
     boolean existsByShopSlugAndIsDeletedFalse(String shopSlug);
 
+    // Get all active approved shops for randomization
+    List<ShopEntity> findByIsDeletedFalseAndIsApprovedTrueOrderByCreatedAtDesc();
+    Page<ShopEntity> findByIsDeletedFalseAndIsApprovedTrueOrderByCreatedAtDesc(Pageable pageable);
 }

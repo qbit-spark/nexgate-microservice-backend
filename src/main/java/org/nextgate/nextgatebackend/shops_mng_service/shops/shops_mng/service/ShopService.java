@@ -30,4 +30,6 @@ public interface ShopService {
     List<ShopEntity> getMyShops() throws ItemNotFoundException;
     Page<ShopEntity> getMyShopsPaged( int page, int size) throws ItemNotFoundException;
 
+    List<ShopEntity> getFeaturedShops();
+    Page<ShopEntity> getFeaturedShopsPaged(int page, int size);
 }
