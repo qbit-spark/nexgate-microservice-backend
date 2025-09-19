@@ -135,14 +135,6 @@ public class ProductController {
     }
 
 
-    @GetMapping("/my-shops-summary")
-    public ResponseEntity<GlobeSuccessResponseBuilder> getMyShopsProductsSummary()
-            throws ItemNotFoundException {
-
-        GlobeSuccessResponseBuilder response = productService.getMyShopsProductsSummary();
-
-        return ResponseEntity.ok(response);
-    }
 
 
     private ProductResponse buildProductResponse(ProductEntity product) {
