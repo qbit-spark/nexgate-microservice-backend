@@ -78,6 +78,8 @@ public class ShopServiceImpl implements ShopService {
         shop.setTaxNumber(request.getTaxNumber());
         shop.setLicenseNumber(request.getLicenseNumber());
         shop.setPromotionText(request.getPromotionText());
+        String uniqueSlug = generateUniqueShopSlug(request.getShopName());
+        shop.setShopSlug(uniqueSlug);
 
         return shopRepository.save(shop);
     }
@@ -122,7 +124,18 @@ public class ShopServiceImpl implements ShopService {
             shop.setCategory(category);
         }
 
-        if (request.getShopName() != null) shop.setShopName(request.getShopName());
+        // Update shop name and regenerate slug if name changed
+        if (request.getShopName() != null) {
+            // Check if name actually changed
+            if (!shop.getShopName().equals(request.getShopName())) {
+                shop.setShopName(request.getShopName());
+
+                // Regenerate slug only if name changed
+                String newSlug = generateUniqueShopSlug(request.getShopName());
+                shop.setShopSlug(newSlug);
+            }
+        }
+
         if (request.getShopDescription() != null) shop.setShopDescription(request.getShopDescription());
         if (request.getTagline() != null) shop.setTagline(request.getTagline());
         if (request.getLogoUrl() != null) shop.setLogoUrl(request.getLogoUrl());
@@ -235,5 +248,33 @@ public class ShopServiceImpl implements ShopService {
                     .orElseThrow(() -> new ItemNotFoundException("User not found"));
         }
         throw new ItemNotFoundException("User not authenticated");
+    }
+
+    // Add these helper methods at the bottom of ShopServiceImpl class:
+
+    private String generateUniqueShopSlug(String shopName) {
+        String baseSlug = createBaseSlug(shopName);
+        String slug = baseSlug;
+        int counter = 2;
+
+        while (shopRepository.existsByShopSlugAndIsDeletedFalse(slug)) {
+            slug = baseSlug + "-" + counter;
+            counter++;
+        }
+
+        return slug;
+    }
+
+    private String createBaseSlug(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            return "shop";
+        }
+
+        return name.toLowerCase()
+                .trim()
+                .replaceAll("[^a-z0-9\\s-]", "")
+                .replaceAll("\\s+", "-")
+                .replaceAll("-+", "-")
+                .replaceAll("^-|-$", "");
     }
 }

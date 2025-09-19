@@ -140,6 +140,10 @@ public class ProductServiceImpl implements ProductService {
         product.setEditedBy(user.getId());
         product.setIsDeleted(false);
 
+        //Slug
+        String uniqueSlug = generateUniqueSlugForShop(request.getProductName(), shopId);
+        product.setProductSlug(uniqueSlug);
+
         // Save product
         ProductEntity savedProduct = productRepo.save(product);
         ProductResponse response = buildProductResponse(savedProduct);
@@ -224,6 +228,33 @@ public class ProductServiceImpl implements ProductService {
                     .orElseThrow(() -> new ItemNotFoundException("User not found"));
         }
         throw new ItemNotFoundException("User not authenticated");
+    }
+
+    private String generateUniqueSlugForShop(String productName, UUID shopId) {
+        String baseSlug = createBaseSlug(productName);
+        String slug = baseSlug;
+        int counter = 2;
+
+        // Check uniqueness only within the same shop
+        while (productRepo.existsByProductSlugAndShop_ShopIdAndIsDeletedFalse(slug, shopId)) {
+            slug = baseSlug + "-" + counter;
+            counter++;
+        }
+
+        return slug;
+    }
+
+    private String createBaseSlug(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            return "product";
+        }
+
+        return name.toLowerCase()
+                .trim()
+                .replaceAll("[^a-z0-9\\s-]", "")
+                .replaceAll("\\s+", "-")
+                .replaceAll("-+", "-")
+                .replaceAll("^-|-$", "");
     }
 
 }

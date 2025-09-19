@@ -34,8 +34,6 @@ public class CreateProductRequest {
     @NotNull(message = "Category is required")
     private UUID categoryId;
 
-    @NotNull(message = "Shop is required")
-    private UUID shopId;
 
     // OPTIONAL FIELDS
     @Size(max = 200, message = "Short description must not exceed 200 characters")
@@ -77,6 +75,7 @@ public class CreateProductRequest {
     private ProductStatus status = ProductStatus.ACTIVE;
 
     // COLLECTIONS
+    @NotNull(message = "Product images list cannot be empty")
     private List<@URL(message = "Product image URLs must be valid") String> productImages;
     private List<@Size(max = 50, message = "Each tag must not exceed 50 characters") String> tags;
 

@@ -192,9 +192,6 @@ public class ShopEntity {
     protected void onCreate() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
-        if (shopSlug == null && shopName != null) {
-            shopSlug = generateSlugFromName(shopName);
-        }
     }
 
     @PreUpdate
@@ -202,13 +199,6 @@ public class ShopEntity {
         updatedAt = LocalDateTime.now();
     }
 
-    private String generateSlugFromName(String name) {
-        return name.toLowerCase()
-                .replaceAll("[^a-z0-9\\s-]", "")
-                .replaceAll("\\s+", "-")
-                .replaceAll("-+", "-")
-                .replaceAll("^-|-$", "");
-    }
 
     // Business Logic Methods
     public boolean isPhysicalShop() {
