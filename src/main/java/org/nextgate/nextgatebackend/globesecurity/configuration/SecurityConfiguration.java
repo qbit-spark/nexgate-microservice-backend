@@ -59,6 +59,7 @@ public class SecurityConfiguration {
                         .requestMatchers("/api/v1/shops/featured").permitAll()
                         .requestMatchers("/api/v1/shops/featured-paged").permitAll()
                         .requestMatchers("/api/v1/shops/{shopId}").permitAll()
+                        .requestMatchers("/api/v1/shops/{shopId}/summary-stats").permitAll()
                         .requestMatchers("/api/v1/shops/category/{categoryId}/paged").permitAll()
                         .requestMatchers("/api/v1/shops/category/{categoryId}").permitAll()
                         .requestMatchers("/api/v1/shops/reviews/{shopId}/active-reviews-by-shop").permitAll()

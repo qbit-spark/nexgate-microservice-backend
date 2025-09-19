@@ -11,9 +11,11 @@ import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemReadyExistExcepti
 import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
 import org.nextgate.nextgatebackend.globeresponsebody.GlobeSuccessResponseBuilder;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.rates.entity.ShopRatingEntity;
+import org.nextgate.nextgatebackend.shops_mng_service.shops.rates.payloads.ShopRatingSummaryResponse;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.rates.service.ShopRatingService;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.reviews.entity.ShopReviewEntity;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.reviews.paylaod.ReviewResponse;
+import org.nextgate.nextgatebackend.shops_mng_service.shops.reviews.paylaod.ShopReviewSummaryResponse;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.reviews.service.ShopReviewService;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.entity.ShopEntity;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.payload.*;
@@ -25,10 +27,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
+import java.time.LocalDateTime;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
@@ -192,6 +192,37 @@ public class ShopController {
         return ResponseEntity.ok(buildPagedSummaryResponse(shopPage, "Featured shops retrieved successfully"));
     }
 
+    @GetMapping("/{shopId}/summary-stats")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getShopSummaryStats(
+            @PathVariable UUID shopId) throws ItemNotFoundException {
+
+        // Get rating summary
+        ShopRatingSummaryResponse ratingSummary = shopRatingService.getShopRatingSummary(shopId);
+
+        // Get review summary
+        ShopReviewSummaryResponse reviewSummary = shopReviewService.getShopReviewSummary(shopId);
+
+        // Get user activities (reviews + ratings combined)
+        List<UserActivitySummary> userActivities = buildUserActivitySummary(shopId);
+
+        // Build combined response
+        ShopSummaryStatsResponse stats = ShopSummaryStatsResponse.builder()
+                .shopId(shopId)
+                .shopName(ratingSummary.getShopName())
+                .averageRating(ratingSummary.getAverageRating())
+                .totalRatings(ratingSummary.getTotalRatings())
+                .ratingDistribution(ratingSummary.getRatingDistribution())
+                .totalReviews(reviewSummary.getTotalReviews())
+                .activeReviews(reviewSummary.getActiveReviews())
+                .hiddenReviews(reviewSummary.getHiddenReviews())
+                .flaggedReviews(reviewSummary.getFlaggedReviews())
+                .userActivities(userActivities)
+                .build();
+
+        return ResponseEntity.ok(
+                GlobeSuccessResponseBuilder.success("Shop summary stats retrieved successfully", stats)
+        );
+    }
 
 
     // RESPONSE BUILDERS
@@ -423,4 +454,69 @@ public class ShopController {
             throw new AccessDeniedException("Access denied. Insufficient permissions.");
         }
     }
+
+    private List<UserActivitySummary> buildUserActivitySummary(UUID shopId) throws ItemNotFoundException {
+
+        // Get all reviews for this shop
+        List<ShopReviewEntity> reviews = shopReviewService.getActiveReviewsByShop(shopId);
+
+        // Get all ratings for this shop
+        List<ShopRatingEntity> ratings = shopRatingService.getRatingsByShop(shopId);
+
+        // Create a map to combine user activities
+        Map<UUID, UserActivitySummary> userActivityMap = new HashMap<>();
+
+        // Process reviews
+        for (ShopReviewEntity review : reviews) {
+            UUID userId = review.getUser().getId();
+            String userName = review.getUser().getFirstName() + " " + review.getUser().getLastName();
+
+            UserActivitySummary activity = userActivityMap.getOrDefault(userId,
+                    UserActivitySummary.builder()
+                            .userId(userId)
+                            .userName(userName)
+                            .hasReview(false)
+                            .hasRating(false)
+                            .build());
+
+            activity.setReviewId(review.getReviewId());
+            activity.setReviewText(review.getReviewText());
+            activity.setReviewStatus(review.getStatus());
+            activity.setReviewDate(review.getCreatedAt());
+            activity.setHasReview(true);
+
+            userActivityMap.put(userId, activity);
+        }
+
+        // Process ratings
+        for (ShopRatingEntity rating : ratings) {
+            UUID userId = rating.getUser().getId();
+            String userName = rating.getUser().getFirstName() + " " + rating.getUser().getLastName();
+
+            UserActivitySummary activity = userActivityMap.getOrDefault(userId,
+                    UserActivitySummary.builder()
+                            .userId(userId)
+                            .userName(userName)
+                            .hasReview(false)
+                            .hasRating(false)
+                            .build());
+
+            activity.setRatingId(rating.getRatingId());
+            activity.setRatingValue(rating.getRatingValue());
+            activity.setRatingDate(rating.getCreatedAt());
+            activity.setHasRating(true);
+
+            userActivityMap.put(userId, activity);
+        }
+
+        // Return sorted by most recent activity
+        return userActivityMap.values().stream()
+                .sorted((a, b) -> {
+                    LocalDateTime dateA = a.getReviewDate() != null ? a.getReviewDate() : a.getRatingDate();
+                    LocalDateTime dateB = b.getReviewDate() != null ? b.getReviewDate() : b.getRatingDate();
+                    return dateB.compareTo(dateA); // Most recent first
+                })
+                .toList();
+    }
+
 }
