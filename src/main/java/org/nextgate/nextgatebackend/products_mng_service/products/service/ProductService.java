@@ -35,26 +35,26 @@ public interface ProductService {
 //    /**
 //     * Get detailed product information - For shop owners and admins
 //     */
-//    GlobeSuccessResponseBuilder getProductDetailed(UUID productId)
-//            throws ItemNotFoundException, RandomExceptions;
+    GlobeSuccessResponseBuilder getProductDetailed(UUID productId)
+            throws ItemNotFoundException, RandomExceptions;
 //
 //    /**
 //     * Soft delete a product - Only shop owner can delete their products
 //     */
-//    GlobeSuccessResponseBuilder deleteProduct(UUID productId)
-//            throws ItemNotFoundException, RandomExceptions;
+    GlobeSuccessResponseBuilder deleteProduct(UUID productId)
+            throws ItemNotFoundException, RandomExceptions;
 //
 //    /**
 //     * Update product status - Shop owner can change status
 //     */
-//    GlobeSuccessResponseBuilder updateProductStatus(UUID productId, ProductStatus status)
-//            throws ItemNotFoundException, RandomExceptions;
+    GlobeSuccessResponseBuilder updateProductStatus(UUID productId, ProductStatus status)
+            throws ItemNotFoundException, RandomExceptions;
 //
 //    /**
 //     * Update product stock quantity
 //     */
-//    GlobeSuccessResponseBuilder updateProductStock(UUID productId, Integer newStock)
-//            throws ItemNotFoundException, RandomExceptions;
+    GlobeSuccessResponseBuilder updateProductStock(UUID productId, Integer newStock)
+            throws ItemNotFoundException, RandomExceptions;
 //
 //    // ========================
 //    // SHOP OWNER PRODUCT QUERIES
@@ -63,20 +63,15 @@ public interface ProductService {
 //    /**
 //     * Get products by specific shop ID - For shop owners managing their inventory
 //     */
-//    GlobeSuccessResponseBuilder getProductsByShop(UUID shopId)
-//            throws ItemNotFoundException, RandomExceptions;
+    GlobeSuccessResponseBuilder getProductsByShop(UUID shopId)
+            throws ItemNotFoundException, RandomExceptions;
 //
 //    /**
 //     * Get products by shop with pagination - For shop owners
 //     */
-//    Page<ProductEntity> getProductsByShopPaged(UUID shopId, int page, int size)
-//            throws ItemNotFoundException, RandomExceptions;
-//
-//    /**
-//     * Get all my shops' products summary - Returns products grouped by shop
-//     */
-//    GlobeSuccessResponseBuilder getMyShopsProductsSummary()
-//            throws ItemNotFoundException;
+    Page<ProductEntity> getProductsByShopPaged(UUID shopId, int page, int size)
+            throws ItemNotFoundException, RandomExceptions;
+
 //
 //    /**
 //     * Get products by shop and status - For inventory management
