@@ -16,6 +16,7 @@ import org.nextgate.nextgatebackend.products_mng_service.products.enums.ReqActio
 import org.nextgate.nextgatebackend.products_mng_service.products.payload.*;
 import org.nextgate.nextgatebackend.products_mng_service.products.repo.ProductRepo;
 import org.nextgate.nextgatebackend.products_mng_service.products.service.ProductService;
+import org.nextgate.nextgatebackend.products_mng_service.products.utils.helpers.ProductBuildResponseHelper;
 import org.nextgate.nextgatebackend.products_mng_service.products.utils.helpers.ProductHelperMethods;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.entity.ShopEntity;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.repo.ShopRepo;
@@ -46,6 +47,7 @@ public class ProductServiceImpl implements ProductService {
     private final ProductCategoryRepo productCategoryRepo;
     private final AccountRepo accountRepo;
     private final ProductHelperMethods productHelperMethods;
+    private final ProductBuildResponseHelper productBuildResponseHelper;
 
     @Override
     @Transactional
@@ -170,6 +172,90 @@ public class ProductServiceImpl implements ProductService {
         );
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public GlobeSuccessResponseBuilder getProductDetailed(UUID shopId, UUID productId)
+            throws ItemNotFoundException, RandomExceptions {
+
+        // 1. Get authenticated user
+        AccountEntity authenticatedAccount = getAuthenticatedAccount();
+
+        //2. Validate shop existence
+        ShopEntity shop = shopRepo.findById(shopId)
+                .orElseThrow(() -> new ItemNotFoundException("Shop not found"));
+
+        // 2. Find product
+        ProductEntity product = productRepo.findByProductIdAndIsDeletedFalse(productId)
+                .orElseThrow(() -> new ItemNotFoundException("Product not found"));
+
+        // Ensure the product belongs to the specified shop
+        if (!product.getShop().getShopId().equals(shopId)) {
+            throw new ItemNotFoundException("Product does not belong to the specified shop");
+        }
+
+        //3. Check if the authenticated user is the owner or admin
+        boolean isValidToCreateProduct = validateSystemRolesOrOwner(List.of("ROLE_SUPER_ADMIN", "ROLE_STAFF_ADMIN"), authenticatedAccount, shop);
+        if (!isValidToCreateProduct) {
+            throw new RandomExceptions("You do not have permission to create a product for this shop");
+        }
+
+        // 4. Build comprehensive response with all features
+        ProductDetailedResponse response = productBuildResponseHelper.buildDetailedProductResponse(product);
+
+
+        return GlobeSuccessResponseBuilder.success(
+                "Product details retrieved successfully",
+                response
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public GlobeSuccessResponseBuilder getProductsByShop(UUID shopId)
+            throws ItemNotFoundException, RandomExceptions {
+
+        //1. Get the authenticated user
+        AccountEntity authenticatedAccount = getAuthenticatedAccount();
+
+        //2. Validate shop existence
+        ShopEntity shop = shopRepo.findById(shopId)
+                .orElseThrow(() -> new ItemNotFoundException("Shop not found"));
+
+        if (shop.getIsDeleted()) {
+            throw new ItemNotFoundException("Shop not found");
+        }
+
+        //3. Check if the authenticated user is the owner or admin
+        boolean isValidToViewProducts = validateSystemRolesOrOwner(
+                List.of("ROLE_SUPER_ADMIN", "ROLE_STAFF_ADMIN"), authenticatedAccount, shop);
+        if (!isValidToViewProducts) {
+            throw new RandomExceptions("You do not have permission to view products for this shop");
+        }
+
+        //4. Get products with minimal data for performance
+        List<ProductEntity> products = productRepo.findByShopAndIsDeletedFalseOrderByCreatedAtDesc(shop);
+
+        //5. Build lightweight response list
+        List<ProductSummaryResponse> responses = products.stream()
+                .map(productBuildResponseHelper::buildProductSummaryResponse)
+                .toList();
+
+        //6. Build summary statistics
+        ProductSummaryResponse.ProductListSummary summary = productBuildResponseHelper.buildProductListSummary(products, shop);
+
+        //7. Build final response
+        ProductSummaryResponse.ShopProductsListResponse finalResponse = ProductSummaryResponse.ShopProductsListResponse.builder()
+                .shop(productBuildResponseHelper.buildShopSummaryForProducts(shop))
+                .summary(summary)
+                .products(responses)
+                .totalProducts(responses.size())
+                .build();
+
+        return GlobeSuccessResponseBuilder.success(
+                String.format("Retrieved %d products from shop: %s", products.size(), shop.getShopName()),
+                finalResponse
+        );
+    }
 
     // HELPER METHODS
     private AccountEntity getAuthenticatedAccount() throws ItemNotFoundException {

@@ -40,4 +40,21 @@ public class ProductController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @GetMapping("/{productId}/detailed")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getProductDetailed(
+            @PathVariable UUID shopId,
+            @PathVariable UUID productId)
+            throws ItemNotFoundException, RandomExceptions {
+        GlobeSuccessResponseBuilder response = productService.getProductDetailed(shopId, productId);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/all")
+    public  ResponseEntity<GlobeSuccessResponseBuilder> getAllProducts(@PathVariable UUID shopId) throws RandomExceptions, ItemNotFoundException {
+        GlobeSuccessResponseBuilder response = productService.getProductsByShop(shopId);
+
+        return ResponseEntity.ok(response);
+    }
+
+
 }

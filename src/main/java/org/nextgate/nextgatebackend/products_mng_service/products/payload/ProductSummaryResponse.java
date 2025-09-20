@@ -1,3 +1,4 @@
+// ProductSummaryResponse.java - Ultra lightweight for cards
 package org.nextgate.nextgatebackend.products_mng_service.products.payload;
 
 import lombok.AllArgsConstructor;
@@ -18,40 +19,90 @@ import java.util.UUID;
 @AllArgsConstructor
 public class ProductSummaryResponse {
 
-    // ESSENTIAL INFO FOR LISTS
+    // ESSENTIAL CARD INFO ONLY
     private UUID productId;
     private String productName;
     private String productSlug;
     private String shortDescription;
-    private List<String> productImages; // Usually just first image
+    private String primaryImage; // Just first image for card
 
-    // PRICING
+    // PRICING - Essential for cards
     private BigDecimal price;
     private BigDecimal comparePrice;
+    private BigDecimal finalPrice; // Price after color adjustments
     private Boolean isOnSale;
     private BigDecimal discountPercentage;
 
-    // INVENTORY STATUS
+    // INVENTORY - Key for availability
+    private Integer stockQuantity;
     private Boolean isInStock;
     private Boolean isLowStock;
 
     // BASIC DETAILS
     private String brand;
+    private String sku;
     private ProductCondition condition;
     private ProductStatus status;
 
-    // SHOP INFO
-    private UUID shopId;
-    private String shopName;
-
-    // CATEGORY INFO
-    private UUID categoryId;
-    private String categoryName;
-
-    // FEATURES
+    // FEATURES - Important for filtering
     private Boolean isFeatured;
     private Boolean isDigital;
 
+    // SPECIAL OFFERS - For badges/labels
+    private Boolean hasGroupBuying;
+    private Boolean hasInstallments;
+    private Boolean hasMultipleColors;
+    private BigDecimal groupPrice; // For "Group Buy: $X" badge
+    private BigDecimal startingFromPrice; // Lowest price with color variations
+
     // TIMESTAMPS
     private LocalDateTime createdAt;
+
+
+    // ShopProductsListResponse.java - Main list response
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ShopProductsListResponse {
+        private ShopSummaryForProducts shop;
+        private ProductListSummary summary;
+        private List<ProductSummaryResponse> products;
+        private Integer totalProducts;
+    }
+
+    // ShopSummaryForProducts.java - Minimal shop info
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ShopSummaryForProducts {
+        private UUID shopId;
+        private String shopName;
+        private String shopSlug;
+        private String logoUrl;
+        private Boolean isVerified;
+        private Boolean isApproved;
+    }
+
+    // ProductListSummary.java - Quick stats
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ProductListSummary {
+        private Integer totalProducts;
+        private Integer activeProducts;
+        private Integer draftProducts;
+        private Integer outOfStockProducts;
+        private Integer featuredProducts;
+        private Integer lowStockProducts;
+        private BigDecimal averagePrice;
+        private BigDecimal totalInventoryValue;
+
+        // Quick action counts
+        private Integer productsWithGroupBuying;
+        private Integer productsWithInstallments;
+        private Integer productsWithMultipleColors;
+    }
 }
