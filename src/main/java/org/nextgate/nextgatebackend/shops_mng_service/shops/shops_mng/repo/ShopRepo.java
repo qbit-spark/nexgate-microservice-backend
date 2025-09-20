@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface ShopRepo extends JpaRepository<ShopEntity, UUID> {
@@ -28,4 +29,7 @@ public interface ShopRepo extends JpaRepository<ShopEntity, UUID> {
     // Get all active approved shops for randomization
     List<ShopEntity> findByIsDeletedFalseAndIsApprovedTrueOrderByCreatedAtDesc();
     Page<ShopEntity> findByIsDeletedFalseAndIsApprovedTrueOrderByCreatedAtDesc(Pageable pageable);
+
+    Optional<ShopEntity> findByShopIdAndOwnerAndIsDeletedFalse(UUID shopId, AccountEntity owner);
+
 }

@@ -10,12 +10,17 @@ import org.nextgate.nextgatebackend.authentication_service.utils.StringListJsonC
 import org.nextgate.nextgatebackend.products_mng_service.categories.entity.ProductCategoryEntity;
 import org.nextgate.nextgatebackend.products_mng_service.products.enums.ProductCondition;
 import org.nextgate.nextgatebackend.products_mng_service.products.enums.ProductStatus;
+import org.nextgate.nextgatebackend.products_mng_service.products.utils.ColorsJsonConverter;
+import org.nextgate.nextgatebackend.products_mng_service.products.utils.InstallmentPlansJsonConverter;
+import org.nextgate.nextgatebackend.products_mng_service.products.utils.SpecificationsJsonConverter;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.entity.ShopEntity;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Entity
@@ -28,7 +33,8 @@ import java.util.UUID;
         @Index(name = "idx_product_category", columnList = "category_id"),
         @Index(name = "idx_product_status", columnList = "status"),
         @Index(name = "idx_product_price", columnList = "price"),
-        @Index(name = "idx_product_slug", columnList = "productSlug")
+        @Index(name = "idx_product_slug", columnList = "productSlug"),
+        @Index(name = "idx_product_specifications", columnList = "specifications")
 })
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class ProductEntity {
@@ -77,12 +83,6 @@ public class ProductEntity {
     @Column(length = 50)
     private String sku; // Stock Keeping Unit - must be unique
 
-    // Physical Properties (for shipping)
-    private BigDecimal weight; // in kg
-    private BigDecimal length; // in cm
-    private BigDecimal width;  // in cm
-    private BigDecimal height; // in cm
-
     @Enumerated(EnumType.STRING)
     private ProductCondition condition = ProductCondition.NEW;
 
@@ -97,6 +97,80 @@ public class ProductEntity {
 
     private String metaTitle;
     private String metaDescription;
+
+    // ===============================
+    // NEW FIELDS - SPECIFICATIONS
+    // ===============================
+
+    @Column(name = "specifications", columnDefinition = "jsonb")
+    @Convert(converter = SpecificationsJsonConverter.class)
+    private Map<String, String> specifications = new HashMap<>();
+
+    // ===============================
+    // NEW FIELDS - COLORS
+    // ===============================
+
+    @Column(name = "colors", columnDefinition = "jsonb")
+    @Convert(converter = ColorsJsonConverter.class)
+    private List<Map<String, Object>> colors = new ArrayList<>();
+
+    // ===============================
+    // NEW FIELDS - ORDERING LIMITS
+    // ===============================
+
+    @Column(name = "min_order_quantity")
+    private Integer minOrderQuantity = 1;
+
+    @Column(name = "max_order_quantity")
+    private Integer maxOrderQuantity;
+
+    @Column(name = "max_per_customer")
+    private Integer maxPerCustomer;
+
+    @Column(name = "requires_approval")
+    private Boolean requiresApproval = false;
+
+    // ===============================
+    // NEW FIELDS - GROUP BUYING
+    // ===============================
+
+    @Column(name = "group_buying_enabled")
+    private Boolean groupBuyingEnabled = false;
+
+    @Column(name = "group_min_size")
+    private Integer groupMinSize;
+
+    @Column(name = "group_max_size")
+    private Integer groupMaxSize;
+
+    @Column(name = "group_price", precision = 10, scale = 2)
+    private BigDecimal groupPrice;
+
+    @Column(name = "group_time_limit_hours")
+    private Integer groupTimeLimitHours;
+
+    @Column(name = "group_requires_minimum")
+    private Boolean groupRequiresMinimum = true;
+
+    // ===============================
+    // NEW FIELDS - INSTALLMENT OPTIONS
+    // ===============================
+
+    @Column(name = "installment_enabled")
+    private Boolean installmentEnabled = false;
+
+    @Column(name = "installment_plans", columnDefinition = "jsonb")
+    @Convert(converter = InstallmentPlansJsonConverter.class)
+    private List<Map<String, Object>> installmentPlans = new ArrayList<>();
+
+    @Column(name = "down_payment_required")
+    private Boolean downPaymentRequired = false;
+
+    @Column(name = "min_down_payment", precision = 10, scale = 2)
+    private BigDecimal minDownPayment;
+
+    @Column(name = "min_down_payment_percentage", precision = 5, scale = 2)
+    private BigDecimal minDownPaymentPercentage;
 
     // Relationships - The Key Part!
     @ManyToOne(fetch = FetchType.LAZY)
@@ -179,5 +253,63 @@ public class ProductEntity {
                     .divide(comparePrice, 2, BigDecimal.ROUND_HALF_UP);
         }
         return BigDecimal.ZERO;
+    }
+
+    // ===============================
+    // NEW BUSINESS LOGIC METHODS
+    // ===============================
+
+    public boolean hasSpecifications() {
+        return specifications != null && !specifications.isEmpty();
+    }
+
+    public int getSpecificationCount() {
+        return specifications != null ? specifications.size() : 0;
+    }
+
+    public boolean hasMultipleColors() {
+        return colors != null && colors.size() > 1;
+    }
+
+    public int getColorCount() {
+        return colors != null ? colors.size() : 0;
+    }
+
+    public boolean isGroupBuyingAvailable() {
+        return groupBuyingEnabled != null && groupBuyingEnabled;
+    }
+
+    public boolean isInstallmentAvailable() {
+        return installmentEnabled != null && installmentEnabled;
+    }
+
+    public BigDecimal getGroupDiscount() {
+        if (isGroupBuyingAvailable() && groupPrice != null) {
+            return price.subtract(groupPrice);
+        }
+        return BigDecimal.ZERO;
+    }
+
+    public BigDecimal getGroupDiscountPercentage() {
+        if (isGroupBuyingAvailable() && groupPrice != null) {
+            return getGroupDiscount()
+                    .multiply(BigDecimal.valueOf(100))
+                    .divide(price, 2, BigDecimal.ROUND_HALF_UP);
+        }
+        return BigDecimal.ZERO;
+    }
+
+    public boolean canOrderQuantity(Integer quantity) {
+        if (quantity == null || quantity < 1) return false;
+        if (minOrderQuantity != null && quantity < minOrderQuantity) return false;
+        if (maxOrderQuantity != null && quantity > maxOrderQuantity) return false;
+        return true;
+    }
+
+    public Integer getMaxAllowedQuantity() {
+        if (maxOrderQuantity != null) {
+            return Math.min(maxOrderQuantity, stockQuantity);
+        }
+        return stockQuantity;
     }
 }

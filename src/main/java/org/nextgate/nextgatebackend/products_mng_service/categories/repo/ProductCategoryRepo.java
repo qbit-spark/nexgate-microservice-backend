@@ -11,7 +11,7 @@ import java.util.UUID;
 
 public interface ProductCategoryRepo extends JpaRepository<ProductCategoryEntity, UUID> {
 
-    Optional<ProductCategoryEntity> findByCategoryId(UUID categoryId);
+    Optional<ProductCategoryEntity> findByCategoryIdAndIsActiveTrue(UUID categoryId);
     boolean existsByCategoryName(String categoryName);
 
     List<ProductCategoryEntity> findByIsActiveTrueOrderByCreatedTimeDesc();

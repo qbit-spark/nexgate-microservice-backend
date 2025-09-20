@@ -1,6 +1,8 @@
 
 package org.nextgate.nextgatebackend.products_mng_service.products.repo;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.nextgate.nextgatebackend.products_mng_service.products.entity.ProductEntity;
 import org.nextgate.nextgatebackend.products_mng_service.products.enums.ProductStatus;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.entity.ShopEntity;
@@ -10,6 +12,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -30,11 +33,11 @@ public interface ProductRepo extends JpaRepository<ProductEntity, UUID> {
     // ========================
 
     boolean existsByProductNameAndShopAndIsDeletedFalse(String productName, ShopEntity shop);
-    boolean existsByProductNameAndBrandAndPriceAndShopAndIsDeletedFalse(
+    boolean existsByProductNameAndBrandAndPriceAndSpecificationsAndShopAndIsDeletedFalse(
             String productName,
             String brand,
             BigDecimal price,
-            ShopEntity shop
+            Map<String,String> specifications, ShopEntity shop
     );
     boolean existsBySkuAndIsDeletedFalse(String sku);
 

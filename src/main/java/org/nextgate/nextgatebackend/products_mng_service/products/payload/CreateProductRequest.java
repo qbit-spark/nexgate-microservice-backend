@@ -8,6 +8,7 @@ import org.nextgate.nextgatebackend.products_mng_service.products.enums.ProductS
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Data
@@ -34,7 +35,6 @@ public class CreateProductRequest {
     @NotNull(message = "Category is required")
     private UUID categoryId;
 
-
     // OPTIONAL FIELDS
     @Size(max = 200, message = "Short description must not exceed 200 characters")
     private String shortDescription;
@@ -53,30 +53,14 @@ public class CreateProductRequest {
     @Size(max = 50, message = "SKU must not exceed 50 characters")
     private String sku;
 
-    // PHYSICAL PROPERTIES
-    @DecimalMin(value = "0.0", message = "Weight cannot be negative")
-    @Digits(integer = 5, fraction = 2, message = "Weight must have at most 5 digits and 2 decimal places")
-    private BigDecimal weight;
-
-    @DecimalMin(value = "0.0", message = "Length cannot be negative")
-    @Digits(integer = 5, fraction = 2, message = "Length must have at most 5 digits and 2 decimal places")
-    private BigDecimal length;
-
-    @DecimalMin(value = "0.0", message = "Width cannot be negative")
-    @Digits(integer = 5, fraction = 2, message = "Width must have at most 5 digits and 2 decimal places")
-    private BigDecimal width;
-
-    @DecimalMin(value = "0.0", message = "Height cannot be negative")
-    @Digits(integer = 5, fraction = 2, message = "Height must have at most 5 digits and 2 decimal places")
-    private BigDecimal height;
-
     // ENUMS WITH DEFAULTS
-    private ProductCondition condition = ProductCondition.NEW;
+    private ProductCondition condition;
     private ProductStatus status = ProductStatus.ACTIVE;
 
     // COLLECTIONS
-    @NotNull(message = "Product images list cannot be empty")
+    @NotNull(message = "Product images list cannot be null")
     private List<@URL(message = "Product image URLs must be valid") String> productImages;
+
     private List<@Size(max = 50, message = "Each tag must not exceed 50 characters") String> tags;
 
     // FEATURES
@@ -91,4 +75,158 @@ public class CreateProductRequest {
 
     @Size(max = 200, message = "Meta description must not exceed 200 characters")
     private String metaDescription;
+
+    // ===============================
+    // NEW FIELDS - SPECIFICATIONS
+    // ===============================
+
+    private Map<@NotBlank @Size(max = 100) String, @NotBlank @Size(max = 500) String> specifications;
+
+    // ===============================
+    // NEW FIELDS - COLORS
+    // ===============================
+
+    private List<ColorRequest> colors;
+
+    // ===============================
+    // NEW FIELDS - ORDERING LIMITS
+    // ===============================
+
+    @Min(value = 1, message = "Minimum order quantity must be at least 1")
+    private Integer minOrderQuantity = 1;
+
+    @Min(value = 1, message = "Maximum order quantity must be at least 1")
+    private Integer maxOrderQuantity;
+
+    private Boolean requiresApproval = false;
+
+    // ===============================
+    // NEW FIELDS - GROUP BUYING
+    // ===============================
+
+    private Boolean groupBuyingEnabled = false;
+
+    @Min(value = 2, message = "Group minimum size must be at least 2")
+    private Integer groupMinSize;
+
+    @Min(value = 2, message = "Group maximum size must be at least 2")
+    private Integer groupMaxSize;
+
+    @DecimalMin(value = "0.01", message = "Group price must be greater than 0")
+    @Digits(integer = 8, fraction = 2, message = "Group price must have at most 8 digits and 2 decimal places")
+    private BigDecimal groupPrice;
+
+    @Min(value = 1, message = "Group time limit must be at least 1 hour")
+    @Max(value = 8760, message = "Group time limit cannot exceed 1 year (8760 hours)")
+    private Integer groupTimeLimitHours;
+
+    private Boolean groupRequiresMinimum = true;
+
+    // ===============================
+    // NEW FIELDS - INSTALLMENT OPTIONS
+    // ===============================
+
+    private Boolean installmentEnabled = false;
+
+    private List<InstallmentPlanRequest> installmentPlans;
+
+    private Boolean downPaymentRequired = false;
+
+    @DecimalMin(value = "0.0", message = "Down payment percentage cannot be negative")
+    @DecimalMax(value = "100.0", message = "Down payment percentage cannot exceed 100%")
+    @Digits(integer = 3, fraction = 2, message = "Down payment percentage must have at most 3 digits and 2 decimal places")
+    private BigDecimal minDownPaymentPercentage = BigDecimal.ZERO;
+
+    // ===============================
+    // NESTED CLASSES FOR VALIDATION
+    // ===============================
+
+    @Data
+    public static class ColorRequest {
+        @NotBlank(message = "Color name is required")
+        @Size(max = 50, message = "Color name must not exceed 50 characters")
+        private String name;
+
+        @NotBlank(message = "Color hex code is required")
+        @Pattern(regexp = "^#[0-9A-Fa-f]{6}$", message = "Invalid hex color code format")
+        private String hex;
+
+        private List<@URL(message = "Color image URLs must be valid") String> images;
+
+        @DecimalMin(value = "0.0", message = "Price adjustment cannot be negative")
+        @Digits(integer = 8, fraction = 2, message = "Price adjustment must have at most 8 digits and 2 decimal places")
+        private BigDecimal priceAdjustment = BigDecimal.ZERO;
+    }
+
+    @Data
+    public static class InstallmentPlanRequest {
+        @NotNull(message = "Duration is required")
+        @Min(value = 1, message = "Duration must be at least 1")
+        private Integer duration;
+
+        @NotBlank(message = "Interval is required")
+        @Pattern(regexp = "^(DAYS|WEEKS|MONTHS)$", message = "Interval must be DAYS, WEEKS, or MONTHS")
+        private String interval;
+
+        @DecimalMin(value = "0.0", message = "Interest rate cannot be negative")
+        @DecimalMax(value = "100.0", message = "Interest rate cannot exceed 100%")
+        @Digits(integer = 3, fraction = 2, message = "Interest rate must have at most 3 digits and 2 decimal places")
+        private BigDecimal interestRate = BigDecimal.ZERO;
+
+        @Size(max = 200, message = "Description must not exceed 200 characters")
+        private String description;
+    }
+
+    // ===============================
+    // VALIDATION METHODS
+    // ===============================
+
+    @AssertTrue(message = "Group maximum size must be greater than minimum size")
+    public boolean isValidGroupSizes() {
+        if (groupBuyingEnabled && groupMinSize != null && groupMaxSize != null) {
+            return groupMaxSize >= groupMinSize;
+        }
+        return true;
+    }
+
+    @AssertTrue(message = "Group price must be less than regular price")
+    public boolean isValidGroupPrice() {
+        if (groupBuyingEnabled && groupPrice != null && price != null) {
+            return groupPrice.compareTo(price) < 0;
+        }
+        return true;
+    }
+
+    @AssertTrue(message = "Maximum order quantity must be greater than minimum order quantity")
+    public boolean isValidOrderQuantities() {
+        if (minOrderQuantity != null && maxOrderQuantity != null) {
+            return maxOrderQuantity >= minOrderQuantity;
+        }
+        return true;
+    }
+
+    @AssertTrue(message = "Compare price must be greater than regular price")
+    public boolean isValidComparePrice() {
+        if (comparePrice != null && price != null) {
+            return comparePrice.compareTo(price) > 0;
+        }
+        return true;
+    }
+
+    @AssertTrue(message = "At least one installment plan is required when installments are enabled")
+    public boolean hasInstallmentPlansWhenEnabled() {
+        if (installmentEnabled) {
+            return installmentPlans != null && !installmentPlans.isEmpty();
+        }
+        return true;
+    }
+
+    @AssertTrue(message = "Group buying settings are required when group buying is enabled")
+    public boolean hasGroupBuyingSettingsWhenEnabled() {
+        if (groupBuyingEnabled) {
+            return groupMinSize != null && groupMaxSize != null &&
+                    groupPrice != null && groupTimeLimitHours != null;
+        }
+        return true;
+    }
 }
