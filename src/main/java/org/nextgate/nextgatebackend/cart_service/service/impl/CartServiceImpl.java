@@ -174,7 +174,8 @@ public class CartServiceImpl implements CartService {
         // Build user summary
         CartResponse.UserSummary userSummary = CartResponse.UserSummary.builder()
                 .userId(user.getId())
-                .userName(user.getFirstName() + " " + user.getLastName())
+                .name(user.getFirstName() + " " + user.getLastName())
+                .userName(user.getUserName())
                 .build();
 
         // Build cart items
