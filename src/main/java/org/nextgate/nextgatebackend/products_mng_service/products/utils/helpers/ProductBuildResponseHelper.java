@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.nextgate.nextgatebackend.products_mng_service.products.entity.ProductEntity;
 import org.nextgate.nextgatebackend.products_mng_service.products.enums.ProductStatus;
 import org.nextgate.nextgatebackend.products_mng_service.products.payload.ProductDetailedResponse;
+import org.nextgate.nextgatebackend.products_mng_service.products.payload.ProductPublicResponse;
 import org.nextgate.nextgatebackend.products_mng_service.products.payload.ProductSummaryResponse;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.entity.ShopEntity;
 import org.springframework.stereotype.Service;
@@ -559,6 +560,154 @@ public class ProductBuildResponseHelper {
     private static class PriceInfo {
         private BigDecimal finalPrice;
         private BigDecimal startingFromPrice;
+    }
+
+    public ProductPublicResponse buildPublicProductResponse(ProductEntity product) {
+        return ProductPublicResponse.builder()
+                // Basic Information
+                .productId(product.getProductId())
+                .productName(product.getProductName())
+                .productSlug(product.getProductSlug())
+                .productDescription(product.getProductDescription())
+                .shortDescription(product.getShortDescription())
+                .productImages(product.getProductImages())
+
+                // Pricing Information
+                .price(product.getPrice())
+                .comparePrice(product.getComparePrice())
+                .discountAmount(product.getDiscountAmount())
+                .discountPercentage(product.getDiscountPercentage())
+                .isOnSale(product.isOnSale())
+
+                // Availability Information (no exact stock numbers if low)
+                .isInStock(product.isInStock())
+                .isLowStock(product.isLowStock())
+                .stockQuantity(product.isInStock() ? product.getStockQuantity() : null)
+
+                // Product Details
+                .brand(product.getBrand())
+                .condition(product.getCondition())
+
+                // SEO and Tags
+                .tags(product.getTags())
+
+                // Shop Information (minimal)
+                .shopId(product.getShop().getShopId())
+                .shopName(product.getShop().getShopName())
+                .shopSlug(product.getShop().getShopSlug())
+                .shopLogoUrl(product.getShop().getLogoUrl())
+
+                // Category Information
+                .categoryId(product.getCategory().getCategoryId())
+                .categoryName(product.getCategory().getCategoryName())
+
+                // Features
+                .isDigital(product.getIsDigital())
+                .requiresShipping(product.getRequiresShipping())
+
+                // Specifications
+                .specifications(product.getSpecifications())
+                .hasSpecifications(product.hasSpecifications())
+
+                // Colors
+                .colors(buildPublicColorResponses(product.getColors(), product.getPrice()))
+                .hasMultipleColors(product.hasMultipleColors())
+                .priceRange(buildPublicPriceRange(product))
+
+                // Special Offers
+                .groupBuying(buildPublicGroupBuyingResponse(product))
+                .installmentOptions(buildPublicInstallmentResponse(product))
+
+                // Timestamp
+                .createdAt(product.getCreatedAt())
+                .build();
+    }
+
+    // Helper methods for building public nested responses
+    private List<ProductPublicResponse.ProductColorPublicResponse> buildPublicColorResponses(List<Map<String, Object>> colors, BigDecimal basePrice) {
+        if (colors == null || colors.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        return colors.stream().map(colorMap -> {
+            BigDecimal priceAdjustment = new BigDecimal(colorMap.getOrDefault("priceAdjustment", 0).toString());
+            BigDecimal finalPrice = basePrice.add(priceAdjustment);
+
+            return ProductPublicResponse.ProductColorPublicResponse.builder()
+                    .name((String) colorMap.get("name"))
+                    .hex((String) colorMap.get("hex"))
+                    .images((List<String>) colorMap.getOrDefault("images", new ArrayList<>()))
+                    .priceAdjustment(priceAdjustment)
+                    .finalPrice(finalPrice)
+                    .build();
+        }).toList();
+    }
+
+    private ProductPublicResponse.PriceRangePublicResponse buildPublicPriceRange(ProductEntity product) {
+        BigDecimal minPrice = product.getPrice();
+        BigDecimal maxPrice = product.getPrice();
+
+        if (product.getColors() != null && !product.getColors().isEmpty()) {
+            for (Map<String, Object> color : product.getColors()) {
+                BigDecimal adjustment = new BigDecimal(color.getOrDefault("priceAdjustment", 0).toString());
+                BigDecimal colorPrice = product.getPrice().add(adjustment);
+
+                if (colorPrice.compareTo(minPrice) < 0) {
+                    minPrice = colorPrice;
+                }
+                if (colorPrice.compareTo(maxPrice) > 0) {
+                    maxPrice = colorPrice;
+                }
+            }
+        }
+
+        return ProductPublicResponse.PriceRangePublicResponse.builder()
+                .minPrice(minPrice)
+                .maxPrice(maxPrice)
+                .hasPriceVariations(minPrice.compareTo(maxPrice) != 0)
+                .build();
+    }
+
+    private ProductPublicResponse.GroupBuyingPublicResponse buildPublicGroupBuyingResponse(ProductEntity product) {
+        if (!product.isGroupBuyingAvailable()) {
+            return ProductPublicResponse.GroupBuyingPublicResponse.builder()
+                    .isAvailable(false)
+                    .build();
+        }
+
+        return ProductPublicResponse.GroupBuyingPublicResponse.builder()
+                .isAvailable(true)
+                .minGroupSize(product.getGroupMinSize())
+                .maxGroupSize(product.getGroupMaxSize())
+                .groupPrice(product.getGroupPrice())
+                .groupDiscount(product.getGroupDiscount())
+                .groupDiscountPercentage(product.getGroupDiscountPercentage())
+                .timeLimitHours(product.getGroupTimeLimitHours())
+                .build();
+    }
+
+    private ProductPublicResponse.InstallmentPublicResponse buildPublicInstallmentResponse(ProductEntity product) {
+        if (!product.isInstallmentAvailable()) {
+            return ProductPublicResponse.InstallmentPublicResponse.builder()
+                    .isAvailable(false)
+                    .build();
+        }
+
+        List<ProductPublicResponse.InstallmentPlanPublicResponse> plans = product.getInstallmentPlans().stream()
+                .map(planMap -> ProductPublicResponse.InstallmentPlanPublicResponse.builder()
+                        .duration((Integer) planMap.get("duration"))
+                        .interval((String) planMap.get("interval"))
+                        .interestRate(new BigDecimal(planMap.getOrDefault("interestRate", 0).toString()))
+                        .description((String) planMap.get("description"))
+                        .build())
+                .toList();
+
+        return ProductPublicResponse.InstallmentPublicResponse.builder()
+                .isAvailable(true)
+                .plans(plans)
+                .downPaymentRequired(product.getDownPaymentRequired())
+                .minDownPaymentPercentage(product.getMinDownPaymentPercentage())
+                .build();
     }
 }
 

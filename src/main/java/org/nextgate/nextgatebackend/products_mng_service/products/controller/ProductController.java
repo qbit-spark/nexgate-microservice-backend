@@ -67,13 +67,74 @@ public class ProductController {
     public ResponseEntity<GlobeSuccessResponseBuilder> updateProduct(
             @PathVariable UUID shopId,
             @PathVariable UUID productId,
-            @Valid @RequestBody UpdateProductRequest request)
+            @Valid @RequestBody UpdateProductRequest request,
+            @RequestParam ReqAction action)
             throws ItemNotFoundException, RandomExceptions, ItemReadyExistException {
 
-        GlobeSuccessResponseBuilder response = productService.updateProduct(shopId, productId, request);
+        GlobeSuccessResponseBuilder response = productService.updateProduct(shopId, productId, request, action);
 
         return ResponseEntity.ok(response);
     }
 
+    @PatchMapping("/{productId}/publish")
+    public ResponseEntity<GlobeSuccessResponseBuilder> publishProduct(
+            @PathVariable UUID shopId,
+            @PathVariable UUID productId)
+            throws ItemNotFoundException, RandomExceptions {
+
+        GlobeSuccessResponseBuilder response = productService.publishProduct(shopId, productId);
+
+        return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/{productId}")
+    public ResponseEntity<GlobeSuccessResponseBuilder> deleteProduct(
+            @PathVariable UUID shopId,
+            @PathVariable UUID productId)
+            throws ItemNotFoundException, RandomExceptions {
+
+        GlobeSuccessResponseBuilder response = productService.deleteProduct(shopId, productId);
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/{productId}/restore")
+    public ResponseEntity<GlobeSuccessResponseBuilder> restoreProduct(
+            @PathVariable UUID shopId,
+            @PathVariable UUID productId)
+            throws ItemNotFoundException, RandomExceptions {
+
+        GlobeSuccessResponseBuilder response = productService.restoreProduct(shopId, productId);
+
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{productId}")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getPublicProductById(
+            @PathVariable UUID shopId,
+            @PathVariable UUID productId)
+            throws ItemNotFoundException {
+
+        GlobeSuccessResponseBuilder response = productService.getProductById(shopId, productId);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/public-view/all")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getAllPublicProducts(
+            @PathVariable UUID shopId) throws ItemNotFoundException {
+
+        GlobeSuccessResponseBuilder response = productService.getPublicProductsByShop(shopId);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/public-view/all-paged")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getAllPublicProductsPaged(
+            @PathVariable UUID shopId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) throws ItemNotFoundException {
+
+        GlobeSuccessResponseBuilder response = productService.getPublicProductsByShopPaged(shopId, page, size);
+        return ResponseEntity.ok(response);
+    }
 
 }

@@ -19,8 +19,24 @@ public interface ProductService {
 
     GlobeSuccessResponseBuilder getAllProductsPaged(UUID shopId, int page, int size) throws ItemNotFoundException, RandomExceptions;
 
-    GlobeSuccessResponseBuilder updateProduct(UUID shopId, UUID productId, UpdateProductRequest request)
+    GlobeSuccessResponseBuilder updateProduct(UUID shopId, UUID productId, UpdateProductRequest request, ReqAction action)
             throws ItemNotFoundException, RandomExceptions, ItemReadyExistException;
+
+
+    GlobeSuccessResponseBuilder publishProduct(UUID shopId, UUID productId)
+            throws ItemNotFoundException, RandomExceptions;
+
+    GlobeSuccessResponseBuilder deleteProduct(UUID shopId, UUID productId)
+            throws ItemNotFoundException, RandomExceptions;
+
+    GlobeSuccessResponseBuilder restoreProduct(UUID shopId, UUID productId)
+            throws ItemNotFoundException, RandomExceptions;
+
+    GlobeSuccessResponseBuilder getPublicProductsByShop(UUID shopId) throws ItemNotFoundException;
+
+    GlobeSuccessResponseBuilder getPublicProductsByShopPaged(UUID shopId, int page, int size) throws ItemNotFoundException;
+
+    GlobeSuccessResponseBuilder getProductById(UUID shopId, UUID productId) throws ItemNotFoundException;
 
 }
 

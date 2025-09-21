@@ -19,6 +19,7 @@ import org.nextgate.nextgatebackend.products_mng_service.products.service.Produc
 import org.nextgate.nextgatebackend.products_mng_service.products.utils.helpers.ProductBuildResponseHelper;
 import org.nextgate.nextgatebackend.products_mng_service.products.utils.helpers.ProductHelperMethods;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.entity.ShopEntity;
+import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.enums.ShopStatus;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.repo.ShopRepo;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -32,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -323,7 +325,7 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional
-    public GlobeSuccessResponseBuilder updateProduct(UUID shopId, UUID productId, UpdateProductRequest request)
+    public GlobeSuccessResponseBuilder updateProduct(UUID shopId, UUID productId, UpdateProductRequest request, ReqAction action)
             throws ItemNotFoundException, RandomExceptions, ItemReadyExistException {
 
         // 1. Get authenticated user
@@ -358,7 +360,7 @@ public class ProductServiceImpl implements ProductService {
         // 6. Check if new SKU already exists (if SKU is being changed)
         if (request.getSku() != null &&
                 !request.getSku().equals(product.getSku()) &&
-                productRepo.existsBySkuAndShopAndIsDeletedFalse(request.getSku(), shop)) {
+                productRepo.existsBySkuAndIsDeletedFalse(request.getSku())) {
             throw new ItemReadyExistException("A product with this SKU already exists");
         }
 
@@ -372,6 +374,14 @@ public class ProductServiceImpl implements ProductService {
         // 8. Update product fields using helper method
         productHelperMethods.updateProductFields(product, request, category, shop, account);
 
+        // 8.5. Handle status based on action (just like in create)
+        if (action == ReqAction.SAVE_PUBLISH) {
+            product.setStatus(ProductStatus.ACTIVE);
+        } else if (action == ReqAction.SAVE_DRAFT) {
+            product.setStatus(ProductStatus.DRAFT);
+        }
+        // If no action specified, keep current status
+
         // 9. Save updated product
         ProductEntity updatedProduct = productRepo.save(product);
 
@@ -379,10 +389,284 @@ public class ProductServiceImpl implements ProductService {
         ProductDetailedResponse response = productBuildResponseHelper.buildDetailedProductResponse(updatedProduct);
 
         return GlobeSuccessResponseBuilder.success(
-                "Product updated successfully",
+                String.format("Product updated successfully and %s",
+                        action == ReqAction.SAVE_PUBLISH ? "published" : "saved as draft"),
                 response
         );
     }
+
+    @Override
+    @Transactional
+    public GlobeSuccessResponseBuilder publishProduct(UUID shopId, UUID productId)
+            throws ItemNotFoundException, RandomExceptions {
+
+        // 1. Get authenticated user
+        AccountEntity account = getAuthenticatedAccount();
+
+        // 2. Validate shop existence
+        ShopEntity shop = shopRepo.findById(shopId)
+                .orElseThrow(() -> new ItemNotFoundException("Shop not found"));
+
+        if (shop.getIsDeleted()) {
+            throw new ItemNotFoundException("Shop not found");
+        }
+
+        // 3. Check permissions
+        boolean isValidToPublishProduct = validateSystemRolesOrOwner(
+                List.of("ROLE_SUPER_ADMIN", "ROLE_STAFF_ADMIN"), account, shop);
+        if (!isValidToPublishProduct) {
+            throw new RandomExceptions("You do not have permission to publish products for this shop");
+        }
+
+        // 4. Find existing product
+        ProductEntity product = productRepo.findByProductIdAndShop_ShopIdAndIsDeletedFalse(productId, shopId)
+                .orElseThrow(() -> new ItemNotFoundException("Product not found in this shop"));
+
+        // 5. Check if product is already active
+        if (product.getStatus() == ProductStatus.ACTIVE) {
+            throw new RandomExceptions("Product is already published");
+        }
+
+        // 6. Validate product can be published (has minimum required fields)
+        validateProductForPublishing(product);
+
+        // 7. Update status to ACTIVE
+        product.setStatus(ProductStatus.ACTIVE);
+        product.setEditedBy(account.getId());
+        product.setUpdatedAt(LocalDateTime.now());
+
+        // 8. Save updated product
+        ProductEntity publishedProduct = productRepo.save(product);
+
+        // 9. Build response
+        ProductDetailedResponse response = productBuildResponseHelper.buildDetailedProductResponse(publishedProduct);
+
+        return GlobeSuccessResponseBuilder.success(
+                String.format("Product '%s' published successfully", product.getProductName()),
+                response
+        );
+    }
+
+    @Override
+    @Transactional
+    public GlobeSuccessResponseBuilder deleteProduct(UUID shopId, UUID productId)
+            throws ItemNotFoundException, RandomExceptions {
+
+        // 1. Get authenticated user
+        AccountEntity account = getAuthenticatedAccount();
+
+        // 2. Validate shop existence
+        ShopEntity shop = shopRepo.findById(shopId)
+                .orElseThrow(() -> new ItemNotFoundException("Shop not found"));
+
+        if (shop.getIsDeleted()) {
+            throw new ItemNotFoundException("Shop not found");
+        }
+
+        // 3. Check permissions
+        boolean isValidToDeleteProduct = validateSystemRolesOrOwner(
+                List.of("ROLE_SUPER_ADMIN", "ROLE_STAFF_ADMIN"), account, shop);
+        if (!isValidToDeleteProduct) {
+            throw new RandomExceptions("You do not have permission to delete products for this shop");
+        }
+
+        // 4. Find existing product
+        ProductEntity product = productRepo.findByProductIdAndShop_ShopIdAndIsDeletedFalse(productId, shopId)
+                .orElseThrow(() -> new ItemNotFoundException("Product not found in this shop"));
+
+        // 5. Check current status and apply appropriate deletion logic
+        String responseMessage;
+
+        if (product.getStatus() == ProductStatus.DRAFT) {
+            // HARD DELETE - Permanently remove from database
+            productRepo.delete(product);
+            responseMessage = String.format("Draft product '%s' has been permanently deleted", product.getProductName());
+
+            log.info("Product hard deleted: {} by user: {}", product.getProductName(), account.getUserName());
+
+            return GlobeSuccessResponseBuilder.success(responseMessage);
+
+        } else {
+            // SOFT DELETE - Mark as deleted but keep in database
+            product.setIsDeleted(true);
+            product.setDeletedAt(LocalDateTime.now());
+            product.setDeletedBy(account.getId());
+            product.setStatus(ProductStatus.ARCHIVED); // Change status to archived
+            product.setEditedBy(account.getId());
+            product.setUpdatedAt(LocalDateTime.now());
+
+            productRepo.save(product);
+
+            responseMessage = String.format("Product '%s' has been deleted and will be permanently removed after 30 days",
+                    product.getProductName());
+
+            log.info("Product soft deleted: {} by user: {}", product.getProductName(), account.getUserName());
+
+            // Return deletion info
+            var deletionInfo = new Object() {
+                public final String message = responseMessage;
+                public final String productName = product.getProductName();
+                public final ProductStatus previousStatus = product.getStatus();
+                public final LocalDateTime deletedAt = product.getDeletedAt();
+                public final String deletionType = "SOFT_DELETE";
+                public final String note = "Product will be permanently deleted after 30 days";
+            };
+
+            return GlobeSuccessResponseBuilder.success(responseMessage, deletionInfo);
+        }
+    }
+
+    @Override
+    @Transactional
+    public GlobeSuccessResponseBuilder restoreProduct(UUID shopId, UUID productId)
+            throws ItemNotFoundException, RandomExceptions {
+
+        // 1. Get authenticated user
+        AccountEntity account = getAuthenticatedAccount();
+
+        // 2. Validate shop existence
+        ShopEntity shop = shopRepo.findById(shopId)
+                .orElseThrow(() -> new ItemNotFoundException("Shop not found"));
+
+        // 3. Check permissions
+        boolean isValidToRestoreProduct = validateSystemRolesOrOwner(
+                List.of("ROLE_SUPER_ADMIN", "ROLE_STAFF_ADMIN"), account, shop);
+        if (!isValidToRestoreProduct) {
+            throw new RandomExceptions("You do not have permission to restore products for this shop");
+        }
+
+        // 4. Find soft-deleted product (including deleted ones)
+        ProductEntity product = productRepo.findByProductIdAndShop_ShopId(productId, shopId)
+                .orElseThrow(() -> new ItemNotFoundException("Product not found in this shop"));
+
+        // 5. Check if product is actually soft-deleted
+        if (!product.getIsDeleted()) {
+            throw new RandomExceptions("Product is not deleted and cannot be restored");
+        }
+
+        // 6. Restore the product
+        product.setIsDeleted(false);
+        product.setDeletedAt(null);
+        product.setDeletedBy(null);
+        product.setStatus(ProductStatus.DRAFT); // Restore as draft for safety
+        product.setEditedBy(account.getId());
+        product.setUpdatedAt(LocalDateTime.now());
+
+        ProductEntity restoredProduct = productRepo.save(product);
+
+        log.info("Product restored: {} by user: {}", product.getProductName(), account.getUserName());
+
+        // Build response
+        ProductDetailedResponse response = productBuildResponseHelper.buildDetailedProductResponse(restoredProduct);
+
+        return GlobeSuccessResponseBuilder.success(
+                String.format("Product '%s' has been restored successfully", product.getProductName()),
+                response
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public GlobeSuccessResponseBuilder getPublicProductsByShop(UUID shopId) throws ItemNotFoundException {
+
+        // 1. Validate shop
+        ShopEntity shop = validatePublicShop(shopId);
+
+        // 2. Get only ACTIVE products for public viewing
+        List<ProductEntity> products = productRepo.findByShopAndStatusAndIsDeletedFalseOrderByCreatedAtDesc(shop, ProductStatus.ACTIVE);
+
+        // 3. Build lightweight response list (reuse existing helper)
+        List<ProductSummaryResponse> responses = products.stream()
+                .map(productBuildResponseHelper::buildProductSummaryResponse)
+                .toList();
+
+        // 4. Build shop summary for public (no internal summary stats)
+        ProductSummaryResponse.ShopSummaryForProducts shopSummary = productBuildResponseHelper.buildShopSummaryForProducts(shop);
+
+        // 5. Build final response WITHOUT internal summary
+        var finalResponse = new Object() {
+            public final ProductSummaryResponse.ShopSummaryForProducts shop = shopSummary;
+            public final List<ProductSummaryResponse> products = responses;
+            public final Integer totalProducts = responses.size();
+        };
+
+        return GlobeSuccessResponseBuilder.success(
+                String.format("Retrieved %d products from %s", products.size(), shop.getShopName()),
+                finalResponse
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public GlobeSuccessResponseBuilder getPublicProductsByShopPaged(UUID shopId, int page, int size) throws ItemNotFoundException {
+
+        // 1. Validate shop
+        ShopEntity shop = validatePublicShop(shopId);
+
+        // 2. Validate pagination
+        if (page < 1) page = 1;
+        if (size <= 0) size = 10;
+
+        Pageable pageable = PageRequest.of(page - 1, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+        // 3. Get only ACTIVE products for public viewing
+        Page<ProductEntity> productPage = productRepo.findByShopAndStatusAndIsDeletedFalseOrderByCreatedAtDesc(shop, ProductStatus.ACTIVE, pageable);
+
+        // 4. Build lightweight response list
+        List<ProductSummaryResponse> responses = productPage.getContent().stream()
+                .map(productBuildResponseHelper::buildProductSummaryResponse)
+                .toList();
+
+        // 5. Build shop summary for public
+        ProductSummaryResponse.ShopSummaryForProducts shopSummary = productBuildResponseHelper.buildShopSummaryForProducts(shop);
+
+        // 6. Build final response with pagination but WITHOUT internal summary
+        var finalResponse = new Object() {
+            public final Object contents = new Object() {
+                public final ProductSummaryResponse.ShopSummaryForProducts shop = shopSummary;
+                public final List<ProductSummaryResponse> products = responses;
+                public final Integer totalProducts = responses.size();
+            };
+            public final int currentPage = productPage.getNumber() + 1;
+            public final int pageSize = productPage.getSize();
+            public final long totalElements = productPage.getTotalElements();
+            public final int totalPages = productPage.getTotalPages();
+            public final boolean hasNext = productPage.hasNext();
+            public final boolean hasPrevious = productPage.hasPrevious();
+        };
+
+        return GlobeSuccessResponseBuilder.success(
+                String.format("Retrieved %d products from %s (Page %d of %d)",
+                        responses.size(), shop.getShopName(), productPage.getNumber() + 1, productPage.getTotalPages()),
+                finalResponse
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public GlobeSuccessResponseBuilder getProductById(UUID shopId, UUID productId) throws ItemNotFoundException {
+
+        // 1. Validate shop existence and is approved/active
+        ShopEntity shop = validatePublicShop(shopId);
+
+        // 2. Find product (only ACTIVE products for public)
+        ProductEntity product = productRepo.findByProductIdAndShop_ShopIdAndIsDeletedFalse(productId, shopId)
+                .orElseThrow(() -> new ItemNotFoundException("Product not found"));
+
+        // 3. Check if product is publicly available
+        if (product.getStatus() != ProductStatus.ACTIVE) {
+            throw new ItemNotFoundException("Product not available");
+        }
+
+        // 4. Build public response (no sensitive details)
+        ProductPublicResponse response = productBuildResponseHelper.buildPublicProductResponse(product);
+
+        return GlobeSuccessResponseBuilder.success(
+                "Product retrieved successfully",
+                response
+        );
+    }
+
 
     // HELPER METHODS
     private AccountEntity getAuthenticatedAccount() throws ItemNotFoundException {
@@ -434,4 +718,97 @@ public class ProductServiceImpl implements ProductService {
         return hasCustomRole || isOwner;
     }
 
+    private void validateProductForPublishing(ProductEntity product) throws RandomExceptions {
+        List<String> missingFields = new ArrayList<>();
+
+        // Check required fields for publishing
+        if (product.getProductName() == null || product.getProductName().trim().isEmpty()) {
+            missingFields.add("Product name");
+        }
+
+        if (product.getProductDescription() == null || product.getProductDescription().trim().isEmpty()) {
+            missingFields.add("Product description");
+        }
+
+        if (product.getPrice() == null || product.getPrice().compareTo(BigDecimal.ZERO) <= 0) {
+            missingFields.add("Valid price");
+        }
+
+        if (product.getStockQuantity() == null || product.getStockQuantity() < 0) {
+            missingFields.add("Stock quantity");
+        }
+
+        if (product.getCategory() == null) {
+            missingFields.add("Product category");
+        }
+
+        if (product.getProductImages() == null || product.getProductImages().isEmpty()) {
+            missingFields.add("At least one product image");
+        }
+
+        // If there are missing fields, throw exception
+        if (!missingFields.isEmpty()) {
+            String missingFieldsList = String.join(", ", missingFields);
+            throw new RandomExceptions(
+                    String.format("Cannot publish product. Missing required fields: %s", missingFieldsList)
+            );
+        }
+
+        // Check if group buying is enabled but missing required fields
+        if (product.getGroupBuyingEnabled() != null && product.getGroupBuyingEnabled()) {
+            List<String> groupBuyingIssues = new ArrayList<>();
+
+            if (product.getGroupMinSize() == null || product.getGroupMinSize() < 2) {
+                groupBuyingIssues.add("Group minimum size (at least 2)");
+            }
+
+            if (product.getGroupMaxSize() == null || product.getGroupMaxSize() < 2) {
+                groupBuyingIssues.add("Group maximum size (at least 2)");
+            }
+
+            if (product.getGroupPrice() == null || product.getGroupPrice().compareTo(BigDecimal.ZERO) <= 0) {
+                groupBuyingIssues.add("Group price");
+            }
+
+            if (product.getGroupTimeLimitHours() == null || product.getGroupTimeLimitHours() < 1) {
+                groupBuyingIssues.add("Group time limit");
+            }
+
+            if (!groupBuyingIssues.isEmpty()) {
+                String issuesList = String.join(", ", groupBuyingIssues);
+                throw new RandomExceptions(
+                        String.format("Cannot publish product. Group buying is enabled but missing: %s", issuesList)
+                );
+            }
+        }
+
+        // Check if installment is enabled but missing required fields
+        if (product.getInstallmentEnabled() != null && product.getInstallmentEnabled()) {
+            if (product.getInstallmentPlans() == null || product.getInstallmentPlans().isEmpty()) {
+                throw new RandomExceptions(
+                        "Cannot publish product. Installment is enabled but no installment plans are configured"
+                );
+            }
+        }
+    }
+
+    private ShopEntity validatePublicShop(UUID shopId) throws ItemNotFoundException {
+        ShopEntity shop = shopRepo.findById(shopId)
+                .orElseThrow(() -> new ItemNotFoundException("Shop not found"));
+
+        // Check if shop is publicly accessible
+        if (shop.getIsDeleted()) {
+            throw new ItemNotFoundException("Shop not found");
+        }
+
+        if (!shop.isApproved()) {
+            throw new ItemNotFoundException("Shop not available");
+        }
+
+        if (shop.getStatus() != ShopStatus.ACTIVE) {
+            throw new ItemNotFoundException("Shop not available");
+        }
+
+        return shop;
+    }
 }
