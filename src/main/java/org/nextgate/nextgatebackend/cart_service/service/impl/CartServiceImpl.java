@@ -14,6 +14,7 @@ import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException
 import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
 import org.nextgate.nextgatebackend.globeresponsebody.GlobeSuccessResponseBuilder;
 import org.nextgate.nextgatebackend.products_mng_service.products.entity.ProductEntity;
+import org.nextgate.nextgatebackend.products_mng_service.products.enums.ProductStatus;
 import org.nextgate.nextgatebackend.products_mng_service.products.repo.ProductRepo;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -46,7 +47,7 @@ public class CartServiceImpl implements CartService {
         AccountEntity user = getAuthenticatedAccount();
         CartEntity cart = ensureCartExists(user);
 
-        ProductEntity product = productRepo.findByProductIdAndIsDeletedFalse(request.getProductId())
+        ProductEntity product = productRepo.findByProductIdAndIsDeletedFalseAndStatus(request.getProductId(), ProductStatus.ACTIVE)
                 .orElseThrow(() -> new ItemNotFoundException("Product not found"));
 
         // Check stock availability
@@ -167,6 +168,7 @@ public class CartServiceImpl implements CartService {
             return savedCart;
         });
     }
+
     private CartResponse buildCartResponse(AccountEntity user, List<CartItemEntity> cartItems) {
 
         // Build user summary
