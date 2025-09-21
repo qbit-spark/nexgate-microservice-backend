@@ -17,7 +17,9 @@ import org.nextgate.nextgatebackend.products_mng_service.products.payload.*;
 import org.nextgate.nextgatebackend.products_mng_service.products.repo.ProductRepo;
 import org.nextgate.nextgatebackend.products_mng_service.products.service.ProductService;
 import org.nextgate.nextgatebackend.products_mng_service.products.utils.helpers.ProductBuildResponseHelper;
+import org.nextgate.nextgatebackend.products_mng_service.products.utils.helpers.ProductFilterHelper;
 import org.nextgate.nextgatebackend.products_mng_service.products.utils.helpers.ProductHelperMethods;
+import org.nextgate.nextgatebackend.products_mng_service.products.utils.helpers.ProductSearchHelper;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.entity.ShopEntity;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.enums.ShopStatus;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.repo.ShopRepo;
@@ -50,6 +52,8 @@ public class ProductServiceImpl implements ProductService {
     private final AccountRepo accountRepo;
     private final ProductHelperMethods productHelperMethods;
     private final ProductBuildResponseHelper productBuildResponseHelper;
+    private final ProductSearchHelper productSearchHelper;
+    private final ProductFilterHelper productFilterHelper;
 
     @Override
     @Transactional
@@ -667,6 +671,72 @@ public class ProductServiceImpl implements ProductService {
         );
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public GlobeSuccessResponseBuilder searchProducts(UUID shopId, String query, List<ProductStatus> status,
+                                                      int page, int size, String sortBy, String sortDir) throws ItemNotFoundException {
+
+        // 1. Validate and sanitize search query
+        String sanitizedQuery = productSearchHelper.validateAndSanitizeQuery(query);
+
+        // 2. Determine user type and permissions
+        SearchContext searchContext = productSearchHelper.determineSearchContext(shopId);
+
+        // 3. Validate and set pagination parameters
+        if (page < 1) page = 1;
+        if (size <= 0) size = 10;
+        if (size > 50) size = 50; // Prevent large searches
+
+        // 4. Validate and set sorting
+        String validatedSortBy = productSearchHelper.validateSortField(sortBy);
+        Sort.Direction direction = "desc".equalsIgnoreCase(sortDir) ? Sort.Direction.DESC : Sort.Direction.ASC;
+
+        // 5. Determine which product statuses to search
+        List<ProductStatus> searchStatuses = productSearchHelper.determineSearchStatuses(status, searchContext);
+
+        // 6. Build sort criteria (relevance vs other fields)
+        Sort sort = productSearchHelper.buildSearchSort(validatedSortBy, direction, sanitizedQuery);
+        Pageable pageable = PageRequest.of(page - 1, size, sort);
+
+        // 7. Execute search
+        Page<ProductEntity> searchResults = productSearchHelper.executeProductSearch(searchContext.getShop(), sanitizedQuery, searchStatuses, pageable);
+
+        // 8. Build response based on user type
+        return productSearchHelper.buildSearchResponse(searchResults, sanitizedQuery, searchContext, searchStatuses);
+    }
+
+
+    @Override
+    @Transactional(readOnly = true)
+    public GlobeSuccessResponseBuilder filterProducts(UUID shopId, ProductFilterCriteria criteria,
+                                                      int page, int size, String sortBy, String sortDir)
+            throws ItemNotFoundException {
+
+        // 1. Determine user context and permissions (reuse from search)
+        SearchContext searchContext = productSearchHelper.determineSearchContext(shopId);
+
+        // 2. Validate pagination
+        if (page < 1) page = 1;
+        if (size <= 0) size = 10;
+        if (size > 50) size = 50; // Prevent large requests
+
+        // 3. Validate and set sorting
+        String validatedSortBy = productSearchHelper.validateSortField(sortBy);
+        Sort.Direction direction = "desc".equalsIgnoreCase(sortDir) ? Sort.Direction.DESC : Sort.Direction.ASC;
+        Sort sort = Sort.by(direction, validatedSortBy);
+        Pageable pageable = PageRequest.of(page - 1, size, sort);
+
+        // 4. Determine search statuses based on user permissions
+        List<ProductStatus> searchStatuses = productSearchHelper.determineSearchStatuses(criteria.getStatus(), searchContext);
+
+        // 5. Execute filter using helper
+        Page<ProductEntity> filterResults = productFilterHelper.executeProductFilter(
+                searchContext.getShop(), criteria, searchStatuses, pageable);
+
+        // 6. Build response
+        return productFilterHelper.buildFilterResponse(filterResults, criteria, searchContext, searchStatuses);
+    }
+
 
     // HELPER METHODS
     private AccountEntity getAuthenticatedAccount() throws ItemNotFoundException {
@@ -811,4 +881,5 @@ public class ProductServiceImpl implements ProductService {
 
         return shop;
     }
+
 }

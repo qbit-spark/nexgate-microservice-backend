@@ -4,10 +4,13 @@ import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemReadyExistException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
 import org.nextgate.nextgatebackend.globeresponsebody.GlobeSuccessResponseBuilder;
+import org.nextgate.nextgatebackend.products_mng_service.products.enums.ProductStatus;
 import org.nextgate.nextgatebackend.products_mng_service.products.enums.ReqAction;
 import org.nextgate.nextgatebackend.products_mng_service.products.payload.CreateProductRequest;
+import org.nextgate.nextgatebackend.products_mng_service.products.payload.ProductFilterCriteria;
 import org.nextgate.nextgatebackend.products_mng_service.products.payload.UpdateProductRequest;
 
+import java.util.List;
 import java.util.UUID;
 
 public interface ProductService {
@@ -37,6 +40,14 @@ public interface ProductService {
     GlobeSuccessResponseBuilder getPublicProductsByShopPaged(UUID shopId, int page, int size) throws ItemNotFoundException;
 
     GlobeSuccessResponseBuilder getProductById(UUID shopId, UUID productId) throws ItemNotFoundException;
+
+    GlobeSuccessResponseBuilder searchProducts(UUID shopId, String query, List<ProductStatus> status,
+                                               int page, int size, String sortBy, String sortDir) throws ItemNotFoundException;
+
+    GlobeSuccessResponseBuilder filterProducts(UUID shopId, ProductFilterCriteria criteria,
+                                               int page, int size, String sortBy, String sortDir)
+            throws ItemNotFoundException;
+
 
 }
 

@@ -9,6 +9,9 @@ import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.entity.Sho
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -16,7 +19,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface ProductRepo extends JpaRepository<ProductEntity, UUID> {
+public interface ProductRepo extends JpaRepository<ProductEntity, UUID>, JpaSpecificationExecutor<ProductEntity> {
 
     // ========================
     // BASIC FINDERS
@@ -42,6 +45,24 @@ public interface ProductRepo extends JpaRepository<ProductEntity, UUID> {
     boolean existsBySkuAndIsDeletedFalse(String sku);
 
     Optional<ProductEntity> findByProductIdAndShop_ShopId(UUID productId, UUID shopId);
+
+
+    Page<ProductEntity> findByShopAndIsDeletedFalseAndStatusInAndProductNameContainingIgnoreCaseOrderByCreatedAtDesc(
+            ShopEntity shop, List<ProductStatus> status, String productName, Pageable pageable);
+
+
+    @Query("SELECT p FROM ProductEntity p WHERE " +
+            "p.shop = :shop AND " +
+            "p.isDeleted = false AND " +
+            "p.status IN :statuses AND " +
+            "(LOWER(p.productName) LIKE LOWER(:query) OR " +
+            "LOWER(p.productDescription) LIKE LOWER(:query) OR " +
+            "LOWER(p.shortDescription) LIKE LOWER(:query) OR " +
+            "LOWER(p.brand) LIKE LOWER(:query))")
+    Page<ProductEntity> searchProductsWithLike(@Param("shop") ShopEntity shop,
+                                               @Param("query") String query,
+                                               @Param("statuses") List<ProductStatus> statuses,
+                                               Pageable pageable);
 
     //exit by sku and shop
     boolean existsBySkuAndShopAndIsDeletedFalse(String sku, ShopEntity shop);
@@ -74,6 +95,20 @@ public interface ProductRepo extends JpaRepository<ProductEntity, UUID> {
 
     // Count products by shop
     long countByShopAndIsDeletedFalse(ShopEntity shop);
+
+    @Query("SELECT p FROM ProductEntity p WHERE " +
+            "p.shop = :shop AND " +
+            "p.isDeleted = false AND " +
+            "p.status IN :statuses AND " +
+            "(LOWER(p.productName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+            "LOWER(p.productDescription) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+            "LOWER(p.brand) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+            "EXISTS (SELECT 1 FROM p.tags t WHERE LOWER(t) LIKE LOWER(CONCAT('%', :query, '%'))) OR " +
+            "EXISTS (SELECT 1 FROM p.specifications s WHERE LOWER(s) LIKE LOWER(CONCAT('%', :query, '%'))))")
+    Page<ProductEntity> searchProductsInShop(@Param("shop") ShopEntity shop,
+                                             @Param("query") String query,
+                                             @Param("statuses") List<ProductStatus> statuses,
+                                             Pageable pageable);
 
     long countByShopAndStatusAndIsDeletedFalse(ShopEntity shop, ProductStatus status);
 

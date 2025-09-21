@@ -6,14 +6,19 @@ import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemReadyExistException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
 import org.nextgate.nextgatebackend.globeresponsebody.GlobeSuccessResponseBuilder;
+import org.nextgate.nextgatebackend.products_mng_service.products.enums.ProductCondition;
+import org.nextgate.nextgatebackend.products_mng_service.products.enums.ProductStatus;
 import org.nextgate.nextgatebackend.products_mng_service.products.enums.ReqAction;
 import org.nextgate.nextgatebackend.products_mng_service.products.payload.CreateProductRequest;
+import org.nextgate.nextgatebackend.products_mng_service.products.payload.ProductFilterCriteria;
 import org.nextgate.nextgatebackend.products_mng_service.products.payload.UpdateProductRequest;
 import org.nextgate.nextgatebackend.products_mng_service.products.service.ProductService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -134,6 +139,65 @@ public class ProductController {
             @RequestParam(defaultValue = "10") int size) throws ItemNotFoundException {
 
         GlobeSuccessResponseBuilder response = productService.getPublicProductsByShopPaged(shopId, page, size);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<GlobeSuccessResponseBuilder> searchProducts(
+            @PathVariable UUID shopId,
+            @RequestParam String q,
+            @RequestParam(required = false) List<ProductStatus> status,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "relevance") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir) throws ItemNotFoundException {
+
+        GlobeSuccessResponseBuilder response = productService.searchProducts(shopId, q, status, page, size, sortBy, sortDir);
+        return ResponseEntity.ok(response);
+    }
+
+
+    @GetMapping("/advanced-filter")
+    public ResponseEntity<GlobeSuccessResponseBuilder> filterProducts(
+            @PathVariable UUID shopId,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) List<String> brand,
+            @RequestParam(required = false) ProductCondition condition,
+            @RequestParam(required = false) UUID categoryId,
+            @RequestParam(required = false) List<String> tags,
+            @RequestParam(required = false) Boolean inStock,
+            @RequestParam(required = false) Boolean onSale,
+            @RequestParam(required = false) Boolean hasGroupBuying,
+            @RequestParam(required = false) Boolean hasInstallments,
+            @RequestParam(required = false) Boolean hasMultipleColors,
+            @RequestParam(required = false) Boolean isFeatured,
+            @RequestParam(required = false) List<ProductStatus> status,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir) throws ItemNotFoundException {
+
+        // Build filter criteria object
+        ProductFilterCriteria filterCriteria = ProductFilterCriteria.builder()
+                .minPrice(minPrice)
+                .maxPrice(maxPrice)
+                .brands(brand)
+                .condition(condition)
+                .categoryId(categoryId)
+                .tags(tags)
+                .inStock(inStock)
+                .onSale(onSale)
+                .hasGroupBuying(hasGroupBuying)
+                .hasInstallments(hasInstallments)
+                .hasMultipleColors(hasMultipleColors)
+                .isFeatured(isFeatured)
+                .status(status)
+                .build();
+
+        GlobeSuccessResponseBuilder response = productService.filterProducts(
+                shopId, filterCriteria, page, size, sortBy, sortDir);
+
         return ResponseEntity.ok(response);
     }
 
