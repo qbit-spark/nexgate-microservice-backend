@@ -14,6 +14,6 @@ public interface ProductService {
 
     GlobeSuccessResponseBuilder getProductDetailed(UUID shopId, UUID productId) throws ItemNotFoundException, RandomExceptions;
 
-    GlobeSuccessResponseBuilder getProductsByShop(UUID shopId) throws ItemNotFoundException, RandomExceptions;
+    GlobeSuccessResponseBuilder getProductsByMyShop(UUID shopId) throws ItemNotFoundException, RandomExceptions;
 }
 

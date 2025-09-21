@@ -211,7 +211,7 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional(readOnly = true)
-    public GlobeSuccessResponseBuilder getProductsByShop(UUID shopId)
+    public GlobeSuccessResponseBuilder getProductsByMyShop(UUID shopId)
             throws ItemNotFoundException, RandomExceptions {
 
         //1. Get the authenticated user

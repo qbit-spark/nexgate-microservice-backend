@@ -83,6 +83,7 @@ public class ProductSummaryResponse {
         private String logoUrl;
         private Boolean isVerified;
         private Boolean isApproved;
+        private Boolean isMyShop;
     }
 
     // ProductListSummary.java - Quick stats
