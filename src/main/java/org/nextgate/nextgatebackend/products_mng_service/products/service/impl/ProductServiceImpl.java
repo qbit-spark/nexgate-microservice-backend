@@ -257,6 +257,133 @@ public class ProductServiceImpl implements ProductService {
         );
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public GlobeSuccessResponseBuilder getAllProductsPaged(UUID shopId, int page, int size) throws ItemNotFoundException, RandomExceptions {
+
+        // Get authenticated user
+        AccountEntity authenticatedAccount = getAuthenticatedAccount();
+
+        // Validate shop existence
+        ShopEntity shop = shopRepo.findById(shopId)
+                .orElseThrow(() -> new ItemNotFoundException("Shop not found"));
+
+        if (shop.getIsDeleted()) {
+            throw new ItemNotFoundException("Shop not found");
+        }
+
+        // Check permissions
+        boolean isValidToViewProducts = validateSystemRolesOrOwner(
+                List.of("ROLE_SUPER_ADMIN", "ROLE_STAFF_ADMIN"), authenticatedAccount, shop);
+        if (!isValidToViewProducts) {
+            throw new RandomExceptions("You do not have permission to view products for this shop");
+        }
+
+        // Validate pagination
+        if (page < 1) page = 1;
+        if (size <= 0) size = 10;
+
+        Pageable pageable = PageRequest.of(page - 1, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+        Page<ProductEntity> productPage = productRepo.findByShopAndIsDeletedFalseOrderByCreatedAtDesc(shop, pageable);
+
+        // Build lightweight response list
+        List<ProductSummaryResponse> responses = productPage.getContent().stream()
+                .map(productBuildResponseHelper::buildProductSummaryResponse)
+                .toList();
+
+        // Build summary statistics
+        ProductSummaryResponse.ProductListSummary summary = productBuildResponseHelper.buildProductListSummary(productPage.getContent(), shop);
+
+        // Build main data response
+        ProductSummaryResponse.ShopProductsListResponse dataResponse = ProductSummaryResponse.ShopProductsListResponse.builder()
+                .shop(productBuildResponseHelper.buildShopSummaryForProducts(shop))
+                .summary(summary)
+                .products(responses)
+                .totalProducts(responses.size())
+                .build();
+
+        // Build final response with pagination
+        var finalResponse = new Object() {
+            public final ProductSummaryResponse.ShopProductsListResponse contents = dataResponse;
+            public final int currentPage = productPage.getNumber() + 1;
+            public final int pageSize = productPage.getSize();
+            public final long totalElements = productPage.getTotalElements();
+            public final int totalPages = productPage.getTotalPages();
+            public final boolean hasNext = productPage.hasNext();
+            public final boolean hasPrevious = productPage.hasPrevious();
+        };
+
+        return GlobeSuccessResponseBuilder.success(
+                String.format("Retrieved %d products from shop: %s (Page %d of %d)",
+                        responses.size(), shop.getShopName(), productPage.getNumber() + 1, productPage.getTotalPages()),
+                finalResponse
+        );
+    }
+
+    @Override
+    @Transactional
+    public GlobeSuccessResponseBuilder updateProduct(UUID shopId, UUID productId, UpdateProductRequest request)
+            throws ItemNotFoundException, RandomExceptions, ItemReadyExistException {
+
+        // 1. Get authenticated user
+        AccountEntity account = getAuthenticatedAccount();
+
+        // 2. Validate shop existence
+        ShopEntity shop = shopRepo.findById(shopId)
+                .orElseThrow(() -> new ItemNotFoundException("Shop not found"));
+
+        if (shop.getIsDeleted()) {
+            throw new ItemNotFoundException("Shop not found");
+        }
+
+        // 3. Check if the authenticated user is the owner or admin
+        boolean isValidToUpdateProduct = validateSystemRolesOrOwner(
+                List.of("ROLE_SUPER_ADMIN", "ROLE_STAFF_ADMIN"), account, shop);
+        if (!isValidToUpdateProduct) {
+            throw new RandomExceptions("You do not have permission to update products for this shop");
+        }
+
+        // 4. Find existing product
+        ProductEntity product = productRepo.findByProductIdAndShop_ShopIdAndIsDeletedFalse(productId, shopId)
+                .orElseThrow(() -> new ItemNotFoundException("Product not found in this shop"));
+
+        // 5. Check if new product name already exists (if name is being changed)
+        if (request.getProductName() != null &&
+                !product.getProductName().equals(request.getProductName()) &&
+                productRepo.existsByProductNameAndShopAndIsDeletedFalse(request.getProductName(), shop)) {
+            throw new ItemReadyExistException("A product with this name already exists in this shop");
+        }
+
+        // 6. Check if new SKU already exists (if SKU is being changed)
+        if (request.getSku() != null &&
+                !request.getSku().equals(product.getSku()) &&
+                productRepo.existsBySkuAndShopAndIsDeletedFalse(request.getSku(), shop)) {
+            throw new ItemReadyExistException("A product with this SKU already exists");
+        }
+
+        // 7. Validate category if provided
+        ProductCategoryEntity category = null;
+        if (request.getCategoryId() != null) {
+            category = productCategoryRepo.findByCategoryIdAndIsActiveTrue(request.getCategoryId())
+                    .orElseThrow(() -> new ItemNotFoundException("Category not found or inactive"));
+        }
+
+        // 8. Update product fields using helper method
+        productHelperMethods.updateProductFields(product, request, category, shop, account);
+
+        // 9. Save updated product
+        ProductEntity updatedProduct = productRepo.save(product);
+
+        // 10. Build response
+        ProductDetailedResponse response = productBuildResponseHelper.buildDetailedProductResponse(updatedProduct);
+
+        return GlobeSuccessResponseBuilder.success(
+                "Product updated successfully",
+                response
+        );
+    }
+
     // HELPER METHODS
     private AccountEntity getAuthenticatedAccount() throws ItemNotFoundException {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();

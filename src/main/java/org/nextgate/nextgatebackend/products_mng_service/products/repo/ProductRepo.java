@@ -41,6 +41,9 @@ public interface ProductRepo extends JpaRepository<ProductEntity, UUID> {
     );
     boolean existsBySkuAndIsDeletedFalse(String sku);
 
+    //exit by sku and shop
+    boolean existsBySkuAndShopAndIsDeletedFalse(String sku, ShopEntity shop);
+
     boolean existsByProductSlugAndIsDeletedFalse(String productSlug);
 
     // New method for shop-scoped slug checking

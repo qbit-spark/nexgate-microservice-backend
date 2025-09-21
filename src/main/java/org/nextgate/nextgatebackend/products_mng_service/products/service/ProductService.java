@@ -6,6 +6,7 @@ import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
 import org.nextgate.nextgatebackend.globeresponsebody.GlobeSuccessResponseBuilder;
 import org.nextgate.nextgatebackend.products_mng_service.products.enums.ReqAction;
 import org.nextgate.nextgatebackend.products_mng_service.products.payload.CreateProductRequest;
+import org.nextgate.nextgatebackend.products_mng_service.products.payload.UpdateProductRequest;
 
 import java.util.UUID;
 
@@ -15,5 +16,11 @@ public interface ProductService {
     GlobeSuccessResponseBuilder getProductDetailed(UUID shopId, UUID productId) throws ItemNotFoundException, RandomExceptions;
 
     GlobeSuccessResponseBuilder getProductsByMyShop(UUID shopId) throws ItemNotFoundException, RandomExceptions;
+
+    GlobeSuccessResponseBuilder getAllProductsPaged(UUID shopId, int page, int size) throws ItemNotFoundException, RandomExceptions;
+
+    GlobeSuccessResponseBuilder updateProduct(UUID shopId, UUID productId, UpdateProductRequest request)
+            throws ItemNotFoundException, RandomExceptions, ItemReadyExistException;
+
 }
 
