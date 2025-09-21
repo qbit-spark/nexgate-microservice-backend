@@ -72,6 +72,8 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.GET,"/api/v1/shops/{shopId}/products/{productId}").permitAll()
                         .requestMatchers(HttpMethod.GET,"/api/v1/shops/{shopId}/products/public-view/all").permitAll()
                         .requestMatchers(HttpMethod.GET,"/api/v1/shops/{shopId}/products/public-view/all-paged").permitAll()
+                        .requestMatchers(HttpMethod.GET,"/api/v1/shops/{shopId}/products/search").permitAll()
+                        .requestMatchers(HttpMethod.GET,"/api/v1/shops/{shopId}/products/advanced-filter").permitAll()
 
                         .anyRequest().authenticated())
                 .httpBasic(Customizer.withDefaults())
