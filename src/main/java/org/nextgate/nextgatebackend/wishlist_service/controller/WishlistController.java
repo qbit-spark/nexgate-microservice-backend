@@ -36,12 +36,12 @@ public class WishlistController {
         return ResponseEntity.ok(response);
     }
 
-    @DeleteMapping("/products/{productId}")
+    @DeleteMapping("/{itemId}")
     public ResponseEntity<GlobeSuccessResponseBuilder> removeFromWishlist(
-            @PathVariable UUID productId)
+            @PathVariable UUID itemId)
             throws ItemNotFoundException {
 
-        GlobeSuccessResponseBuilder response = wishlistService.removeFromWishlist(productId);
+        GlobeSuccessResponseBuilder response = wishlistService.removeFromWishlist(itemId);
         return ResponseEntity.ok(response);
     }
 
@@ -53,13 +53,13 @@ public class WishlistController {
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/move-to-cart/{productId}")
+    @PostMapping("/move-to-cart/{itemId}")
     public ResponseEntity<GlobeSuccessResponseBuilder> moveToCart(
-            @PathVariable UUID productId,
+            @PathVariable UUID itemId,
             @RequestParam(defaultValue = "1") Integer quantity)
             throws ItemNotFoundException, RandomExceptions {
 
-        GlobeSuccessResponseBuilder response = wishlistService.moveToCart(productId, quantity);
+        GlobeSuccessResponseBuilder response = wishlistService.moveToCart(itemId, quantity);
         return ResponseEntity.ok(response);
     }
 }

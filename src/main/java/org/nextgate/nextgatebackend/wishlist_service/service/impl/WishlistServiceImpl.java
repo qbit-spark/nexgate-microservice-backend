@@ -78,14 +78,15 @@ public class WishlistServiceImpl implements WishlistService {
 
     @Override
     @Transactional
-    public GlobeSuccessResponseBuilder removeFromWishlist(UUID productId) throws ItemNotFoundException {
+    public GlobeSuccessResponseBuilder removeFromWishlist(UUID itemId) throws ItemNotFoundException {
 
         AccountEntity user = getAuthenticatedAccount();
 
-        ProductEntity product = productRepo.findByProductIdAndIsDeletedFalse(productId)
-                .orElseThrow(() -> new ItemNotFoundException("Product not found"));
+        //Check if this item belong to this user
+        wishlistItemRepo.findByWishlistIdAndUser(itemId, user)
+                .orElseThrow(() -> new ItemNotFoundException("Wishlist item not found"));
 
-        wishlistItemRepo.deleteByUserAndProduct(user, product);
+        wishlistItemRepo.deleteById(itemId);
 
         return GlobeSuccessResponseBuilder.success("Product removed from wishlist successfully");
     }
@@ -102,8 +103,16 @@ public class WishlistServiceImpl implements WishlistService {
 
     @Override
     @Transactional
-    public GlobeSuccessResponseBuilder moveToCart(UUID productId, Integer quantity)
+    public GlobeSuccessResponseBuilder moveToCart(UUID itemId, Integer quantity)
             throws ItemNotFoundException, RandomExceptions {
+
+        AccountEntity user = getAuthenticatedAccount();
+
+        // Get wishlist item
+        WishlistItemEntity wishlistItem = wishlistItemRepo.findByWishlistIdAndUser(itemId, user)
+                .orElseThrow(() -> new ItemNotFoundException("Wishlist item not found"));
+
+        UUID productId = wishlistItem.getProduct().getProductId();
 
         // Add to cart
         AddToCartRequest cartRequest = new AddToCartRequest();
@@ -113,7 +122,7 @@ public class WishlistServiceImpl implements WishlistService {
         cartService.addToCart(cartRequest);
 
         // Remove from wishlist
-        removeFromWishlist(productId);
+       // removeFromWishlist(productId);
 
         return GlobeSuccessResponseBuilder.success("Product moved to cart successfully");
     }

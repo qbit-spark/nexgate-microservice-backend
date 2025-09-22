@@ -21,6 +21,6 @@ public interface WishlistService {
     GlobeSuccessResponseBuilder clearWishlist()
             throws ItemNotFoundException;
 
-    GlobeSuccessResponseBuilder moveToCart(UUID productId, Integer quantity)
+    GlobeSuccessResponseBuilder moveToCart(UUID itemId, Integer quantity)
             throws ItemNotFoundException, RandomExceptions;
 }
