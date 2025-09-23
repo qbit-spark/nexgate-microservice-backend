@@ -737,6 +737,31 @@ public class ProductServiceImpl implements ProductService {
         return productFilterHelper.buildFilterResponse(filterResults, criteria, searchContext, searchStatuses);
     }
 
+    @Override
+    public GlobeSuccessResponseBuilder findBySlug(UUID shopId, String slug) throws ItemNotFoundException {
+
+        // 1. Validate shop existence and is approved/active
+        ShopEntity shop = validatePublicShop(shopId);
+
+        // 2. Find product (only ACTIVE products for public)
+        ProductEntity product = productRepo.findByProductSlugAndShopAndIsDeletedFalse(slug, shop)
+                .orElseThrow(() -> new ItemNotFoundException("Product with given slug do not found"));
+
+        // 3. Check if product is publicly available
+        if (product.getStatus() != ProductStatus.ACTIVE) {
+            throw new ItemNotFoundException("Product not available");
+        }
+
+        // 4. Build public response (no sensitive details)
+        ProductPublicResponse response = productBuildResponseHelper.buildPublicProductResponse(product);
+
+        return GlobeSuccessResponseBuilder.success(
+                "Product retrieved successfully",
+                response
+        );
+
+    }
+
 
     // HELPER METHODS
     private AccountEntity getAuthenticatedAccount() throws ItemNotFoundException {

@@ -49,5 +49,6 @@ public interface ProductService {
             throws ItemNotFoundException;
 
 
+    GlobeSuccessResponseBuilder findBySlug(UUID shopId, String slug) throws ItemNotFoundException;
 }
 

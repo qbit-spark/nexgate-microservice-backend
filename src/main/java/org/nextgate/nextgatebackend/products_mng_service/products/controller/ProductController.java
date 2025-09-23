@@ -92,6 +92,15 @@ public class ProductController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/find-by-slug/{slug}")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getProductBySlug(
+            @PathVariable UUID shopId,
+            @PathVariable String slug)
+            throws ItemNotFoundException {
+        GlobeSuccessResponseBuilder response = productService.findBySlug(shopId, slug);
+        return ResponseEntity.ok(response);
+    }
+
     @DeleteMapping("/{productId}")
     public ResponseEntity<GlobeSuccessResponseBuilder> deleteProduct(
             @PathVariable UUID shopId,

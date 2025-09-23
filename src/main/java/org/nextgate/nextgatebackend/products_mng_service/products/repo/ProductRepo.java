@@ -31,7 +31,7 @@ public interface ProductRepo extends JpaRepository<ProductEntity, UUID>, JpaSpec
 
     Optional<ProductEntity> findByProductIdAndShop_ShopIdAndIsDeletedFalse(UUID productId, UUID shopId);
 
-    Optional<ProductEntity> findByProductSlugAndIsDeletedFalse(String productSlug);
+    Optional<ProductEntity> findByProductSlugAndShopAndIsDeletedFalse(String productSlug, ShopEntity shop);
 
     // ========================
     // EXISTENCE CHECKS
