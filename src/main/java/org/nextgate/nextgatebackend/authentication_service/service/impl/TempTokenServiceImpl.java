@@ -74,7 +74,7 @@ public class TempTokenServiceImpl implements TempTokenService {
         // Invalidate any existing active tokens for the same purpose
         invalidateAllTokensForPurpose(account, userIdentifier, purpose);
 
-        // Create a JWT payload
+        // Create a JWT payloads
         Map<String, Object> claims = new HashMap<>();
         claims.put("userIdentifier", userIdentifier);
         claims.put("purpose", purpose.name());
