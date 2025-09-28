@@ -7,6 +7,7 @@ public enum PaymentMethodsType {
     BANK_TRANSFER,
     CRYPTOCURRENCY,
     MOBILE_PAYMENT,
+    MNO_PAYMENT,
     WALLET,
     GIFT_CARD,
     CASH_ON_DELIVERY

@@ -75,7 +75,6 @@ public class PaymentMethodsEntity {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class PaymentMethodDetails {
-        private String billingAddressId;
 
         // Credit/Debit Card fields
         private String cardType;
