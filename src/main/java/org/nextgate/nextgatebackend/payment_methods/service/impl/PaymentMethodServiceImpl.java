@@ -10,6 +10,7 @@ import org.nextgate.nextgatebackend.payment_methods.entity.PaymentMethodsEntity;
 import org.nextgate.nextgatebackend.payment_methods.payload.CreatePaymentMethodRequest;
 import org.nextgate.nextgatebackend.payment_methods.payload.PaymentMethodDetailResponse;
 import org.nextgate.nextgatebackend.payment_methods.payload.PaymentMethodListResponse;
+import org.nextgate.nextgatebackend.payment_methods.payload.PaymentMethodSummaryResponse;
 import org.nextgate.nextgatebackend.payment_methods.repo.PaymentMethodRepository;
 import org.nextgate.nextgatebackend.payment_methods.service.PaymentMethodService;
 import org.nextgate.nextgatebackend.payment_methods.utils.validators.PaymentMethodHelper;
@@ -62,28 +63,122 @@ public class PaymentMethodServiceImpl implements PaymentMethodService {
     }
 
     @Override
-    public PaymentMethodDetailResponse getPaymentMethodById(UUID paymentMethodId) {
-        return null;
+    public PaymentMethodDetailResponse getPaymentMethodById(UUID paymentMethodId) throws ItemNotFoundException {
+        // Get authenticated user
+        AccountEntity authenticatedAccount = getAuthenticatedAccount();
+
+        // Find payment method and verify ownership
+        PaymentMethodsEntity paymentMethod = paymentMethodRepository
+                .findByPaymentMethodIdAndOwner(paymentMethodId, authenticatedAccount)
+                .orElseThrow(() -> new ItemNotFoundException("Payment method not found, or you do not have access to it"));
+
+        // Convert to response DTO
+        return paymentMethodMapper.toDetailResponse(paymentMethod);
     }
 
     @Override
-    public PaymentMethodListResponse getMyPaymentMethods() {
-        return null;
+    public PaymentMethodListResponse getMyPaymentMethods() throws ItemNotFoundException {
+        // Get authenticated user
+        AccountEntity authenticatedAccount = getAuthenticatedAccount();
+
+        // Get all payment methods for the user
+        List<PaymentMethodsEntity> paymentMethods = paymentMethodRepository.findByOwner(authenticatedAccount);
+
+        // Convert to summary responses
+        List<PaymentMethodSummaryResponse> summaryResponses = paymentMethodMapper.toSummaryResponseList(paymentMethods);
+
+        // Find default payment method
+        PaymentMethodSummaryResponse defaultMethod = summaryResponses.stream()
+                .filter(PaymentMethodSummaryResponse::getIsDefault)
+                .findFirst()
+                .orElse(null);
+
+        // Calculate counts
+        int totalCount = paymentMethods.size();
+        int activeCount = (int) paymentMethods.stream()
+                .filter(PaymentMethodsEntity::getIsActive)
+                .count();
+
+        return PaymentMethodListResponse.builder()
+                .paymentMethods(summaryResponses)
+                .totalCount(totalCount)
+                .activeCount(activeCount)
+                .defaultPaymentMethod(defaultMethod)
+                .build();
     }
 
     @Override
-    public PaymentMethodDetailResponse updatePaymentMethod(UUID paymentMethodId, CreatePaymentMethodRequest request) {
-        return null;
+    @Transactional
+    public PaymentMethodDetailResponse updatePaymentMethod(UUID paymentMethodId, CreatePaymentMethodRequest request) throws ItemNotFoundException, BadRequestException {
+        // Get authenticated user
+        AccountEntity authenticatedAccount = getAuthenticatedAccount();
+
+        // Find payment method and verify ownership
+        PaymentMethodsEntity existingPaymentMethod = paymentMethodRepository
+                .findByPaymentMethodIdAndOwner(paymentMethodId, authenticatedAccount)
+                .orElseThrow(() -> new ItemNotFoundException("Payment method not found"));
+
+        // Validate payment method details (only validate provided fields)
+        paymentMethodValidator.validatePaymentMethodDetails(request);
+
+        // Check for duplicates (excluding current payment method)
+        paymentMethodValidator.checkForDuplicateOnUpdate(authenticatedAccount, request, paymentMethodId);
+
+        // Handle default payment method logic
+        if (request.getIsDefault() != null && request.getIsDefault() && !existingPaymentMethod.getIsDefault()) {
+            paymentMethodHelper.unsetCurrentDefaultPaymentMethod(authenticatedAccount);
+        }
+
+        // Partial update - only update provided fields
+        paymentMethodHelper.updatePaymentMethodFields(existingPaymentMethod, request);
+
+        // Save updated entity
+        PaymentMethodsEntity savedEntity = paymentMethodRepository.save(existingPaymentMethod);
+
+        // Convert to response DTO
+        return paymentMethodMapper.toDetailResponse(savedEntity);
     }
 
     @Override
-    public void deletePaymentMethod(UUID paymentMethodId) {
+    @Transactional
+    public void deletePaymentMethod(UUID paymentMethodId) throws ItemNotFoundException {
+        // Get authenticated user
+        AccountEntity authenticatedAccount = getAuthenticatedAccount();
 
+        // Find payment method and verify ownership
+        PaymentMethodsEntity paymentMethod = paymentMethodRepository
+                .findByPaymentMethodIdAndOwner(paymentMethodId, authenticatedAccount)
+                .orElseThrow(() -> new ItemNotFoundException("Payment method not found"));
+
+        // Hard delete - permanently remove from database
+        paymentMethodRepository.delete(paymentMethod);
     }
 
     @Override
-    public PaymentMethodDetailResponse setAsDefault(UUID paymentMethodId) {
-        return null;
+    @Transactional
+    public PaymentMethodDetailResponse setAsDefault(UUID paymentMethodId) throws ItemNotFoundException, BadRequestException {
+        // Get authenticated user
+        AccountEntity authenticatedAccount = getAuthenticatedAccount();
+
+        // Find payment method and verify ownership
+        PaymentMethodsEntity paymentMethod = paymentMethodRepository
+                .findByPaymentMethodIdAndOwner(paymentMethodId, authenticatedAccount)
+                .orElseThrow(() -> new ItemNotFoundException("Payment method not found"));
+
+        // Check if payment method is active
+        if (!paymentMethod.getIsActive()) {
+            throw new BadRequestException("Cannot set inactive payment method as default");
+        }
+
+        // Unset current default payment methods
+        paymentMethodHelper.unsetCurrentDefaultPaymentMethod(authenticatedAccount);
+
+        // Set this payment method as default
+        paymentMethod.setIsDefault(true);
+        PaymentMethodsEntity savedEntity = paymentMethodRepository.save(paymentMethod);
+
+        // Convert to response DTO
+        return paymentMethodMapper.toDetailResponse(savedEntity);
     }
 
     private AccountEntity getAuthenticatedAccount() throws ItemNotFoundException {

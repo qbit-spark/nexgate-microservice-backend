@@ -12,14 +12,14 @@ public interface PaymentMethodService {
 
     PaymentMethodDetailResponse createPaymentMethod(CreatePaymentMethodRequest request) throws ItemNotFoundException, BadRequestException;
 
-    PaymentMethodDetailResponse getPaymentMethodById(UUID paymentMethodId);
+    PaymentMethodDetailResponse getPaymentMethodById(UUID paymentMethodId) throws ItemNotFoundException;
 
-    PaymentMethodListResponse getMyPaymentMethods();
+    PaymentMethodListResponse getMyPaymentMethods() throws ItemNotFoundException;
 
-    PaymentMethodDetailResponse updatePaymentMethod(UUID paymentMethodId, CreatePaymentMethodRequest request);
+    PaymentMethodDetailResponse updatePaymentMethod(UUID paymentMethodId, CreatePaymentMethodRequest request) throws ItemNotFoundException, BadRequestException;
 
-    void deletePaymentMethod(UUID paymentMethodId);
+    void deletePaymentMethod(UUID paymentMethodId) throws ItemNotFoundException;
 
-    PaymentMethodDetailResponse setAsDefault(UUID paymentMethodId);
+    PaymentMethodDetailResponse setAsDefault(UUID paymentMethodId) throws ItemNotFoundException, BadRequestException;
 
 }

@@ -9,6 +9,7 @@ import org.nextgate.nextgatebackend.payment_methods.repo.PaymentMethodRepository
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -42,6 +43,30 @@ public class PaymentMethodValidator {
             case CRYPTOCURRENCY -> checkDuplicateCrypto(existingMethods, request);
             case MOBILE_PAYMENT -> checkDuplicateMobilePayment(existingMethods, request);
             default -> false; // GIFT_CARD and CASH_ON_DELIVERY can have duplicates
+        };
+
+        if (exists) {
+            throw new BadRequestException("Payment method with similar details already exists for your account");
+        }
+    }
+
+
+    public void checkForDuplicateOnUpdate(AccountEntity account, CreatePaymentMethodRequest request, UUID currentPaymentMethodId) throws BadRequestException {
+        // Get all payment methods of the same type for this user (excluding current one)
+        List<PaymentMethodsEntity> existingMethods = paymentMethodRepository
+                .findByOwnerAndPaymentMethodType(account, request.getPaymentMethodType())
+                .stream()
+                .filter(method -> !method.getPaymentMethodId().equals(currentPaymentMethodId))
+                .toList();
+
+        boolean exists = switch (request.getPaymentMethodType()) {
+            case CREDIT_CARD, DEBIT_CARD -> checkDuplicateCard(existingMethods, request);
+            case PAYPAL -> checkDuplicatePayPal(existingMethods, request);
+            case MNO_PAYMENT -> checkDuplicateMno(existingMethods, request);
+            case BANK_TRANSFER -> checkDuplicateBank(existingMethods, request);
+            case CRYPTOCURRENCY -> checkDuplicateCrypto(existingMethods, request);
+            case MOBILE_PAYMENT -> checkDuplicateMobilePayment(existingMethods, request);
+            default -> false;
         };
 
         if (exists) {
