@@ -80,7 +80,6 @@ public class CheckoutSessionMapper {
 
         return items.stream()
                 .map(item -> CheckoutSessionResponse.CheckoutItemResponse.builder()
-                        .itemId(item.getItemId())
                         .productId(item.getProductId())
                         .productName(item.getProductName())
                         .productSlug(item.getProductSlug())
