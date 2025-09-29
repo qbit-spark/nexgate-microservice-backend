@@ -31,7 +31,7 @@ public class CreateCheckoutSessionRequest {
     @NotBlank(message = "Shipping method is required")
     private String shippingMethodId;
 
-    @NotNull(message = "Payment method is required")
+    //This is optional coz Wallet can be used without Payment Method
     private UUID paymentMethodId;
 
     // Optional metadata for coupons, referrals, etc.

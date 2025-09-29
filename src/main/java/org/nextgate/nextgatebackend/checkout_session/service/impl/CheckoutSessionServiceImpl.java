@@ -16,6 +16,9 @@ import org.nextgate.nextgatebackend.checkout_session.utils.helpers.CheckoutSessi
 import org.nextgate.nextgatebackend.checkout_session.utils.helpers.CheckoutSessionValidator;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.payment_methods.entity.PaymentMethodsEntity;
+import org.nextgate.nextgatebackend.payment_methods.enums.PaymentMethodsType;
+import org.nextgate.nextgatebackend.wallet_service.wallet.entity.WalletEntity;
+import org.nextgate.nextgatebackend.wallet_service.wallet.service.WalletService;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -37,6 +40,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
     private final CheckoutSessionValidator validator;
     private final CheckoutSessionHelper helper;
     private final CheckoutSessionMapper mapper;
+    private final WalletService walletService;
 
     @Override
     @Transactional
@@ -75,11 +79,23 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // ========================================
         // 3. VALIDATE & FETCH PAYMENT METHOD
         // ========================================
-        PaymentMethodsEntity paymentMethod = validator.validateAndGetPaymentMethod(
-                request.getPaymentMethodId(),
-                authenticatedUser
-        );
-        log.info("Payment method validated: {}", paymentMethod.getPaymentMethodType());
+
+        PaymentMethodsEntity paymentMethod;
+
+        if (request.getPaymentMethodId() != null) {
+            // User provided a payment method - validate it
+            paymentMethod = validator.validateAndGetPaymentMethod(
+                    request.getPaymentMethodId(),
+                    authenticatedUser
+            );
+            log.info("Payment method validated: {}", paymentMethod.getPaymentMethodType());
+        } else {
+            // No payment method provided - default to wallet
+            // Create a virtual wallet payment method
+            paymentMethod = createVirtualWalletPaymentMethod(authenticatedUser);
+            log.info("Using default wallet payment method");
+        }
+
 
         // ========================================
         // 4. VALIDATE SHIPPING ADDRESS
@@ -216,5 +232,30 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
                 .anyMatch(role -> customRoles.contains(role.getRoleName()));
 
         return hasCustomRole;
+    }
+
+    private PaymentMethodsEntity createVirtualWalletPaymentMethod(AccountEntity user)
+            throws ItemNotFoundException, BadRequestException {
+
+        // Verify wallet exists and is active via WalletService
+        // This will throw exception if wallet doesn't exist
+        WalletEntity wallet = walletService.getWalletByAccountId(user.getAccountId());
+
+        if (!wallet.getIsActive()) {
+            throw new BadRequestException(
+                    "Your wallet is not active. Please activate your wallet or provide a payment method."
+            );
+        }
+
+        // Create virtual payment method entity (not persisted to DB)
+        return PaymentMethodsEntity.builder()
+                .paymentMethodId(null) // Virtual
+                .owner(user)
+                .paymentMethodType(PaymentMethodsType.WALLET)
+                .isActive(true)
+                .isDefault(false)
+                .isVerified(true)
+                .billingAddress(null) // Wallet doesn't need billing address
+                .build();
     }
 }

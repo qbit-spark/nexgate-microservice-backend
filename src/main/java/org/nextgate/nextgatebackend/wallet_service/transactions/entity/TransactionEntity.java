@@ -23,7 +23,6 @@ import java.util.UUID;
                 @Index(name = "idx_transaction_account", columnList = "account_id"),
                 @Index(name = "idx_transaction_wallet", columnList = "wallet_id"),
                 @Index(name = "idx_transaction_status", columnList = "status"),
-                @Index(name = "idx_transaction_source", columnList = "transactionSource"),
                 @Index(name = "idx_transaction_type", columnList = "transactionType"),
                 @Index(name = "idx_transaction_created", columnList = "createdAt"),
                 @Index(name = "idx_transaction_account_created", columnList = "account_id, createdAt")

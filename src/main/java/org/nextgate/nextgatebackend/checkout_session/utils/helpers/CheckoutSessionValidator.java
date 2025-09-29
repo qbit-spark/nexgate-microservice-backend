@@ -8,7 +8,10 @@ import org.nextgate.nextgatebackend.checkout_session.enums.CheckoutSessionType;
 import org.nextgate.nextgatebackend.checkout_session.payload.CreateCheckoutSessionRequest;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.payment_methods.entity.PaymentMethodsEntity;
+import org.nextgate.nextgatebackend.payment_methods.enums.PaymentMethodsType;
 import org.nextgate.nextgatebackend.payment_methods.repo.PaymentMethodRepository;
+import org.nextgate.nextgatebackend.wallet_service.wallet.entity.WalletEntity;
+import org.nextgate.nextgatebackend.wallet_service.wallet.service.WalletService;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
@@ -18,6 +21,7 @@ import java.util.UUID;
 public class CheckoutSessionValidator {
 
     private final PaymentMethodRepository paymentMethodRepository;
+    private final WalletService walletService;
     // Todo: Add other repositories as needed (ProductRepo, ShippingAddressRepo, etc.)
 
     // ========================================
@@ -161,5 +165,34 @@ public class CheckoutSessionValidator {
         // Todo: Verify shipping method exists and is available
         // ShippingMethodEntity method = shippingMethodRepo.findById(shippingMethodId)
         //     .orElseThrow(() -> new ItemNotFoundException("Shipping method not found"));
+    }
+
+    public PaymentMethodsEntity getOrCreateWalletPaymentMethod(
+            UUID paymentMethodId,
+            AccountEntity user) throws ItemNotFoundException, BadRequestException {
+
+        // If payment method ID provided, validate and return it
+        if (paymentMethodId != null) {
+            return validateAndGetPaymentMethod(paymentMethodId, user);
+        }
+
+        // Otherwise, use wallet as default payment method
+        // Check if user's wallet exists and is active
+        WalletEntity wallet = walletService.getWalletByAccountId(user.getAccountId());
+
+        if (!wallet.getIsActive()) {
+            throw new BadRequestException("Your wallet is not active. Please activate it or provide a payment method.");
+        }
+
+        // Return a virtual PaymentMethodsEntity representing the wallet
+        // This is not saved to DB, just used for processing
+        return PaymentMethodsEntity.builder()
+                .paymentMethodId(null) // Virtual, not in DB
+                .owner(user)
+                .paymentMethodType(PaymentMethodsType.WALLET)
+                .isActive(true)
+                .isDefault(false)
+                .isVerified(true)
+                .build();
     }
 }
