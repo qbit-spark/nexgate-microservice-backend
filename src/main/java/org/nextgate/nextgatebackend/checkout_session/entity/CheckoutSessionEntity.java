@@ -157,8 +157,7 @@ public class CheckoutSessionEntity {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class CheckoutItem {
-        private UUID itemId;
-        private UUID productId;
+       private UUID productId;
         private String productName;
         private String productSlug;
         private String productImage;
