@@ -1,5 +1,6 @@
 package org.nextgate.nextgatebackend.cart_service.service;
 
+import org.nextgate.nextgatebackend.cart_service.entity.CartEntity;
 import org.nextgate.nextgatebackend.cart_service.payload.AddToCartRequest;
 import org.nextgate.nextgatebackend.cart_service.payload.CartResponse;
 import org.nextgate.nextgatebackend.cart_service.payload.UpdateCartItemRequest;
@@ -26,6 +27,6 @@ public interface CartService {
     GlobeSuccessResponseBuilder clearCart()
             throws ItemNotFoundException;
 
-    GlobeSuccessResponseBuilder initializeCart()
+    CartEntity initializeCart()
             throws ItemNotFoundException;
 }

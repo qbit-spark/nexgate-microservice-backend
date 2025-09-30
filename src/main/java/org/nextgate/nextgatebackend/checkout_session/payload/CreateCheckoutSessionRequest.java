@@ -21,8 +21,6 @@ public class CreateCheckoutSessionRequest {
     private CheckoutSessionType sessionType;
 
     @Valid
-    @NotNull(message = "Items are required")
-    @NotEmpty(message = "At least one item is required")
     private List<CheckoutItemDto> items;
 
     @NotNull(message = "Shipping address is required")

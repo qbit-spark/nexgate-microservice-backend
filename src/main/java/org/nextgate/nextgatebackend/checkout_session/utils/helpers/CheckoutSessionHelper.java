@@ -2,10 +2,16 @@ package org.nextgate.nextgatebackend.checkout_session.utils.helpers;
 
 import lombok.RequiredArgsConstructor;
 import org.apache.coyote.BadRequestException;
+import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
+import org.nextgate.nextgatebackend.cart_service.entity.CartEntity;
+import org.nextgate.nextgatebackend.cart_service.entity.CartItemEntity;
+import org.nextgate.nextgatebackend.cart_service.repo.CartRepo;
 import org.nextgate.nextgatebackend.checkout_session.entity.CheckoutSessionEntity;
 import org.nextgate.nextgatebackend.checkout_session.payload.CreateCheckoutSessionRequest;
+import org.nextgate.nextgatebackend.checkout_session.payload.UpdateCheckoutSessionRequest;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.payment_methods.entity.PaymentMethodsEntity;
+import org.nextgate.nextgatebackend.payment_methods.enums.PaymentMethodsType;
 import org.nextgate.nextgatebackend.products_mng_service.products.entity.ProductEntity;
 import org.nextgate.nextgatebackend.products_mng_service.products.enums.ProductStatus;
 import org.nextgate.nextgatebackend.products_mng_service.products.repo.ProductRepo;
@@ -16,6 +22,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -25,6 +32,7 @@ public class CheckoutSessionHelper {
 
     private final WalletService walletService;
     private final ProductRepo productRepo;
+    private final CartRepo cartRepo;
 
     // ========================================
     // BILLING ADDRESS DETERMINATION
@@ -282,5 +290,122 @@ public class CheckoutSessionHelper {
 
     public LocalDateTime calculateInventoryHoldExpiration() {
         return calculateSessionExpiration();
+    }
+
+    public CreateCheckoutSessionRequest convertUpdateToCreateRequest(
+            UpdateCheckoutSessionRequest updateRequest) {
+        // Helper to convert update request to create request format
+        // Used for billing address determination
+        return CreateCheckoutSessionRequest.builder()
+                .shippingAddressId(updateRequest.getShippingAddressId())
+                .shippingMethodId(updateRequest.getShippingMethodId())
+                .paymentMethodId(updateRequest.getPaymentMethodId())
+                .metadata(updateRequest.getMetadata())
+                .build();
+    }
+
+// ========================================
+// PAYMENT METHOD RECONSTRUCTION
+// ========================================
+
+    public PaymentMethodsEntity getPaymentMethodFromIntent(
+            CheckoutSessionEntity.PaymentIntent paymentIntent,
+            AccountEntity user) throws ItemNotFoundException, BadRequestException {
+
+        if (paymentIntent == null) {
+            throw new BadRequestException("Payment intent is null");
+        }
+
+        // Reconstruct payment method info from intent
+        String provider = paymentIntent.getProvider();
+
+        if (provider == null || provider.trim().isEmpty()) {
+            throw new BadRequestException("Payment provider is not specified in payment intent");
+        }
+
+        return switch (provider.toUpperCase()) {
+            case "WALLET" -> createVirtualWalletPaymentMethod(user);
+            case "CASH_ON_DELIVERY", "COD" -> createVirtualCODPaymentMethod(user);
+            case "CREDIT_CARD", "DEBIT_CARD" -> throw new BadRequestException(
+                    "Card payment method reconstruction not yet implemented. Please update payment method."
+            );
+            case "MNO_PAYMENT", "MPESA" -> throw new BadRequestException(
+                    "Mobile money payment method reconstruction not yet implemented. Please update payment method."
+            );
+            case "PAYPAL" -> throw new BadRequestException(
+                    "PayPal payment method reconstruction not yet implemented. Please update payment method."
+            );
+            case "BANK_TRANSFER" -> throw new BadRequestException(
+                    "Bank transfer payment method reconstruction not yet implemented. Please update payment method."
+            );
+            default -> throw new BadRequestException(
+                    "Unknown or unsupported payment provider: " + provider +
+                            ". Please update your payment method to continue."
+            );
+        };
+    }
+
+// ========================================
+// VIRTUAL PAYMENT METHOD CREATION
+// ========================================
+
+    public PaymentMethodsEntity createVirtualWalletPaymentMethod(AccountEntity user)
+            throws ItemNotFoundException, BadRequestException {
+
+        // Verify wallet exists and is active via WalletService
+        WalletEntity wallet = walletService.getWalletByAccountId(user.getAccountId());
+
+        if (!wallet.getIsActive()) {
+            throw new BadRequestException(
+                    "Your wallet is not active. Please activate your wallet or provide a payment method."
+            );
+        }
+
+        // Create virtual payment method entity (not persisted to DB)
+        return PaymentMethodsEntity.builder()
+                .paymentMethodId(null) // Virtual
+                .owner(user)
+                .paymentMethodType(PaymentMethodsType.WALLET)
+                .isActive(true)
+                .isDefault(false)
+                .isVerified(true)
+                .billingAddress(null) // Wallet doesn't need billing address
+                .build();
+    }
+
+    public PaymentMethodsEntity createVirtualCODPaymentMethod(AccountEntity user) {
+        // Create virtual COD payment method entity (not persisted to DB)
+        return PaymentMethodsEntity.builder()
+                .paymentMethodId(null) // Virtual
+                .owner(user)
+                .paymentMethodType(PaymentMethodsType.CASH_ON_DELIVERY)
+                .isActive(true)
+                .isDefault(false)
+                .isVerified(true)
+                .billingAddress(null) // COD doesn't need billing address
+                .build();
+    }
+
+    public List<CheckoutSessionEntity.CheckoutItem> convertCartItemsToCheckoutItems(CartEntity cart)
+            throws ItemNotFoundException, BadRequestException {
+
+        List<CheckoutSessionEntity.CheckoutItem> checkoutItems = new ArrayList<>();
+
+        for (CartItemEntity cartItem : cart.getCartItems()) {
+            CheckoutSessionEntity.CheckoutItem checkoutItem = fetchAndBuildCheckoutItem(
+                    cartItem.getProduct().getProductId(),
+                    cartItem.getQuantity()
+            );
+            checkoutItems.add(checkoutItem);
+        }
+
+        return checkoutItems;
+    }
+
+    public void clearCartAfterCheckout(CartEntity cart) {
+        // Called AFTER successful payment
+        cart.getCartItems().clear();
+        cart.setUpdatedAt(LocalDateTime.now());
+        cartRepo.save(cart);
     }
 }

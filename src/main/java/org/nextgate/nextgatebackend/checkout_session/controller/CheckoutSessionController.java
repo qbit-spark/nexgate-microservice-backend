@@ -6,6 +6,7 @@ import org.apache.coyote.BadRequestException;
 import org.nextgate.nextgatebackend.checkout_session.payload.CheckoutSessionResponse;
 import org.nextgate.nextgatebackend.checkout_session.payload.CheckoutSessionSummaryResponse;
 import org.nextgate.nextgatebackend.checkout_session.payload.CreateCheckoutSessionRequest;
+import org.nextgate.nextgatebackend.checkout_session.payload.UpdateCheckoutSessionRequest;
 import org.nextgate.nextgatebackend.checkout_session.service.CheckoutSessionService;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.globeresponsebody.GlobeSuccessResponseBuilder;
@@ -47,4 +48,56 @@ public class CheckoutSessionController {
         return GlobeSuccessResponseBuilder.success("Checkout sessions retrieved successfully", responses);
     }
 
+    @DeleteMapping("/{sessionId}/cancel")
+    public GlobeSuccessResponseBuilder cancelCheckoutSession(
+            @PathVariable UUID sessionId)
+            throws ItemNotFoundException, BadRequestException {
+
+        checkoutSessionService.cancelCheckoutSession(sessionId);
+
+        return GlobeSuccessResponseBuilder.success(
+                "Checkout session cancelled successfully",
+                null
+        );
+    }
+
+    @PatchMapping("/{sessionId}")
+    public GlobeSuccessResponseBuilder updateCheckoutSession(
+            @PathVariable UUID sessionId,
+            @Valid @RequestBody UpdateCheckoutSessionRequest request)
+            throws ItemNotFoundException, BadRequestException {
+
+        CheckoutSessionResponse response = checkoutSessionService.updateCheckoutSession(sessionId, request);
+
+        return GlobeSuccessResponseBuilder.success(
+                "Checkout session updated successfully",
+                response
+        );
+    }
+
+    @PostMapping("/{sessionId}/retry-payment")
+    public GlobeSuccessResponseBuilder retryPayment(
+            @PathVariable UUID sessionId)
+            throws ItemNotFoundException, BadRequestException {
+
+        CheckoutSessionResponse response = checkoutSessionService.retryPayment(sessionId);
+
+        return GlobeSuccessResponseBuilder.success(
+                "Payment retry initiated successfully",
+                response
+        );
+    }
+
+    @GetMapping("/active")
+    public GlobeSuccessResponseBuilder getMyActiveCheckoutSessions()
+            throws ItemNotFoundException {
+
+        List<CheckoutSessionSummaryResponse> responses =
+                checkoutSessionService.getMyActiveCheckoutSessions();
+
+        return GlobeSuccessResponseBuilder.success(
+                "Active checkout sessions retrieved successfully",
+                responses
+        );
+    }
 }

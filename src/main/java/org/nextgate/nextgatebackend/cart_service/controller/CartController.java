@@ -20,13 +20,13 @@ public class CartController {
 
     private final CartService cartService;
 
-    @PostMapping("/initialize")
-    public ResponseEntity<GlobeSuccessResponseBuilder> initializeCart()
-            throws ItemNotFoundException {
-
-        GlobeSuccessResponseBuilder response = cartService.initializeCart();
-        return ResponseEntity.ok(response);
-    }
+//    @PostMapping("/initialize")
+//    public ResponseEntity<GlobeSuccessResponseBuilder> initializeCart()
+//            throws ItemNotFoundException {
+//
+//        GlobeSuccessResponseBuilder response = cartService.initializeCart();
+//        return ResponseEntity.ok(response);
+//    }
 
     @PostMapping("/add")
     public ResponseEntity<GlobeSuccessResponseBuilder> addToCart(

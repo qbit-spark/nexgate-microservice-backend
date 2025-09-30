@@ -3,6 +3,7 @@ package org.nextgate.nextgatebackend.checkout_session.service;
 import org.apache.coyote.BadRequestException;
 import org.nextgate.nextgatebackend.checkout_session.payload.CheckoutSessionResponse;
 import org.nextgate.nextgatebackend.checkout_session.payload.CheckoutSessionSummaryResponse;
+import org.nextgate.nextgatebackend.checkout_session.payload.UpdateCheckoutSessionRequest;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.checkout_session.payload.CreateCheckoutSessionRequest;
 
@@ -25,23 +26,19 @@ public interface CheckoutSessionService {
             throws ItemNotFoundException;
 
 //    // Cancel checkout session
-//    void cancelCheckoutSession(UUID sessionId)
-//            throws ItemNotFoundException, BadRequestException;
-//
-//    // Update shipping address
-//    CheckoutSessionResponse updateShippingAddress(UUID sessionId, UUID shippingAddressId)
-//            throws ItemNotFoundException, BadRequestException;
-//
-//    // Update shipping method
-//    CheckoutSessionResponse updateShippingMethod(UUID sessionId, String shippingMethodId)
-//            throws ItemNotFoundException, BadRequestException;
-//
-//    // Update payment method
-//    CheckoutSessionResponse updatePaymentMethod(UUID sessionId, UUID paymentMethodId)
-//            throws ItemNotFoundException, BadRequestException;
-//
+    void cancelCheckoutSession(UUID sessionId)
+            throws ItemNotFoundException, BadRequestException;
+
+    CheckoutSessionResponse updateCheckoutSession(UUID sessionId, UpdateCheckoutSessionRequest request)
+            throws ItemNotFoundException, BadRequestException;
+
+
+
 //    // Retry payment
-//    CheckoutSessionResponse retryPayment(UUID sessionId)
-//            throws ItemNotFoundException, BadRequestException;
+    CheckoutSessionResponse retryPayment(UUID sessionId)
+            throws ItemNotFoundException, BadRequestException;
+
+    List<CheckoutSessionSummaryResponse> getMyActiveCheckoutSessions()
+            throws ItemNotFoundException;
 
 }

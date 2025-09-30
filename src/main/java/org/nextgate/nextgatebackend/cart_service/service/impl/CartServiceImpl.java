@@ -150,12 +150,12 @@ public class CartServiceImpl implements CartService {
 
     @Override
     @Transactional
-    public GlobeSuccessResponseBuilder initializeCart() throws ItemNotFoundException {
+    public CartEntity initializeCart() throws ItemNotFoundException {
 
         AccountEntity user = getAuthenticatedAccount();
         CartEntity cart = ensureCartExists(user);
 
-        return GlobeSuccessResponseBuilder.success("Shopping cart initialized successfully");
+        return cart;
     }
 
     // HELPER METHODS
@@ -280,4 +280,5 @@ public class CartServiceImpl implements CartService {
         }
         throw new ItemNotFoundException("User not authenticated");
     }
+
 }
