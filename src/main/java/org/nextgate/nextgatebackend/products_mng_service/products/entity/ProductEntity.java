@@ -124,9 +124,6 @@ public class ProductEntity {
     @Column(name = "max_order_quantity")
     private Integer maxOrderQuantity;
 
-    @Column(name = "max_per_customer")
-    private Integer maxPerCustomer;
-
     @Column(name = "requires_approval")
     private Boolean requiresApproval = false;
 
@@ -137,9 +134,6 @@ public class ProductEntity {
     @Column(name = "group_buying_enabled")
     private Boolean groupBuyingEnabled = false;
 
-    @Column(name = "group_min_size")
-    private Integer groupMinSize;
-
     @Column(name = "group_max_size")
     private Integer groupMaxSize;
 
@@ -149,8 +143,9 @@ public class ProductEntity {
     @Column(name = "group_time_limit_hours")
     private Integer groupTimeLimitHours;
 
-    @Column(name = "group_requires_minimum")
-    private Boolean groupRequiresMinimum = true;
+    @Column(name = "max_per_customer")
+    private Integer maxPerCustomer;
+
 
     // ===============================
     // NEW FIELDS - INSTALLMENT OPTIONS
