@@ -8,6 +8,7 @@ import org.nextgate.nextgatebackend.checkout_session.enums.CheckoutSessionType;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -27,4 +28,22 @@ public class CheckoutSessionSummaryResponse {
     private LocalDateTime createdAt;
     private Boolean isExpired;
     private Boolean canRetryPayment;
+
+    // Item preview - showing limited info about items
+    private List<ItemPreview> itemPreviews;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class ItemPreview {
+        private UUID productId;
+        private String productName;
+        private String productImage;
+        private Integer quantity;
+        private BigDecimal unitPrice;
+        private BigDecimal total;
+        private String shopName;
+    }
 }

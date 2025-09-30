@@ -8,6 +8,7 @@ import org.nextgate.nextgatebackend.authentication_service.repo.AccountRepo;
 import org.nextgate.nextgatebackend.checkout_session.entity.CheckoutSessionEntity;
 import org.nextgate.nextgatebackend.checkout_session.enums.CheckoutSessionStatus;
 import org.nextgate.nextgatebackend.checkout_session.payload.CheckoutSessionResponse;
+import org.nextgate.nextgatebackend.checkout_session.payload.CheckoutSessionSummaryResponse;
 import org.nextgate.nextgatebackend.checkout_session.payload.CreateCheckoutSessionRequest;
 import org.nextgate.nextgatebackend.checkout_session.repo.CheckoutSessionRepo;
 import org.nextgate.nextgatebackend.checkout_session.service.CheckoutSessionService;
@@ -65,6 +66,130 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
             case GROUP_PURCHASE -> throw new BadRequestException("GROUP_PURCHASE checkout not implemented yet");
             case INSTALLMENT -> throw new BadRequestException("INSTALLMENT checkout not implemented yet");
         };
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CheckoutSessionResponse getCheckoutSessionById(UUID sessionId)
+            throws ItemNotFoundException {
+
+        log.info("Fetching checkout session: {}", sessionId);
+
+        // ========================================
+        // 1. GET AUTHENTICATED USER
+        // ========================================
+        AccountEntity authenticatedUser = getAuthenticatedAccount();
+
+        // ========================================
+        // 2. FETCH CHECKOUT SESSION
+        // ========================================
+        CheckoutSessionEntity session = checkoutSessionRepo.findBySessionIdAndCustomer(sessionId, authenticatedUser)
+                .orElseThrow(() -> new ItemNotFoundException(
+                        "Checkout session not found or you don't have permission to access it"));
+
+        // ========================================
+        // 3. CHECK IF SESSION IS EXPIRED
+        // ========================================
+        if (session.isExpired()) {
+            log.warn("Requested checkout session {} is expired", sessionId);
+            // Still return it, but the client can check the status/expiresAt
+        }
+
+        // ========================================
+        // 4. MAP TO RESPONSE & RETURN
+        // ========================================
+        CheckoutSessionResponse response = mapper.toResponse(session);
+        log.info("Successfully retrieved checkout session: {}", sessionId);
+
+        return response;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CheckoutSessionSummaryResponse> getMyCheckoutSessions()
+            throws ItemNotFoundException {
+
+        log.info("Fetching all checkout sessions for authenticated user");
+
+        // ========================================
+        // 1. GET AUTHENTICATED USER
+        // ========================================
+        AccountEntity authenticatedUser = getAuthenticatedAccount();
+
+        // ========================================
+        // 2. FETCH ALL SESSIONS FOR USER
+        // ========================================
+        List<CheckoutSessionEntity> sessions = checkoutSessionRepo
+                .findByCustomerOrderByCreatedAtDesc(authenticatedUser);
+
+        log.info("Found {} checkout sessions for user: {}",
+                sessions.size(), authenticatedUser.getUserName());
+
+        // ========================================
+        // 3. MAP TO SUMMARY RESPONSES
+        // ========================================
+        List<CheckoutSessionSummaryResponse> responses = mapper.toSummaryResponseList(sessions);
+
+        return responses;
+    }
+
+
+
+
+    // ========================================
+    // HELPER METHODS
+    // ========================================
+
+    private AccountEntity getAuthenticatedAccount() throws ItemNotFoundException {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated()) {
+            UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+            String userName = userDetails.getUsername();
+            return accountRepo.findByUserName(userName)
+                    .orElseThrow(() -> new ItemNotFoundException("User not found"));
+        }
+        throw new ItemNotFoundException("User not authenticated");
+    }
+
+    private boolean validateSystemRolesOrOwner(List<String> customRoles, AccountEntity account, CheckoutSessionEntity checkoutSession) {
+        boolean hasCustomRole = account.getRoles().stream()
+                .anyMatch(role -> customRoles.contains(role.getRoleName()));
+
+        boolean isOwner = checkoutSession.getCustomer().getAccountId().equals(account.getAccountId());
+
+        return hasCustomRole || isOwner;
+    }
+
+    private boolean validateSystemRolesOrOwner(List<String> customRoles, AccountEntity account) {
+        boolean hasCustomRole = account.getRoles().stream()
+                .anyMatch(role -> customRoles.contains(role.getRoleName()));
+
+        return hasCustomRole;
+    }
+
+    private PaymentMethodsEntity createVirtualWalletPaymentMethod(AccountEntity user)
+            throws ItemNotFoundException, BadRequestException {
+
+        // Verify wallet exists and is active via WalletService
+        // This will throw exception if wallet doesn't exist
+        WalletEntity wallet = walletService.getWalletByAccountId(user.getAccountId());
+
+        if (!wallet.getIsActive()) {
+            throw new BadRequestException(
+                    "Your wallet is not active. Please activate your wallet or provide a payment method."
+            );
+        }
+
+        // Create virtual payment method entity (not persisted to DB)
+        return PaymentMethodsEntity.builder()
+                .paymentMethodId(null) // Virtual
+                .owner(user)
+                .paymentMethodType(PaymentMethodsType.WALLET)
+                .isActive(true)
+                .isDefault(false)
+                .isVerified(true)
+                .billingAddress(null) // Wallet doesn't need billing address
+                .build();
     }
 
     // ========================================
@@ -203,59 +328,4 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         return response;
     }
 
-    // ========================================
-    // HELPER METHODS
-    // ========================================
-
-    private AccountEntity getAuthenticatedAccount() throws ItemNotFoundException {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.isAuthenticated()) {
-            UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-            String userName = userDetails.getUsername();
-            return accountRepo.findByUserName(userName)
-                    .orElseThrow(() -> new ItemNotFoundException("User not found"));
-        }
-        throw new ItemNotFoundException("User not authenticated");
-    }
-
-    private boolean validateSystemRolesOrOwner(List<String> customRoles, AccountEntity account, CheckoutSessionEntity checkoutSession) {
-        boolean hasCustomRole = account.getRoles().stream()
-                .anyMatch(role -> customRoles.contains(role.getRoleName()));
-
-        boolean isOwner = checkoutSession.getCustomer().getAccountId().equals(account.getAccountId());
-
-        return hasCustomRole || isOwner;
-    }
-
-    private boolean validateSystemRolesOrOwner(List<String> customRoles, AccountEntity account) {
-        boolean hasCustomRole = account.getRoles().stream()
-                .anyMatch(role -> customRoles.contains(role.getRoleName()));
-
-        return hasCustomRole;
-    }
-
-    private PaymentMethodsEntity createVirtualWalletPaymentMethod(AccountEntity user)
-            throws ItemNotFoundException, BadRequestException {
-
-        // Verify wallet exists and is active via WalletService
-        // This will throw exception if wallet doesn't exist
-        WalletEntity wallet = walletService.getWalletByAccountId(user.getAccountId());
-
-        if (!wallet.getIsActive()) {
-            throw new BadRequestException(
-                    "Your wallet is not active. Please activate your wallet or provide a payment method."
-            );
-        }
-
-        // Create virtual payment method entity (not persisted to DB)
-        return PaymentMethodsEntity.builder()
-                .paymentMethodId(null) // Virtual
-                .owner(user)
-                .paymentMethodType(PaymentMethodsType.WALLET)
-                .isActive(true)
-                .isDefault(false)
-                .isVerified(true)
-                .billingAddress(null) // Wallet doesn't need billing address
-                .build();
-    }
 }

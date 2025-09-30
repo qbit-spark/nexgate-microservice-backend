@@ -59,6 +59,7 @@ public class CheckoutSessionMapper {
                 .createdAt(entity.getCreatedAt())
                 .isExpired(entity.isExpired())
                 .canRetryPayment(entity.canRetryPayment())
+                .itemPreviews(mapItemsToPreview(entity.getItems())) // ADD THIS LINE
                 .build();
     }
 
@@ -184,5 +185,24 @@ public class CheckoutSessionMapper {
                         .transactionId(attempt.getTransactionId())
                         .build())
                 .collect(Collectors.toList());
+    }
+
+    private List<CheckoutSessionSummaryResponse.ItemPreview> mapItemsToPreview(
+            List<CheckoutSessionEntity.CheckoutItem> items) {
+        if (items == null || items.isEmpty()) {
+            return List.of();
+        }
+
+        return items.stream()
+                .map(item -> CheckoutSessionSummaryResponse.ItemPreview.builder()
+                        .productId(item.getProductId())
+                        .productName(item.getProductName())
+                        .productImage(item.getProductImage())
+                        .quantity(item.getQuantity())
+                        .unitPrice(item.getUnitPrice())
+                        .total(item.getTotal())
+                        .shopName(item.getShopName())
+                        .build())
+                .collect(java.util.stream.Collectors.toList());
     }
 }

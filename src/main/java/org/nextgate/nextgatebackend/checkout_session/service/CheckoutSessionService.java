@@ -1,4 +1,3 @@
-// CheckoutSessionService.java
 package org.nextgate.nextgatebackend.checkout_session.service;
 
 import org.apache.coyote.BadRequestException;
@@ -18,13 +17,13 @@ public interface CheckoutSessionService {
             throws ItemNotFoundException, BadRequestException;
 
     // Get checkout session by ID
-//    CheckoutSessionResponse getCheckoutSessionById(UUID sessionId)
-//            throws ItemNotFoundException;
-//
-//    // Get all checkout sessions for authenticated user
-//    List<CheckoutSessionSummaryResponse> getMyCheckoutSessions()
-//            throws ItemNotFoundException;
-//
+    CheckoutSessionResponse getCheckoutSessionById(UUID sessionId)
+            throws ItemNotFoundException;
+
+    // Get all checkout sessions for authenticated user
+    List<CheckoutSessionSummaryResponse> getMyCheckoutSessions()
+            throws ItemNotFoundException;
+
 //    // Cancel checkout session
 //    void cancelCheckoutSession(UUID sessionId)
 //            throws ItemNotFoundException, BadRequestException;
@@ -44,4 +43,5 @@ public interface CheckoutSessionService {
 //    // Retry payment
 //    CheckoutSessionResponse retryPayment(UUID sessionId)
 //            throws ItemNotFoundException, BadRequestException;
+
 }
