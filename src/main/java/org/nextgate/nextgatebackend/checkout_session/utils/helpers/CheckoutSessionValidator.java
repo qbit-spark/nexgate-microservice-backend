@@ -52,7 +52,7 @@ public class CheckoutSessionValidator {
         switch (sessionType) {
             case REGULAR_DIRECTLY -> validateRegularDirectlyRequest(request);
             case REGULAR_CART -> validateAndGetUserCart();
-            case GROUP_PURCHASE -> throw new BadRequestException("GROUP_PURCHASE checkout not implemented yet");
+            case GROUP_PURCHASE -> validateGroupPurchaseRequest(request);
             case INSTALLMENT -> throw new BadRequestException("INSTALLMENT checkout not implemented yet");
             default -> throw new BadRequestException("Invalid checkout session type");
         }

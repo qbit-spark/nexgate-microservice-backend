@@ -95,4 +95,9 @@ public class LedgerAccountEntity {
         return LedgerAccountType.PLATFORM_REVENUE.equals(accountType) ||
                 LedgerAccountType.PLATFORM_RESERVE.equals(accountType);
     }
+
+    public boolean isExternalAccount() {
+        return LedgerAccountType.EXTERNAL_MONEY_IN.equals(accountType) ||
+                LedgerAccountType.EXTERNAL_MONEY_OUT.equals(accountType);
+    }
 }

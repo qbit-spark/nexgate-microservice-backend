@@ -51,7 +51,7 @@ public class LedgerServiceImpl implements LedgerService {
 
         validateEntry(debitAccount, creditAccount, amount);
 
-        if (!debitAccount.canDebit(amount)) {
+        if (!debitAccount.isExternalAccount() && !debitAccount.canDebit(amount)) {
             throw new InsufficientBalanceException(
                     debitAccount.getAccountNumber(),
                     amount,
@@ -101,7 +101,7 @@ public class LedgerServiceImpl implements LedgerService {
 
         validateEntry(debitAccount, creditAccount, amount);
 
-        if (!debitAccount.canDebit(amount)) {
+        if (!debitAccount.isExternalAccount() && !debitAccount.canDebit(amount)) {
             throw new InsufficientBalanceException(
                     debitAccount.getAccountNumber(),
                     amount,
