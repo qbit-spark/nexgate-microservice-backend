@@ -8,6 +8,7 @@ import org.nextgate.nextgatebackend.authentication_service.repo.AccountRepo;
 import org.nextgate.nextgatebackend.cart_service.entity.CartEntity;
 import org.nextgate.nextgatebackend.checkout_session.entity.CheckoutSessionEntity;
 import org.nextgate.nextgatebackend.checkout_session.enums.CheckoutSessionStatus;
+import org.nextgate.nextgatebackend.checkout_session.enums.CheckoutSessionType;
 import org.nextgate.nextgatebackend.checkout_session.payload.CheckoutSessionResponse;
 import org.nextgate.nextgatebackend.checkout_session.payload.CheckoutSessionSummaryResponse;
 import org.nextgate.nextgatebackend.checkout_session.payload.CreateCheckoutSessionRequest;
@@ -23,8 +24,13 @@ import org.nextgate.nextgatebackend.financial_system.wallet.entity.WalletEntity;
 import org.nextgate.nextgatebackend.financial_system.wallet.service.WalletService;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
+import org.nextgate.nextgatebackend.group_purchase_mng.entity.GroupPurchaseInstanceEntity;
+import org.nextgate.nextgatebackend.group_purchase_mng.repo.GroupPurchaseInstanceRepo;
+import org.nextgate.nextgatebackend.group_purchase_mng.service.GroupPurchaseService;
 import org.nextgate.nextgatebackend.payment_methods.entity.PaymentMethodsEntity;
 import org.nextgate.nextgatebackend.payment_methods.enums.PaymentMethodsType;
+import org.nextgate.nextgatebackend.products_mng_service.products.entity.ProductEntity;
+import org.nextgate.nextgatebackend.products_mng_service.products.repo.ProductRepo;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -47,6 +53,8 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
     private final CheckoutSessionMapper mapper;
     private final WalletService walletService;
     private final PaymentOrchestrator paymentOrchestrator;
+    private final ProductRepo productRepo;
+    private final GroupPurchaseInstanceRepo groupPurchaseInstanceRepo;
 
 
     @Override
@@ -69,7 +77,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         return switch (request.getSessionType()) {
             case REGULAR_DIRECTLY -> handleRegularDirectlyCheckout(request, authenticatedUser);
             case REGULAR_CART -> handleRegularCartCheckout(request, authenticatedUser);
-            case GROUP_PURCHASE -> throw new BadRequestException("GROUP_PURCHASE checkout not implemented yet");
+            case GROUP_PURCHASE -> handleGroupPurchaseCheckout(request, authenticatedUser);
             case INSTALLMENT -> throw new BadRequestException("INSTALLMENT checkout not implemented yet");
         };
     }
@@ -872,5 +880,122 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
     }
 
 
+    // ========================================
+    // GROUP_PURCHASE CHECKOUT HANDLER
+    // ========================================
+
+    public CheckoutSessionResponse handleGroupPurchaseCheckout(
+            CreateCheckoutSessionRequest request,
+            AccountEntity authenticatedUser) throws ItemNotFoundException, BadRequestException {
+
+        log.info("Processing GROUP_PURCHASE checkout for user: {}",
+                authenticatedUser.getUserName());
+
+        // 1. Validate request
+        validator.validateGroupPurchaseRequest(request);
+
+        // 2. Get groupInstanceId (nullable)
+        UUID groupInstanceId = request.getGroupInstanceId();
+
+        // 3. Extract product and quantity
+        UUID productId = request.getItems().get(0).getProductId();
+        Integer quantity = request.getItems().get(0).getQuantity();
+
+        // 4. Fetch and validate product
+        ProductEntity product = productRepo.findByProductIdAndIsDeletedFalse(productId)
+                .orElseThrow(() -> new ItemNotFoundException("Product not found"));
+
+        validator.validateProductForGroupBuying(product);
+        validator.validateQuantityForGroupBuying(quantity, product);
+
+        // 5. If joining existing group, validate it
+        if (groupInstanceId != null) {
+            GroupPurchaseInstanceEntity group =
+                    groupPurchaseInstanceRepo.findById(groupInstanceId)
+                            .orElseThrow(() -> new ItemNotFoundException("Group not found"));
+
+            validator.validateGroupIsJoinable(group);
+            validator.validateSeatsAvailable(group, quantity);
+
+            // Validate product matches
+            if (!group.getProduct().getProductId().equals(productId)) {
+                throw new BadRequestException("Product mismatch with group");
+            }
+        }
+
+        // 6. Force payment method to WALLET
+        PaymentMethodsEntity paymentMethod =
+                validator.createVirtualWalletPaymentMethod(authenticatedUser);
+
+        // 7. Validate wallet balance
+        BigDecimal groupPrice = product.getGroupPrice();
+        BigDecimal totalAmount = groupPrice.multiply(BigDecimal.valueOf(quantity));
+
+        BigDecimal walletBalance = walletService.getMyWalletBalance();
+        if (walletBalance.compareTo(totalAmount) < 0) {
+            throw new BadRequestException(
+                    String.format("Insufficient wallet balance. Required: %s TZS, Available: %s TZS",
+                            totalAmount, walletBalance)
+            );
+        }
+
+        // 8. Validate shipping address
+        validator.validateShippingAddress(request.getShippingAddressId(), authenticatedUser);
+        CheckoutSessionEntity.ShippingAddress shippingAddress =
+                helper.fetchShippingAddress(request.getShippingAddressId());
+
+        // 9. Validate shipping method
+        validator.validateShippingMethod(request.getShippingMethodId());
+        CheckoutSessionEntity.ShippingMethod shippingMethod =
+                helper.createPlaceholderShippingMethod(request.getShippingMethodId());
+
+        // 10. Build checkout item (using groupPrice)
+        CheckoutSessionEntity.CheckoutItem item =
+                helper.buildGroupPurchaseCheckoutItem(product, quantity);
+
+        // 11. Calculate pricing (using groupPrice)
+        CheckoutSessionEntity.PricingSummary pricing =
+                helper.calculateGroupPurchasePricing(List.of(item), shippingMethod);
+
+        // 12. Determine billing address
+        CheckoutSessionEntity.BillingAddress billingAddress =
+                helper.determineBillingAddress(request, paymentMethod);
+
+        // 13. Create payment intent (WALLET only)
+        CheckoutSessionEntity.PaymentIntent paymentIntent =
+                helper.createPaymentIntent(paymentMethod, pricing, authenticatedUser.getAccountId());
+
+        // 14. Calculate expiration times
+        LocalDateTime sessionExpiration = helper.calculateSessionExpiration();
+        LocalDateTime inventoryHoldExpiration = helper.calculateInventoryHoldExpiration();
+
+        // 15. Hold inventory
+        helper.holdInventory(productId, quantity, inventoryHoldExpiration);
+
+        // 16. Build and save checkout session
+        CheckoutSessionEntity checkoutSession = CheckoutSessionEntity.builder()
+                .sessionType(CheckoutSessionType.GROUP_PURCHASE)
+                .customer(authenticatedUser)
+                .status(CheckoutSessionStatus.PENDING_PAYMENT)
+                .items(List.of(item))
+                .pricing(pricing)
+                .shippingAddress(shippingAddress)
+                .billingAddress(billingAddress)
+                .shippingMethod(shippingMethod)
+                .paymentIntent(paymentIntent)
+                .paymentAttempts(new ArrayList<>())
+                .inventoryHeld(true)
+                .inventoryHoldExpiresAt(inventoryHoldExpiration)
+                .metadata(request.getMetadata()) // Contains groupInstanceId if joining
+                .expiresAt(sessionExpiration)
+                .build();
+
+        CheckoutSessionEntity savedSession = checkoutSessionRepo.save(checkoutSession);
+
+        log.info("GROUP_PURCHASE checkout session created: {}", savedSession.getSessionId());
+
+        // 17. Return response
+        return mapper.toResponse(savedSession);
+    }
 
 }

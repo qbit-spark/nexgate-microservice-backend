@@ -1,6 +1,7 @@
 package org.nextgate.nextgatebackend.checkout_session.utils.helpers;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.coyote.BadRequestException;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.cart_service.entity.CartEntity;
@@ -26,6 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class CheckoutSessionHelper {
@@ -407,5 +409,86 @@ public class CheckoutSessionHelper {
         cart.getCartItems().clear();
         cart.setUpdatedAt(LocalDateTime.now());
         cartRepo.save(cart);
+    }
+
+    // ========================================
+// GROUP PURCHASE HELPERS
+// ========================================
+
+    public CheckoutSessionEntity.CheckoutItem buildGroupPurchaseCheckoutItem(
+            ProductEntity product,
+            Integer quantity
+    ) throws BadRequestException {
+
+        log.debug("Building group purchase checkout item for product: {}, quantity: {}",
+                product.getProductId(), quantity);
+
+        // Use groupPrice instead of regular price
+        BigDecimal unitPrice = product.getGroupPrice();
+
+        // Calculate discount (regularPrice - groupPrice)
+        BigDecimal discountPerItem = product.getPrice().subtract(product.getGroupPrice());
+        BigDecimal discountAmount = discountPerItem.multiply(BigDecimal.valueOf(quantity));
+
+        BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
+
+        // Todo: Tax calculation
+        BigDecimal tax = subtotal.multiply(BigDecimal.valueOf(0.0)); // 0% for now
+
+        BigDecimal total = subtotal.add(tax);
+
+        return CheckoutSessionEntity.CheckoutItem.builder()
+                .productId(product.getProductId())
+                .productName(product.getProductName())
+                .productSlug(product.getProductSlug())
+                .productImage(product.getProductImages() != null && !product.getProductImages().isEmpty()
+                        ? product.getProductImages().get(0) : null)
+                .quantity(quantity)
+                .unitPrice(unitPrice) // Group price
+                .discountAmount(discountAmount) // Savings vs regular price
+                .subtotal(subtotal)
+                .tax(tax)
+                .total(total)
+                .shopId(product.getShop().getShopId())
+                .shopName(product.getShop().getShopName())
+                .shopLogo(product.getShop().getLogoUrl())
+                .availableForCheckout(product.isInStock())
+                .availableQuantity(product.getStockQuantity())
+                .build();
+    }
+
+    public CheckoutSessionEntity.PricingSummary calculateGroupPurchasePricing(
+            List<CheckoutSessionEntity.CheckoutItem> items,
+            CheckoutSessionEntity.ShippingMethod shippingMethod
+    ) {
+
+        log.debug("Calculating group purchase pricing for {} items", items.size());
+
+        BigDecimal subtotal = BigDecimal.ZERO;
+        BigDecimal totalTax = BigDecimal.ZERO;
+        BigDecimal totalDiscount = BigDecimal.ZERO;
+
+        for (CheckoutSessionEntity.CheckoutItem item : items) {
+            subtotal = subtotal.add(item.getSubtotal());
+            totalTax = totalTax.add(item.getTax());
+            totalDiscount = totalDiscount.add(item.getDiscountAmount());
+        }
+
+        BigDecimal shippingCost = shippingMethod != null ?
+                shippingMethod.getCost() : BigDecimal.ZERO;
+
+        BigDecimal total = subtotal.add(shippingCost).add(totalTax);
+
+        log.debug("Group purchase pricing calculated - Total: {} TZS (Savings: {} TZS)",
+                total, totalDiscount);
+
+        return CheckoutSessionEntity.PricingSummary.builder()
+                .subtotal(subtotal.setScale(2, RoundingMode.HALF_UP))
+                .discount(totalDiscount.setScale(2, RoundingMode.HALF_UP))
+                .shippingCost(shippingCost.setScale(2, RoundingMode.HALF_UP))
+                .tax(totalTax.setScale(2, RoundingMode.HALF_UP))
+                .total(total.setScale(2, RoundingMode.HALF_UP))
+                .currency("TZS")
+                .build();
     }
 }

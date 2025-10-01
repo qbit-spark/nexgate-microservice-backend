@@ -2,6 +2,7 @@
 package org.nextgate.nextgatebackend.checkout_session.utils.helpers;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.coyote.BadRequestException;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.cart_service.entity.CartEntity;
@@ -21,8 +22,16 @@ import org.nextgate.nextgatebackend.payment_methods.enums.PaymentMethodsType;
 import org.nextgate.nextgatebackend.payment_methods.repo.PaymentMethodRepository;
 import org.springframework.stereotype.Component;
 
+// Add these imports if not present
+import org.nextgate.nextgatebackend.group_purchase_mng.entity.GroupPurchaseInstanceEntity;
+import org.nextgate.nextgatebackend.group_purchase_mng.enums.GroupStatus;
+import org.nextgate.nextgatebackend.checkout_session.enums.CheckoutSessionType;
+import org.nextgate.nextgatebackend.products_mng_service.products.entity.ProductEntity;
+import org.nextgate.nextgatebackend.products_mng_service.products.enums.ProductStatus;
+
 import java.util.UUID;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class CheckoutSessionValidator {
@@ -392,6 +401,198 @@ public class CheckoutSessionValidator {
                     cartItem.getQuantity()
             );
         }
+    }
+
+    // ========================================
+// GROUP PURCHASE VALIDATIONS
+// ========================================
+
+    public void validateGroupPurchaseRequest(CreateCheckoutSessionRequest request)
+            throws BadRequestException {
+
+        // 1. Validate session type is GROUP_PURCHASE
+        if (request.getSessionType() != CheckoutSessionType.GROUP_PURCHASE) {
+            throw new BadRequestException(
+                    "Invalid session type. Expected: GROUP_PURCHASE"
+            );
+        }
+
+        // 2. Validate exactly 1 item
+        if (request.getItems() == null || request.getItems().isEmpty()) {
+            throw new BadRequestException("GROUP_PURCHASE must have items");
+        }
+
+        if (request.getItems().size() != 1) {
+            throw new BadRequestException(
+                    "GROUP_PURCHASE must have exactly 1 item"
+            );
+        }
+
+        // 3. Validate item has productId and quantity
+        CreateCheckoutSessionRequest.CheckoutItemDto item = request.getItems().get(0);
+
+        if (item.getProductId() == null) {
+            throw new BadRequestException("Product ID is required");
+        }
+
+        if (item.getQuantity() == null || item.getQuantity() < 1) {
+            throw new BadRequestException("Quantity must be at least 1");
+        }
+
+        // 4. Validate shipping address is provided
+        if (request.getShippingAddressId() == null) {
+            throw new BadRequestException("Shipping address is required");
+        }
+
+        // 5. Validate shipping method is provided
+        if (request.getShippingMethodId() == null ||
+                request.getShippingMethodId().trim().isEmpty()) {
+            throw new BadRequestException("Shipping method is required");
+        }
+
+        log.debug("GROUP_PURCHASE request validation passed");
+    }
+
+    public void validateProductForGroupBuying(ProductEntity product)
+            throws BadRequestException {
+
+        // 1. Validate product is not deleted
+        if (product.getIsDeleted() != null && product.getIsDeleted()) {
+            throw new BadRequestException("Product has been deleted");
+        }
+
+        // 2. Validate product status is ACTIVE
+        if (product.getStatus() != ProductStatus.ACTIVE) {
+            throw new BadRequestException(
+                    String.format("Product is not active. Status: %s", product.getStatus())
+            );
+        }
+
+        // 3. Validate group buying is enabled
+        if (product.getGroupBuyingEnabled() == null || !product.getGroupBuyingEnabled()) {
+            throw new BadRequestException(
+                    "Group buying is not enabled for this product"
+            );
+        }
+
+        // 4. Validate groupPrice is set
+        if (product.getGroupPrice() == null) {
+            throw new BadRequestException("Product group price is not set");
+        }
+
+        // 5. Validate groupMaxSize is set
+        if (product.getGroupMaxSize() == null || product.getGroupMaxSize() <= 0) {
+            throw new BadRequestException(
+                    "Product group max size is not set or invalid"
+            );
+        }
+
+        // 6. Validate groupTimeLimitHours is set
+        if (product.getGroupTimeLimitHours() == null ||
+                product.getGroupTimeLimitHours() <= 0) {
+            throw new BadRequestException(
+                    "Product group time limit is not set or invalid"
+            );
+        }
+
+        log.debug("Product validation passed for group buying: {}", product.getProductId());
+    }
+
+    public void validateQuantityForGroupBuying(Integer quantity, ProductEntity product)
+            throws BadRequestException {
+
+        // 1. Validate quantity is positive
+        if (quantity == null || quantity <= 0) {
+            throw new BadRequestException("Quantity must be greater than 0");
+        }
+
+        // 2. Validate quantity does not exceed group max size
+        if (quantity > product.getGroupMaxSize()) {
+            throw new BadRequestException(
+                    String.format("Quantity (%d) exceeds group max size (%d)",
+                            quantity, product.getGroupMaxSize())
+            );
+        }
+
+        // 3. Validate quantity respects maxPerCustomer limit
+        if (product.getMaxPerCustomer() != null && product.getMaxPerCustomer() > 0) {
+            if (quantity > product.getMaxPerCustomer()) {
+                throw new BadRequestException(
+                        String.format("Quantity (%d) exceeds max per customer (%d)",
+                                quantity, product.getMaxPerCustomer())
+                );
+            }
+        }
+
+        log.debug("Quantity validation passed: {} for product: {}",
+                quantity, product.getProductId());
+    }
+
+    public void validateGroupIsJoinable(GroupPurchaseInstanceEntity group)
+            throws BadRequestException {
+
+        // 1. Validate group status is OPEN
+        if (group.getStatus() != GroupStatus.OPEN) {
+            throw new BadRequestException(
+                    String.format("Group is not open for joining. Status: %s",
+                            group.getStatus())
+            );
+        }
+
+        // 2. Validate group is not expired
+        if (group.isExpired()) {
+            throw new BadRequestException(
+                    String.format("Group has expired at: %s", group.getExpiresAt())
+            );
+        }
+
+        // 3. Validate group is not deleted
+        if (group.getIsDeleted() != null && group.getIsDeleted()) {
+            throw new BadRequestException("Group has been deleted");
+        }
+
+        // 4. Validate group is not full
+        if (group.isFull()) {
+            throw new BadRequestException(
+                    String.format("Group is full. Seats occupied: %d/%d",
+                            group.getSeatsOccupied(), group.getTotalSeats())
+            );
+        }
+
+        log.debug("Group validation passed for joining: {}", group.getGroupInstanceId());
+    }
+
+    public void validateSeatsAvailable(
+            GroupPurchaseInstanceEntity group,
+            Integer quantity
+    ) throws BadRequestException {
+
+        Integer seatsRemaining = group.getSeatsRemaining();
+
+        if (seatsRemaining < quantity) {
+            throw new BadRequestException(
+                    String.format("Not enough seats available. Requested: %d, Available: %d",
+                            quantity, seatsRemaining)
+            );
+        }
+
+        log.debug("Seats availability validated: {} seats available for {} requested",
+                seatsRemaining, quantity);
+    }
+
+    public void validateGroupProductMatch(
+            GroupPurchaseInstanceEntity group,
+            UUID productId
+    ) throws BadRequestException {
+
+        if (!group.getProduct().getProductId().equals(productId)) {
+            throw new BadRequestException(
+                    String.format("Product mismatch. Group has product: %s, but checkout has: %s",
+                            group.getProduct().getProductId(), productId)
+            );
+        }
+
+        log.debug("Product match validated for group");
     }
 
 }
