@@ -59,7 +59,7 @@ public class ShopServiceImpl implements ShopService {
         shop.setPhoneNumber(request.getPhoneNumber());
         shop.setCity(request.getCity());
         shop.setRegion(request.getRegion());
-        shop.setStatus(ShopStatus.PENDING);
+        shop.setStatus(ShopStatus.ACTIVE);
         shop.setIsDeleted(false);
         shop.setCategory(category);
         shop.setOwner(owner);

@@ -222,7 +222,7 @@ public class ProductServiceImpl implements ProductService {
         AccountEntity authenticatedAccount = getAuthenticatedAccount();
 
         //2. Validate shop existence
-        ShopEntity shop = shopRepo.findById(shopId)
+        ShopEntity shop = shopRepo.findByShopIdAndOwnerAndIsDeletedFalse(shopId, authenticatedAccount)
                 .orElseThrow(() -> new ItemNotFoundException("Shop not found"));
 
         if (shop.getIsDeleted()) {
