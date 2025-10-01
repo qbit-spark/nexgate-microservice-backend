@@ -106,8 +106,6 @@ public class CreateProductRequest {
 
     private Boolean groupBuyingEnabled = false;
 
-    @Min(value = 2, message = "Group minimum size must be at least 2")
-    private Integer groupMinSize;
 
     @Min(value = 2, message = "Group maximum size must be at least 2")
     private Integer groupMaxSize;
@@ -120,7 +118,6 @@ public class CreateProductRequest {
     @Max(value = 8760, message = "Group time limit cannot exceed 1 year (8760 hours)")
     private Integer groupTimeLimitHours;
 
-    private Boolean groupRequiresMinimum = true;
 
     // ===============================
     // NEW FIELDS - INSTALLMENT OPTIONS
@@ -181,14 +178,6 @@ public class CreateProductRequest {
     // VALIDATION METHODS
     // ===============================
 
-    @AssertTrue(message = "Group maximum size must be greater than minimum size")
-    public boolean isValidGroupSizes() {
-        if (groupBuyingEnabled && groupMinSize != null && groupMaxSize != null) {
-            return groupMaxSize >= groupMinSize;
-        }
-        return true;
-    }
-
     @AssertTrue(message = "Group price must be less than regular price")
     public boolean isValidGroupPrice() {
         if (groupBuyingEnabled && groupPrice != null && price != null) {
@@ -224,8 +213,7 @@ public class CreateProductRequest {
     @AssertTrue(message = "Group buying settings are required when group buying is enabled")
     public boolean hasGroupBuyingSettingsWhenEnabled() {
         if (groupBuyingEnabled) {
-            return groupMinSize != null && groupMaxSize != null &&
-                    groupPrice != null && groupTimeLimitHours != null;
+            return groupMaxSize != null && groupPrice != null && groupTimeLimitHours != null;
         }
         return true;
     }

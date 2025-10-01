@@ -237,9 +237,7 @@ public class ProductHelperMethods {
             product.setGroupBuyingEnabled(request.getGroupBuyingEnabled());
 
             if (request.getGroupBuyingEnabled()) {
-                if (request.getGroupMinSize() != null) {
-                    product.setGroupMinSize(request.getGroupMinSize());
-                }
+
                 if (request.getGroupMaxSize() != null) {
                     product.setGroupMaxSize(request.getGroupMaxSize());
                 }
@@ -249,23 +247,15 @@ public class ProductHelperMethods {
                 if (request.getGroupTimeLimitHours() != null) {
                     product.setGroupTimeLimitHours(request.getGroupTimeLimitHours());
                 }
-                if (request.getGroupRequiresMinimum() != null) {
-                    product.setGroupRequiresMinimum(request.getGroupRequiresMinimum());
-                }
             } else {
                 // If disabling group buying, clear all group buying fields
-                product.setGroupMinSize(null);
                 product.setGroupMaxSize(null);
                 product.setGroupPrice(null);
                 product.setGroupTimeLimitHours(null);
-                product.setGroupRequiresMinimum(null);
             }
         } else {
             // Update individual group buying fields if group buying is already enabled
             if (product.getGroupBuyingEnabled() != null && product.getGroupBuyingEnabled()) {
-                if (request.getGroupMinSize() != null) {
-                    product.setGroupMinSize(request.getGroupMinSize());
-                }
                 if (request.getGroupMaxSize() != null) {
                     product.setGroupMaxSize(request.getGroupMaxSize());
                 }
@@ -275,9 +265,7 @@ public class ProductHelperMethods {
                 if (request.getGroupTimeLimitHours() != null) {
                     product.setGroupTimeLimitHours(request.getGroupTimeLimitHours());
                 }
-                if (request.getGroupRequiresMinimum() != null) {
-                    product.setGroupRequiresMinimum(request.getGroupRequiresMinimum());
-                }
+
             }
         }
 

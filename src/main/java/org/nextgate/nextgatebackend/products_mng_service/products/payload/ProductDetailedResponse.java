@@ -140,7 +140,6 @@ public class ProductDetailedResponse {
         public static class GroupBuyingDetailedResponse {
             private Boolean isEnabled;
             private Boolean isAvailable;
-            private Integer minGroupSize;
             private Integer maxGroupSize;
             private Integer currentGroupSize;
             private Integer remainingSlots;
@@ -151,7 +150,6 @@ public class ProductDetailedResponse {
             private Integer timeLimitHours;
             private Long timeRemainingHours;
             private LocalDateTime expiresAt;
-            private Boolean requiresMinimum;
             private String status;
             private Boolean canJoinGroup;
         }

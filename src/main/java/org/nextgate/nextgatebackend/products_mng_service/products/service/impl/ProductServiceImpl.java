@@ -142,11 +142,9 @@ public class ProductServiceImpl implements ProductService {
         // Group Buying
         product.setGroupBuyingEnabled(request.getGroupBuyingEnabled());
         if (request.getGroupBuyingEnabled()) {
-            product.setGroupMinSize(request.getGroupMinSize());
             product.setGroupMaxSize(request.getGroupMaxSize());
             product.setGroupPrice(request.getGroupPrice());
             product.setGroupTimeLimitHours(request.getGroupTimeLimitHours());
-            product.setGroupRequiresMinimum(request.getGroupRequiresMinimum());
         }
 
         // Installment Options
@@ -852,10 +850,6 @@ public class ProductServiceImpl implements ProductService {
         // Check if group buying is enabled but missing required fields
         if (product.getGroupBuyingEnabled() != null && product.getGroupBuyingEnabled()) {
             List<String> groupBuyingIssues = new ArrayList<>();
-
-            if (product.getGroupMinSize() == null || product.getGroupMinSize() < 2) {
-                groupBuyingIssues.add("Group minimum size (at least 2)");
-            }
 
             if (product.getGroupMaxSize() == null || product.getGroupMaxSize() < 2) {
                 groupBuyingIssues.add("Group maximum size (at least 2)");

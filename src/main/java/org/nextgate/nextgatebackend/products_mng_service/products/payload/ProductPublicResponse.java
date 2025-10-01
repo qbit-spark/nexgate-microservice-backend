@@ -104,7 +104,6 @@ public class ProductPublicResponse {
     @AllArgsConstructor
     public static class GroupBuyingPublicResponse {
         private Boolean isAvailable;
-        private Integer minGroupSize;
         private Integer maxGroupSize;
         private BigDecimal groupPrice;
         private BigDecimal groupDiscount;

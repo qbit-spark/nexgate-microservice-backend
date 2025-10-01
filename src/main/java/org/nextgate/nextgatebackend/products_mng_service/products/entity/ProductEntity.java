@@ -147,11 +147,6 @@ public class ProductEntity {
     private Integer maxPerCustomer;
 
 
-    //Todo: Tobe removed
-    private Integer groupMinSize;
-
-    private Boolean groupRequiresMinimum;
-
 
     // ===============================
     // NEW FIELDS - INSTALLMENT OPTIONS

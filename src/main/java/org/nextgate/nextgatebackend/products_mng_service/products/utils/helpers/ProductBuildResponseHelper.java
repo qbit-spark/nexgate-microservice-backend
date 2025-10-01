@@ -242,7 +242,7 @@ public class ProductBuildResponseHelper {
         // For now, we'll simulate some data
         int currentGroupSize = 7; // This would come from actual group buying records
         int remainingSlots = product.getGroupMaxSize() - currentGroupSize;
-        double progressPercentage = ((double) currentGroupSize / product.getGroupMinSize()) * 100;
+        double progressPercentage = ((double) currentGroupSize / product.getGroupMaxSize()) * 100;
 
         LocalDateTime expiresAt = LocalDateTime.now().plusHours(product.getGroupTimeLimitHours());
         long timeRemainingHours = product.getGroupTimeLimitHours() - 24; // Simulated
@@ -250,7 +250,6 @@ public class ProductBuildResponseHelper {
         return ProductDetailedResponse.OrderingLimitsResponse.GroupBuyingDetailedResponse.builder()
                 .isEnabled(true)
                 .isAvailable(currentGroupSize < product.getGroupMaxSize())
-                .minGroupSize(product.getGroupMinSize())
                 .maxGroupSize(product.getGroupMaxSize())
                 .currentGroupSize(currentGroupSize)
                 .remainingSlots(remainingSlots)
@@ -261,8 +260,7 @@ public class ProductBuildResponseHelper {
                 .timeLimitHours(product.getGroupTimeLimitHours())
                 .timeRemainingHours(Math.max(timeRemainingHours, 0))
                 .expiresAt(expiresAt)
-                .requiresMinimum(product.getGroupRequiresMinimum())
-                .status(currentGroupSize >= product.getGroupMinSize() ? "ACTIVE" : "PENDING")
+                .status("ACTIVE") // Simplified since we removed minGroupSize requirement
                 .canJoinGroup(currentGroupSize < product.getGroupMaxSize())
                 .build();
     }
@@ -677,7 +675,6 @@ public class ProductBuildResponseHelper {
 
         return ProductPublicResponse.GroupBuyingPublicResponse.builder()
                 .isAvailable(true)
-                .minGroupSize(product.getGroupMinSize())
                 .maxGroupSize(product.getGroupMaxSize())
                 .groupPrice(product.getGroupPrice())
                 .groupDiscount(product.getGroupDiscount())

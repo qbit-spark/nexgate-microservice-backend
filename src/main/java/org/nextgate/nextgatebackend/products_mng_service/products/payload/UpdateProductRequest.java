@@ -97,8 +97,6 @@ public class UpdateProductRequest {
     // ===============================
     private Boolean groupBuyingEnabled;
 
-    @Min(value = 2, message = "Group minimum size must be at least 2")
-    private Integer groupMinSize;
 
     @Min(value = 2, message = "Group maximum size must be at least 2")
     private Integer groupMaxSize;
@@ -110,8 +108,6 @@ public class UpdateProductRequest {
     @Min(value = 1, message = "Group time limit must be at least 1 hour")
     @Max(value = 8760, message = "Group time limit cannot exceed 1 year (8760 hours)")
     private Integer groupTimeLimitHours;
-
-    private Boolean groupRequiresMinimum;
 
     // ===============================
     // INSTALLMENT OPTIONS
@@ -165,14 +161,6 @@ public class UpdateProductRequest {
     // ===============================
     // VALIDATION METHODS (same logic as create, but all optional)
     // ===============================
-    @AssertTrue(message = "Group maximum size must be greater than minimum size")
-    public boolean isValidGroupSizes() {
-        if (groupBuyingEnabled != null && groupBuyingEnabled &&
-                groupMinSize != null && groupMaxSize != null) {
-            return groupMaxSize >= groupMinSize;
-        }
-        return true;
-    }
 
     @AssertTrue(message = "Group price must be less than regular price")
     public boolean isValidGroupPrice() {
