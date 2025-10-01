@@ -6,8 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
+import org.nextgate.nextgatebackend.financial_system.escrow.utils.JsonMetadataConverter;
 import org.nextgate.nextgatebackend.financial_system.ledger.enums.LedgerEntryType;
-import org.nextgate.nextgatebackend.wallet_service.escrow.utils.JsonMetadataConverter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;

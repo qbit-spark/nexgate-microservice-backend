@@ -5,8 +5,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.authentication_service.repo.AccountRepo;
 import org.nextgate.nextgatebackend.financial_system.ledger.entity.LedgerAccountEntity;
+import org.nextgate.nextgatebackend.financial_system.ledger.entity.LedgerEntryEntity;
 import org.nextgate.nextgatebackend.financial_system.ledger.enums.LedgerEntryType;
 import org.nextgate.nextgatebackend.financial_system.ledger.service.LedgerService;
+import org.nextgate.nextgatebackend.financial_system.transaction_history.enums.TransactionDirection;
+import org.nextgate.nextgatebackend.financial_system.transaction_history.enums.TransactionType;
+import org.nextgate.nextgatebackend.financial_system.transaction_history.service.TransactionHistoryService;
 import org.nextgate.nextgatebackend.financial_system.wallet.entity.WalletEntity;
 import org.nextgate.nextgatebackend.financial_system.wallet.repo.WalletRepository;
 import org.nextgate.nextgatebackend.financial_system.wallet.service.WalletService;
@@ -31,6 +35,8 @@ public class WalletServiceImpl implements WalletService {
     private final WalletRepository walletRepository;
     private final AccountRepo accountRepo;
     private final LedgerService ledgerService;
+    private final TransactionHistoryService transactionHistoryService;
+
 
     @Override
     @Transactional
@@ -139,7 +145,8 @@ public class WalletServiceImpl implements WalletService {
         LedgerAccountEntity walletLedgerAccount = ledgerService.getOrCreateWalletAccount(wallet);
         LedgerAccountEntity externalMoneyIn = ledgerService.getExternalMoneyInAccount();
 
-        ledgerService.createEntry(
+        // Create ledger entry
+        LedgerEntryEntity ledgerEntry = ledgerService.createEntry(
                 externalMoneyIn,
                 walletLedgerAccount,
                 amount,
@@ -150,6 +157,19 @@ public class WalletServiceImpl implements WalletService {
                 account
         );
 
+        // Create transaction history
+        transactionHistoryService.createTransaction(
+                account,
+                TransactionType.WALLET_TOPUP,
+                TransactionDirection.CREDIT,
+                amount,
+                "Wallet Topup",
+                description != null ? description : "Added funds to wallet",
+                ledgerEntry.getId(),
+                "WALLET",
+                wallet.getId()
+        );
+
         wallet.recordActivity();
         walletRepository.save(wallet);
 
@@ -157,6 +177,7 @@ public class WalletServiceImpl implements WalletService {
 
         return wallet;
     }
+
 
     @Override
     @Transactional
@@ -186,7 +207,8 @@ public class WalletServiceImpl implements WalletService {
 
         LedgerAccountEntity externalMoneyOut = ledgerService.getExternalMoneyOutAccount();
 
-        ledgerService.createEntry(
+        // Create ledger entry
+        LedgerEntryEntity ledgerEntry = ledgerService.createEntry(
                 walletLedgerAccount,
                 externalMoneyOut,
                 amount,
@@ -197,6 +219,19 @@ public class WalletServiceImpl implements WalletService {
                 account
         );
 
+        // Create transaction history
+        transactionHistoryService.createTransaction(
+                account,
+                TransactionType.WALLET_WITHDRAWAL,
+                TransactionDirection.DEBIT,
+                amount,
+                "Wallet Withdrawal",
+                description != null ? description : "Withdrew funds from wallet",
+                ledgerEntry.getId(),
+                "WALLET",
+                wallet.getId()
+        );
+
         wallet.recordActivity();
         walletRepository.save(wallet);
 
@@ -204,6 +239,7 @@ public class WalletServiceImpl implements WalletService {
 
         return wallet;
     }
+
 
     @Override
     public boolean hasSufficientBalance(WalletEntity wallet, BigDecimal amount)

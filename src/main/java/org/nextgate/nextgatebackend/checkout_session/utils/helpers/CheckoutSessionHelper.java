@@ -9,14 +9,14 @@ import org.nextgate.nextgatebackend.cart_service.repo.CartRepo;
 import org.nextgate.nextgatebackend.checkout_session.entity.CheckoutSessionEntity;
 import org.nextgate.nextgatebackend.checkout_session.payload.CreateCheckoutSessionRequest;
 import org.nextgate.nextgatebackend.checkout_session.payload.UpdateCheckoutSessionRequest;
+import org.nextgate.nextgatebackend.financial_system.wallet.entity.WalletEntity;
+import org.nextgate.nextgatebackend.financial_system.wallet.service.WalletService;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.payment_methods.entity.PaymentMethodsEntity;
 import org.nextgate.nextgatebackend.payment_methods.enums.PaymentMethodsType;
 import org.nextgate.nextgatebackend.products_mng_service.products.entity.ProductEntity;
 import org.nextgate.nextgatebackend.products_mng_service.products.enums.ProductStatus;
 import org.nextgate.nextgatebackend.products_mng_service.products.repo.ProductRepo;
-import org.nextgate.nextgatebackend.wallet_service.wallet.entity.WalletEntity;
-import org.nextgate.nextgatebackend.wallet_service.wallet.service.WalletService;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;

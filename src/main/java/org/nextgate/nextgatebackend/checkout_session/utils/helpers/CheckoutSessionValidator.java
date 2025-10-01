@@ -13,12 +13,12 @@ import org.nextgate.nextgatebackend.checkout_session.enums.CheckoutSessionStatus
 import org.nextgate.nextgatebackend.checkout_session.enums.CheckoutSessionType;
 import org.nextgate.nextgatebackend.checkout_session.payload.CreateCheckoutSessionRequest;
 import org.nextgate.nextgatebackend.checkout_session.payload.UpdateCheckoutSessionRequest;
+import org.nextgate.nextgatebackend.financial_system.wallet.entity.WalletEntity;
+import org.nextgate.nextgatebackend.financial_system.wallet.service.WalletService;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.payment_methods.entity.PaymentMethodsEntity;
 import org.nextgate.nextgatebackend.payment_methods.enums.PaymentMethodsType;
 import org.nextgate.nextgatebackend.payment_methods.repo.PaymentMethodRepository;
-import org.nextgate.nextgatebackend.wallet_service.wallet.entity.WalletEntity;
-import org.nextgate.nextgatebackend.wallet_service.wallet.service.WalletService;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
