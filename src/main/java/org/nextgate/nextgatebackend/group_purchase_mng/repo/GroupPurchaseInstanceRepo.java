@@ -38,4 +38,6 @@ public interface GroupPurchaseInstanceRepo extends JpaRepository<GroupPurchaseIn
     // Find groups by status
     List<GroupPurchaseInstanceEntity> findByStatusAndIsDeletedFalseOrderByCreatedAtDesc(
             GroupStatus status);
+
+
 }

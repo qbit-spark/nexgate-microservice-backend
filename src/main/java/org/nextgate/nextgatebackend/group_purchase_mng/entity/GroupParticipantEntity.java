@@ -4,8 +4,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
-import org.nextgate.nextgatebackend.group_purchase_mng.entity.GroupPurchaseInstanceEntity;
 import org.nextgate.nextgatebackend.group_purchase_mng.enums.ParticipantStatus;
+import org.nextgate.nextgatebackend.group_purchase_mng.utils.PurchaseHistoryJsonConverter;
 import org.nextgate.nextgatebackend.group_purchase_mng.utils.TransferHistoryJsonConverter;
 
 import java.math.BigDecimal;
@@ -26,17 +26,9 @@ import java.util.*;
 @NoArgsConstructor
 public class GroupParticipantEntity {
 
-    // ========================================
-    // PRIMARY IDENTIFICATION
-    // ========================================
-
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID participantId;
-
-    // ========================================
-    // RELATIONSHIPS
-    // ========================================
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "group_instance_id", referencedColumnName = "groupInstanceId", nullable = false)
@@ -46,10 +38,6 @@ public class GroupParticipantEntity {
     @JoinColumn(name = "user_id", referencedColumnName = "id", nullable = false)
     private AccountEntity user;
 
-    // ========================================
-    // PURCHASE DETAILS
-    // ========================================
-
     @Column(nullable = false)
     private Integer quantity;
 
@@ -58,10 +46,6 @@ public class GroupParticipantEntity {
 
     @Column(nullable = false)
     private UUID checkoutSessionId;
-
-    // ========================================
-    // STATUS & TIMING
-    // ========================================
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -73,17 +57,14 @@ public class GroupParticipantEntity {
     @Column
     private LocalDateTime transferredAt;
 
-    // ========================================
-    // TRANSFER HISTORY (JSON)
-    // ========================================
-
     @Column(name = "transfer_history", columnDefinition = "jsonb")
     @Convert(converter = TransferHistoryJsonConverter.class)
     private List<TransferHistory> transferHistory = new ArrayList<>();
 
-    // ========================================
-    // LIFECYCLE HOOKS
-    // ========================================
+    // NEW: Purchase history
+    @Column(name = "purchase_history", columnDefinition = "jsonb")
+    @Convert(converter = PurchaseHistoryJsonConverter.class)
+    private List<PurchaseRecord> purchaseHistory = new ArrayList<>();
 
     @PrePersist
     protected void onCreate() {
@@ -92,10 +73,7 @@ public class GroupParticipantEntity {
         }
     }
 
-    // ========================================
-    // BUSINESS LOGIC METHODS
-    // ========================================
-
+    // Existing methods
     public boolean hasTransferred() {
         return transferHistory != null && !transferHistory.isEmpty();
     }
@@ -120,10 +98,41 @@ public class GroupParticipantEntity {
         this.transferredAt = LocalDateTime.now();
     }
 
-    // ========================================
-    // NESTED CLASS FOR JSON STORAGE
-    // ========================================
+    // NEW: Purchase history methods
+    public void addPurchaseRecord(
+            UUID checkoutSessionId,
+            Integer quantity,
+            BigDecimal amountPaid,
+            String transactionId
+    ) {
+        if (purchaseHistory == null) {
+            purchaseHistory = new ArrayList<>();
+        }
 
+        PurchaseRecord record = PurchaseRecord.builder()
+                .checkoutSessionId(checkoutSessionId)
+                .quantity(quantity)
+                .amountPaid(amountPaid)
+                .purchasedAt(LocalDateTime.now())
+                .transactionId(transactionId)
+                .build();
+
+        purchaseHistory.add(record);
+
+        // Update aggregated totals
+        this.quantity += quantity;
+        this.totalPaid = this.totalPaid.add(amountPaid);
+    }
+
+    public int getPurchaseCount() {
+        return purchaseHistory != null ? purchaseHistory.size() : 0;
+    }
+
+    public boolean hasMultiplePurchases() {
+        return getPurchaseCount() > 1;
+    }
+
+    // Existing nested class
     @Data
     @Builder
     @NoArgsConstructor
@@ -133,5 +142,18 @@ public class GroupParticipantEntity {
         private UUID toGroupId;
         private LocalDateTime transferredAt;
         private String reason;
+    }
+
+    // NEW: Nested class for purchase records
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PurchaseRecord {
+        private UUID checkoutSessionId;
+        private Integer quantity;
+        private BigDecimal amountPaid;
+        private LocalDateTime purchasedAt;
+        private String transactionId;
     }
 }

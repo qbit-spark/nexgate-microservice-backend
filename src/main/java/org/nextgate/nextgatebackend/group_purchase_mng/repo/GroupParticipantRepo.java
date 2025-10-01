@@ -28,4 +28,8 @@ public interface GroupParticipantRepo extends JpaRepository<GroupParticipantEnti
 
     // Find by checkout session
     Optional<GroupParticipantEntity> findByCheckoutSessionId(UUID checkoutSessionId);
+
+
+    List<GroupParticipantEntity> findByUser(AccountEntity user);
+
 }
