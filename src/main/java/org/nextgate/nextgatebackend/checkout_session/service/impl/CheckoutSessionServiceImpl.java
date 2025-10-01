@@ -17,11 +17,14 @@ import org.nextgate.nextgatebackend.checkout_session.service.CheckoutSessionServ
 import org.nextgate.nextgatebackend.checkout_session.utils.helpers.CheckoutSessionHelper;
 import org.nextgate.nextgatebackend.checkout_session.utils.helpers.CheckoutSessionMapper;
 import org.nextgate.nextgatebackend.checkout_session.utils.helpers.CheckoutSessionValidator;
+import org.nextgate.nextgatebackend.financial_system.payment_processing.payloads.PaymentResponse;
+import org.nextgate.nextgatebackend.financial_system.payment_processing.service.PaymentOrchestrator;
+import org.nextgate.nextgatebackend.financial_system.wallet.entity.WalletEntity;
+import org.nextgate.nextgatebackend.financial_system.wallet.service.WalletService;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
+import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
 import org.nextgate.nextgatebackend.payment_methods.entity.PaymentMethodsEntity;
 import org.nextgate.nextgatebackend.payment_methods.enums.PaymentMethodsType;
-import org.nextgate.nextgatebackend.wallet_service.wallet.entity.WalletEntity;
-import org.nextgate.nextgatebackend.wallet_service.wallet.service.WalletService;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -43,6 +46,8 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
     private final CheckoutSessionHelper helper;
     private final CheckoutSessionMapper mapper;
     private final WalletService walletService;
+    private final PaymentOrchestrator paymentOrchestrator;
+
 
     @Override
     @Transactional
@@ -355,46 +360,55 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         return response;
     }
 
+
+
     @Override
     @Transactional
-    public CheckoutSessionResponse retryPayment(UUID sessionId)
-            throws ItemNotFoundException, BadRequestException {
+    public PaymentResponse retryPayment(UUID sessionId)
+            throws ItemNotFoundException, BadRequestException, RandomExceptions {
 
         log.info("Retrying payment for checkout session: {}", sessionId);
 
-        // ========================================
-        // 1. GET AUTHENTICATED USER
-        // ========================================
+        // Get authenticated user
         AccountEntity authenticatedUser = getAuthenticatedAccount();
 
-        // ========================================
-        // 2. FETCH CHECKOUT SESSION
-        // ========================================
+        // Fetch checkout session
         CheckoutSessionEntity session = checkoutSessionRepo.findBySessionIdAndCustomer(sessionId, authenticatedUser)
                 .orElseThrow(() -> new ItemNotFoundException(
                         "Checkout session not found or you don't have permission to access it"));
 
-        // ========================================
-        // 3. VALIDATE SESSION CAN RETRY PAYMENT
-        // ========================================
-        validator.validateSessionCanRetryPayment(session);
+        // Validate session can retry payment
+        if (session.getStatus() != CheckoutSessionStatus.PAYMENT_FAILED) {
+            throw new BadRequestException(
+                    String.format("Cannot retry payment - session status: %s. Expected: PAYMENT_FAILED",
+                            session.getStatus())
+            );
+        }
 
-        // ========================================
-        // 4. CHECK PAYMENT ATTEMPT LIMIT
-        // ========================================
+        // Check if expired
+        if (session.isExpired()) {
+            session.setStatus(CheckoutSessionStatus.EXPIRED);
+            checkoutSessionRepo.save(session);
+            throw new BadRequestException("Checkout session has expired. Please create a new checkout session.");
+        }
+
+        // Check payment attempt limit (max 5 attempts)
         int attemptCount = session.getPaymentAttemptCount();
         final int MAX_PAYMENT_ATTEMPTS = 5;
 
         if (attemptCount >= MAX_PAYMENT_ATTEMPTS) {
+            // Exceed max attempts → mark as EXPIRED
+            session.setStatus(CheckoutSessionStatus.EXPIRED);
+            session.setUpdatedAt(LocalDateTime.now());
+            checkoutSessionRepo.save(session);
+
             throw new BadRequestException(
                     String.format("Maximum payment attempts (%d) exceeded. Please create a new checkout session.",
                             MAX_PAYMENT_ATTEMPTS)
             );
         }
 
-        // ========================================
-        // 5. VERIFY INVENTORY STILL AVAILABLE
-        // ========================================
+        // Verify inventory still available
         for (CheckoutSessionEntity.CheckoutItem item : session.getItems()) {
             try {
                 validator.validateInventoryAvailability(item.getProductId(), item.getQuantity());
@@ -406,9 +420,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
             }
         }
 
-        // ========================================
-        // 6. VERIFY PAYMENT METHOD STILL VALID
-        // ========================================
+        // Verify payment method still valid
         if (session.getPaymentIntent() == null) {
             throw new BadRequestException("No payment intent found for this session");
         }
@@ -418,7 +430,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
                 authenticatedUser
         );
 
-        // Validate payment method is still active
+        // For wallet payments, check balance
         if (paymentMethod.getPaymentMethodType() == PaymentMethodsType.WALLET) {
             WalletEntity wallet = walletService.getWalletByAccountId(authenticatedUser.getAccountId());
 
@@ -438,37 +450,22 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
             }
         }
 
-        // ========================================
-        // 7. EXTEND SESSION EXPIRATION
-        // ========================================
+        // Extend session expiration for retry
         LocalDateTime newExpiration = helper.calculateSessionExpiration();
         session.setExpiresAt(newExpiration);
 
-        // Extend inventory hold if needed
-        if (session.getInventoryHeld() != null && session.getInventoryHeld()) {
-            LocalDateTime newInventoryHoldExpiration = helper.calculateInventoryHoldExpiration();
-            session.setInventoryHoldExpiresAt(newInventoryHoldExpiration);
+        // Re-hold inventory (was released after previous failure)
+        LocalDateTime newInventoryHoldExpiration = helper.calculateInventoryHoldExpiration();
+        session.setInventoryHoldExpiresAt(newInventoryHoldExpiration);
 
-            // Re-hold inventory with new expiration
-            for (CheckoutSessionEntity.CheckoutItem item : session.getItems()) {
-                helper.holdInventory(item.getProductId(), item.getQuantity(), newInventoryHoldExpiration);
-            }
-            log.info("Inventory hold extended until: {}", newInventoryHoldExpiration);
+        for (CheckoutSessionEntity.CheckoutItem item : session.getItems()) {
+            helper.holdInventory(item.getProductId(), item.getQuantity(), newInventoryHoldExpiration);
         }
+        session.setInventoryHeld(true);
 
-        // ========================================
-        // 8. CREATE NEW PAYMENT INTENT
-        // ========================================
-        CheckoutSessionEntity.PaymentIntent newPaymentIntent = helper.createPaymentIntent(
-                paymentMethod,
-                session.getPricing(),
-                authenticatedUser.getAccountId()
-        );
-        session.setPaymentIntent(newPaymentIntent);
+        log.info("Inventory re-held until: {}", newInventoryHoldExpiration);
 
-        // ========================================
-        // 9. RECORD PAYMENT ATTEMPT
-        // ========================================
+        // Record retry attempt
         CheckoutSessionEntity.PaymentAttempt attempt = CheckoutSessionEntity.PaymentAttempt.builder()
                 .attemptNumber(attemptCount + 1)
                 .paymentMethod(paymentMethod.getPaymentMethodType().toString())
@@ -480,26 +477,18 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
 
         session.addPaymentAttempt(attempt);
 
-        // ========================================
-        // 10. UPDATE SESSION STATUS
-        // ========================================
+        // Update session status back to PENDING_PAYMENT
         session.setStatus(CheckoutSessionStatus.PENDING_PAYMENT);
         session.setUpdatedAt(LocalDateTime.now());
 
-        // ========================================
-        // 11. SAVE UPDATED SESSION
-        // ========================================
-        CheckoutSessionEntity updatedSession = checkoutSessionRepo.save(session);
+        checkoutSessionRepo.save(session);
 
-        log.info("Payment retry successful for session: {}. Attempt #{}",
-                sessionId, attemptCount + 1);
+        log.info("Payment retry validated for session: {}. Attempt #{}", sessionId, attemptCount + 1);
 
-        // ========================================
-        // 12. BUILD & RETURN RESPONSE
-        // ========================================
-        CheckoutSessionResponse response = mapper.toResponse(updatedSession);
-        return response;
+        // Now process the payment
+        return paymentOrchestrator.processPayment(sessionId);
     }
+
 
     @Override
     @Transactional(readOnly = true)
@@ -552,6 +541,34 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
     }
 
 
+    @Override
+    @Transactional
+    public PaymentResponse processPayment(UUID sessionId)
+            throws ItemNotFoundException, BadRequestException, RandomExceptions {
+
+        log.info("Processing payment for checkout session: {}", sessionId);
+
+        // Get authenticated user
+        AccountEntity authenticatedUser = getAuthenticatedAccount();
+
+        // Fetch checkout session and verify ownership
+        CheckoutSessionEntity session = checkoutSessionRepo.findBySessionIdAndCustomer(sessionId, authenticatedUser)
+                .orElseThrow(() -> new ItemNotFoundException(
+                        "Checkout session not found or you don't have permission to access it"));
+
+        // Validate session can be paid
+        if (session.getStatus() != CheckoutSessionStatus.PENDING_PAYMENT) {
+            throw new BadRequestException(
+                    "Cannot process payment - session status: " + session.getStatus());
+        }
+
+        if (session.isExpired()) {
+            throw new BadRequestException("Checkout session has expired");
+        }
+
+        // Delegate to payment orchestrator
+        return paymentOrchestrator.processPayment(sessionId);
+    }
 
 
     // ========================================

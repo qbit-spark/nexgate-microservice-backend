@@ -8,7 +8,9 @@ import org.nextgate.nextgatebackend.checkout_session.payload.CheckoutSessionSumm
 import org.nextgate.nextgatebackend.checkout_session.payload.CreateCheckoutSessionRequest;
 import org.nextgate.nextgatebackend.checkout_session.payload.UpdateCheckoutSessionRequest;
 import org.nextgate.nextgatebackend.checkout_session.service.CheckoutSessionService;
+import org.nextgate.nextgatebackend.financial_system.payment_processing.payloads.PaymentResponse;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
+import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
 import org.nextgate.nextgatebackend.globeresponsebody.GlobeSuccessResponseBuilder;
 import org.springframework.web.bind.annotation.*;
 
@@ -75,15 +77,28 @@ public class CheckoutSessionController {
         );
     }
 
-    @PostMapping("/{sessionId}/retry-payment")
-    public GlobeSuccessResponseBuilder retryPayment(
-            @PathVariable UUID sessionId)
-            throws ItemNotFoundException, BadRequestException {
 
-        CheckoutSessionResponse response = checkoutSessionService.retryPayment(sessionId);
+    @PostMapping("/{sessionId}/process-payment")
+    public GlobeSuccessResponseBuilder processPayment(@PathVariable UUID sessionId)
+            throws ItemNotFoundException, BadRequestException, RandomExceptions {
+
+        PaymentResponse response = checkoutSessionService.processPayment(sessionId);
 
         return GlobeSuccessResponseBuilder.success(
-                "Payment retry initiated successfully",
+                response.getSuccess() ? "Payment processed successfully" : "Payment processing initiated",
+                response
+        );
+    }
+
+
+    @PostMapping("/{sessionId}/retry-payment")
+    public GlobeSuccessResponseBuilder retryPayment(@PathVariable UUID sessionId)
+            throws ItemNotFoundException, BadRequestException, RandomExceptions {
+
+        PaymentResponse response = checkoutSessionService.retryPayment(sessionId);
+
+        return GlobeSuccessResponseBuilder.success(
+                response.getSuccess() ? "Payment retry successful" : "Payment retry failed",
                 response
         );
     }

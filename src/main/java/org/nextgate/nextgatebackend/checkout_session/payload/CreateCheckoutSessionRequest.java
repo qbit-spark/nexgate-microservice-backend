@@ -29,23 +29,21 @@ public class CreateCheckoutSessionRequest {
     @NotBlank(message = "Shipping method is required")
     private String shippingMethodId;
 
-    //This is optional coz Wallet can be used without Payment Method
     private UUID paymentMethodId;
 
-    // Optional metadata for coupons, referrals, etc.
     private Map<String, Object> metadata;
 
-    // For INSTALLMENT type (future use)
     private UUID installmentPlanId;
 
-    // Nested DTO
+    // NEW: For GROUP_PURCHASE
+    private UUID groupInstanceId;  // Optional: to join existing group
+
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class CheckoutItemDto {
-
         @NotNull(message = "Product ID is required")
         private UUID productId;
 

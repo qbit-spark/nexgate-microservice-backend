@@ -4,8 +4,10 @@ import org.apache.coyote.BadRequestException;
 import org.nextgate.nextgatebackend.checkout_session.payload.CheckoutSessionResponse;
 import org.nextgate.nextgatebackend.checkout_session.payload.CheckoutSessionSummaryResponse;
 import org.nextgate.nextgatebackend.checkout_session.payload.UpdateCheckoutSessionRequest;
+import org.nextgate.nextgatebackend.financial_system.payment_processing.payloads.PaymentResponse;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.checkout_session.payload.CreateCheckoutSessionRequest;
+import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
 
 
 import java.util.List;
@@ -33,10 +35,18 @@ public interface CheckoutSessionService {
             throws ItemNotFoundException, BadRequestException;
 
 
+    // Add this method to your existing CheckoutSessionService interface
 
-//    // Retry payment
-    CheckoutSessionResponse retryPayment(UUID sessionId)
-            throws ItemNotFoundException, BadRequestException;
+    /**
+     * Processes payment for a checkout session
+     */
+    PaymentResponse processPayment(UUID sessionId)
+            throws ItemNotFoundException, BadRequestException, RandomExceptions;
+
+
+    // Retry payment
+    PaymentResponse retryPayment(UUID sessionId)
+            throws ItemNotFoundException, BadRequestException, RandomExceptions;
 
     List<CheckoutSessionSummaryResponse> getMyActiveCheckoutSessions()
             throws ItemNotFoundException;

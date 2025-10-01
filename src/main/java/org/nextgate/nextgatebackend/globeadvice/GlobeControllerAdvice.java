@@ -120,6 +120,19 @@ public class GlobeControllerAdvice {
         return ResponseEntity.status(response.getHttpStatus()).body(response);
     }
 
+    @ExceptionHandler(InsufficientBalanceException.class)
+    public ResponseEntity<GlobeFailureResponseBuilder> handleInsufficientBalance(InsufficientBalanceException ex) {
+        GlobeFailureResponseBuilder response = GlobeFailureResponseBuilder.badRequest(ex.getMessage());
+        return ResponseEntity.status(response.getHttpStatus()).body(response);
+    }
+
+    @ExceptionHandler(LedgerException.class)
+    public ResponseEntity<GlobeFailureResponseBuilder> handleLedgerException(LedgerException ex) {
+        GlobeFailureResponseBuilder response = GlobeFailureResponseBuilder.badRequest(ex.getMessage());
+        return ResponseEntity.status(response.getHttpStatus()).body(response);
+    }
+
+
     /**
      * Helper method to trim exception messages
      */
