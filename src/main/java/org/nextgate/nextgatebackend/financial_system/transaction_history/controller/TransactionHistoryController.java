@@ -27,10 +27,10 @@ public class TransactionHistoryController {
 
     @GetMapping
     public ResponseEntity<GlobeSuccessResponseBuilder> getMyTransactions(
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) throws ItemNotFoundException {
 
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = PageRequest.of(page - 1, size);
         Page<TransactionHistory> transactions = transactionHistoryService.getMyTransactions(pageable);
         Page<TransactionHistoryResponse> response = transactions.map(TransactionHistoryResponse::fromEntity);
 
@@ -64,10 +64,10 @@ public class TransactionHistoryController {
     @GetMapping("/filter/type")
     public ResponseEntity<GlobeSuccessResponseBuilder> getMyTransactionsByType(
             @RequestParam TransactionType type,
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) throws ItemNotFoundException {
 
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = PageRequest.of(page - 1, size);
         Page<TransactionHistory> transactions = transactionHistoryService.getMyTransactionsByType(type, pageable);
         Page<TransactionHistoryResponse> response = transactions.map(TransactionHistoryResponse::fromEntity);
 
@@ -80,10 +80,10 @@ public class TransactionHistoryController {
     @GetMapping("/filter/direction")
     public ResponseEntity<GlobeSuccessResponseBuilder> getMyTransactionsByDirection(
             @RequestParam TransactionDirection direction,
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) throws ItemNotFoundException {
 
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = PageRequest.of(page - 1, size);
         Page<TransactionHistory> transactions = transactionHistoryService.getMyTransactionsByDirection(direction, pageable);
         Page<TransactionHistoryResponse> response = transactions.map(TransactionHistoryResponse::fromEntity);
 
@@ -97,10 +97,10 @@ public class TransactionHistoryController {
     public ResponseEntity<GlobeSuccessResponseBuilder> getMyTransactionsByDateRange(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) throws ItemNotFoundException {
 
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = PageRequest.of(page - 1, size);
         Page<TransactionHistory> transactions = transactionHistoryService.getMyTransactionsByDateRange(
                 startDate, endDate, pageable);
         Page<TransactionHistoryResponse> response = transactions.map(TransactionHistoryResponse::fromEntity);

@@ -137,7 +137,6 @@ public class UserProfileServiceImpl implements UserProfileService {
         sendPasswordChangeNotification(account, httpServletRequest);
     }
 
-
     @Override
     public UsernameValidationResponse validateUsername(String username) {
         UsernameHelper.UsernameValidationResult result =
