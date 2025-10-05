@@ -59,6 +59,7 @@ public class ShopCategoryController {
         return ResponseEntity.ok(GlobeSuccessResponseBuilder.success("Shop categories retrieved successfully", response));
     }
 
+
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     @DeleteMapping("/{categoryId}")
     public GlobeSuccessResponseBuilder deleteCategoryById(@PathVariable UUID categoryId) throws ItemNotFoundException {
