@@ -21,7 +21,6 @@ public interface GroupPurchaseService {
     ) throws ItemNotFoundException, BadRequestException;
 
     GroupPurchaseInstanceEntity joinGroup(
-            UUID groupToJoinId,
             CheckoutSessionEntity checkoutSession
     ) throws ItemNotFoundException, BadRequestException;
 

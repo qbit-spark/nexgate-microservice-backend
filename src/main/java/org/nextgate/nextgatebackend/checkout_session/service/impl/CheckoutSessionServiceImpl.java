@@ -981,6 +981,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
                 .pricing(pricing)
                 .shippingAddress(shippingAddress)
                 .billingAddress(billingAddress)
+                .groupIdToBeJoined(groupInstanceId)
                 .shippingMethod(shippingMethod)
                 .paymentIntent(paymentIntent)
                 .paymentAttempts(new ArrayList<>())

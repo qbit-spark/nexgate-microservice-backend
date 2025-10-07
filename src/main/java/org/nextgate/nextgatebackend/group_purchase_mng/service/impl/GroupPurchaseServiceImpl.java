@@ -44,8 +44,7 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
     @Override
     @Transactional
     public GroupPurchaseInstanceEntity createGroupInstance(
-            CheckoutSessionEntity checkoutSession
-    ) throws ItemNotFoundException, BadRequestException {
+            CheckoutSessionEntity checkoutSession) throws ItemNotFoundException, BadRequestException {
 
         log.info("Creating group instance from checkout session: {}",
                 checkoutSession.getSessionId());
@@ -155,11 +154,10 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
     @Override
     @Transactional
     public GroupPurchaseInstanceEntity joinGroup(
-            UUID groupToJoinId,
             CheckoutSessionEntity checkoutSession) throws ItemNotFoundException, BadRequestException {
 
         log.info("User joining group: {} from checkout session: {}",
-                groupToJoinId, checkoutSession.getSessionId());
+                checkoutSession.getGroupIdToBeJoined(), checkoutSession.getSessionId());
 
         // 1. Get authenticated user
         AccountEntity authenticatedUser = getAuthenticatedAccount();
@@ -176,11 +174,11 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
         AccountEntity customer = checkoutSession.getCustomer();
 
         log.debug("Extracted data - Product: {}, Quantity: {}, Group: {}",
-                productId, quantity, groupToJoinId);
+                productId, quantity, checkoutSession.getGroupIdToBeJoined());
 
         // 4. Fetch group instance
         GroupPurchaseInstanceEntity group = groupPurchaseInstanceRepo
-                .findById(groupToJoinId)
+                .findById(checkoutSession.getGroupIdToBeJoined())
                 .orElseThrow(() -> new ItemNotFoundException("Group not found"));
 
         // 5. Validate group is joinable
@@ -226,7 +224,7 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
             }
 
             log.info("User {} already in group {}. Adding {} more seats.",
-                    customer.getAccountId(), groupToJoinId, quantity);
+                    customer.getAccountId(), checkoutSession.getGroupIdToBeJoined(), quantity);
 
             // Add new purchase record (automatically updates quantity and totalPaid)
             participant.addPurchaseRecord(
@@ -246,7 +244,7 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
         } else {
             // User not in group - create new participant
             log.info("User {} joining group {} for the first time with {} seats.",
-                    customer.getAccountId(), groupToJoinId, quantity);
+                    customer.getAccountId(), checkoutSession.getGroupIdToBeJoined(), quantity);
 
             GroupParticipantEntity participant = GroupParticipantEntity.builder()
                     .groupInstance(group)
@@ -274,7 +272,7 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
             group.setTotalParticipants(group.getTotalParticipants() + 1);
 
             log.info("New participant created for user: {} in group: {}",
-                    customer.getAccountId(), groupToJoinId);
+                    customer.getAccountId(), checkoutSession.getGroupIdToBeJoined());
         }
 
         // 11. Update group seats
@@ -282,11 +280,11 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
         group.setUpdatedAt(now);
 
         log.info("Group {} seats updated: {}/{}",
-                groupToJoinId, group.getSeatsOccupied(), group.getTotalSeats());
+                checkoutSession.getGroupIdToBeJoined(), group.getSeatsOccupied(), group.getTotalSeats());
 
         // 12. Check if group is now complete
         if (group.isFull()) {
-            log.info("Group {} is now full, marking as COMPLETED", groupToJoinId);
+            log.info("Group {} is now full, marking as COMPLETED", checkoutSession.getGroupIdToBeJoined());
             group.setStatus(GroupStatus.COMPLETED);
             group.setCompletedAt(now);
 
@@ -298,7 +296,7 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
         GroupPurchaseInstanceEntity savedGroup = groupPurchaseInstanceRepo.save(group);
 
         log.info("User {} successfully joined group {}",
-                customer.getAccountId(), groupToJoinId);
+                customer.getAccountId(), checkoutSession.getGroupIdToBeJoined());
 
         return savedGroup;
     }

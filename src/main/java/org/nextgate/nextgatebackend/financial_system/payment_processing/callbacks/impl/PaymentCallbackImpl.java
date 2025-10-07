@@ -2,10 +2,13 @@ package org.nextgate.nextgatebackend.financial_system.payment_processing.callbac
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.coyote.BadRequestException;
 import org.nextgate.nextgatebackend.checkout_session.entity.CheckoutSessionEntity;
 import org.nextgate.nextgatebackend.financial_system.escrow.entity.EscrowAccountEntity;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.callbacks.PaymentCallback;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.payloads.PaymentResult;
+import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
+import org.nextgate.nextgatebackend.group_purchase_mng.service.GroupPurchaseService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,11 +18,13 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class PaymentCallbackImpl implements PaymentCallback {
 
+    private final GroupPurchaseService groupPurchaseService;
+
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onPaymentSuccess(
             CheckoutSessionEntity checkoutSession,
-            EscrowAccountEntity escrow) {
+            EscrowAccountEntity escrow) throws BadRequestException, ItemNotFoundException {
 
         log.info("╔════════════════════════════════════════════════════════════╗");
         log.info("║          PAYMENT SUCCESS CALLBACK                          ║");
@@ -32,6 +37,16 @@ public class PaymentCallbackImpl implements PaymentCallback {
         log.info("Seller Amount: {} {}", escrow.getSellerAmount(), escrow.getCurrency());
         log.info("Buyer: {}", checkoutSession.getCustomer().getUserName());
         log.info("Seller: {}", escrow.getSeller().getUserName());
+
+        //We can have specific actions based on session type
+        switch (checkoutSession.getSessionType()){
+            case INSTALLMENT -> logPlaceholderAction("Something to be done about installment when successful");
+            case REGULAR_DIRECTLY -> logPlaceholderAction("Something to be done about regular directly when successful");
+            case REGULAR_CART -> logPlaceholderAction("Something to be done about regular cart when successful");
+            case GROUP_PURCHASE -> handleGroupPurchase(checkoutSession);
+            default -> log.warn("Unknown session type - no specific actions");
+
+        }
 
         try {
             // Placeholder actions - will implement step by step
@@ -133,5 +148,13 @@ public class PaymentCallbackImpl implements PaymentCallback {
      */
     private void logPlaceholderAction(String action) {
         log.info("  [TODO] {}", action);
+    }
+
+    private void handleGroupPurchase(CheckoutSessionEntity checkoutSession) throws BadRequestException, ItemNotFoundException {
+        if (checkoutSession.getGroupIdToBeJoined() != null) {
+              groupPurchaseService.joinGroup(checkoutSession);
+        } else {
+           groupPurchaseService.createGroupInstance(checkoutSession);
+        }
     }
 }

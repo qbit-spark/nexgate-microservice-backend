@@ -154,9 +154,7 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
     }
 
     // Handles successful payment
-    private PaymentResponse handleSuccessfulPayment(
-            CheckoutSessionEntity checkoutSession,
-            PaymentResult result) {
+    private PaymentResponse handleSuccessfulPayment(CheckoutSessionEntity checkoutSession, PaymentResult result) {
 
         log.info("Payment successful for checkout session: {}", checkoutSession.getSessionId());
 

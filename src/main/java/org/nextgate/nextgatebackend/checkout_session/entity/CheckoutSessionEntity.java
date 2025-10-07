@@ -108,6 +108,8 @@ public class CheckoutSessionEntity {
     @Column(name = "created_order_id")
     private UUID createdOrderId;
 
+    private UUID groupIdToBeJoined; // For GROUP_PURCHASE type
+
     // Cart reference (for REGULAR_CART type)
     @Column(name = "cart_id")
     private UUID cartId;
