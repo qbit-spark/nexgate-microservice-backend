@@ -353,8 +353,7 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
         // 9. Validate participant is ACTIVE
         if (sourceParticipant.getStatus() != ParticipantStatus.ACTIVE) {
             throw new BadRequestException(
-                    String.format("Cannot transfer. Your participation status is: %s",
-                            sourceParticipant.getStatus())
+                    "Cannot transfer. Your participation status is not active in this source group"
             );
         }
 

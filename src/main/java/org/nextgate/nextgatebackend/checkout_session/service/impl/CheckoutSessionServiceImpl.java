@@ -604,10 +604,9 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
     }
 
     private boolean validateSystemRolesOrOwner(List<String> customRoles, AccountEntity account) {
-        boolean hasCustomRole = account.getRoles().stream()
-                .anyMatch(role -> customRoles.contains(role.getRoleName()));
 
-        return hasCustomRole;
+        return account.getRoles().stream()
+                .anyMatch(role -> customRoles.contains(role.getRoleName()));
     }
 
 
@@ -874,9 +873,8 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // ========================================
         // 14. BUILD & RETURN RESPONSE
         // ========================================
-        CheckoutSessionResponse response = mapper.toResponse(savedSession);
 
-        return response;
+        return mapper.toResponse(savedSession);
     }
 
 
