@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.nextgate.nextgatebackend.checkout_session.entity.CheckoutSessionEntity;
 import org.nextgate.nextgatebackend.checkout_session.enums.CheckoutSessionStatus;
 import org.nextgate.nextgatebackend.checkout_session.repo.CheckoutSessionRepo;
+import org.nextgate.nextgatebackend.financial_system.payment_processing.callbacks.PaymentCallback;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.enums.PaymentMethod;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.enums.PaymentStatus;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.payloads.PaymentRequest;
@@ -31,8 +32,10 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
     private final WalletPaymentProcessor walletPaymentProcessor;
     private final ExternalPaymentProcessor externalPaymentProcessor;
     private final OrderService orderService;
+    private final PaymentCallback paymentCallback;
 
     @Override
+    @Transactional
     public PaymentResponse processPayment(UUID checkoutSessionId)
             throws ItemNotFoundException, RandomExceptions {
 
@@ -78,7 +81,7 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
             // Route to appropriate processor
             PaymentResult result = routeToProcessor(checkoutSession, paymentMethod);
 
-            // Handle payment result
+            // Handle payment result-- This is the heart of payment orchestration
             if (result.isSuccess()) {
                 return handleSuccessfulPayment(checkoutSession, result);
             } else if (result.isPending()) {
@@ -98,6 +101,8 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
             throw e;
         }
     }
+
+
 
     // Determines payment method from checkout session or request override
     private PaymentMethod determinePaymentMethod(
@@ -148,7 +153,6 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
         };
     }
 
-    //Todo: Here is where orders are created after successful payment
     // Handles successful payment
     private PaymentResponse handleSuccessfulPayment(
             CheckoutSessionEntity checkoutSession,
@@ -159,6 +163,16 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
         // Update checkout session status
         checkoutSession.setStatus(CheckoutSessionStatus.PAYMENT_COMPLETED);
         checkoutSession.setCompletedAt(LocalDateTime.now());
+
+        // ========================================
+        // INVOKE SUCCESS CALLBACK
+        // ========================================
+        try {
+            paymentCallback.onPaymentSuccess(checkoutSession, result.getEscrow());
+        } catch (Exception e) {
+            log.error("Payment callback failed, but payment was successful", e);
+            // Continue processing - callback failure shouldn't fail the payment
+        }
 
         // Create order via OrderService (placeholder for now)
         UUID orderId = orderService.createOrderFromCheckoutSession(checkoutSession, result.getEscrow());
@@ -199,6 +213,15 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
         checkoutSession.setStatus(CheckoutSessionStatus.PAYMENT_PROCESSING);
         checkoutSessionRepo.save(checkoutSession);
 
+        // ========================================
+        // INVOKE PENDING CALLBACK
+        // ========================================
+        try {
+            paymentCallback.onPaymentPending(checkoutSession, result);
+        } catch (Exception e) {
+            log.error("Payment pending callback failed", e);
+        }
+
         return PaymentResponse.builder()
                 .success(false)
                 .status(PaymentStatus.PENDING)
@@ -220,6 +243,19 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
 
         checkoutSession.setStatus(CheckoutSessionStatus.PAYMENT_FAILED);
         checkoutSessionRepo.save(checkoutSession);
+
+        // ========================================
+        // INVOKE FAILURE CALLBACK
+        // ========================================
+        try {
+            paymentCallback.onPaymentFailure(
+                    checkoutSession,
+                    result,
+                    result.getErrorMessage()
+            );
+        } catch (Exception e) {
+            log.error("Payment failure callback failed", e);
+        }
 
         return PaymentResponse.builder()
                 .success(false)

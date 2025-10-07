@@ -567,7 +567,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // Validate session can be paid
         if (session.getStatus() != CheckoutSessionStatus.PENDING_PAYMENT) {
             throw new BadRequestException(
-                    "Cannot process payment - session status: " + session.getStatus());
+                    "Cannot process payment - session is not pending: " + session.getStatus());
         }
 
         if (session.isExpired()) {

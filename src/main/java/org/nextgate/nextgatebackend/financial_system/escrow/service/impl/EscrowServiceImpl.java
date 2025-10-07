@@ -63,7 +63,9 @@ public class EscrowServiceImpl implements EscrowService {
         // Generate unique escrow number (e.g., ESC-2025-000001)
         String escrowNumber = generateEscrowNumber();
 
-        // Create escrow entity with buyer, seller, and amount details
+        // ========================================
+        // STEP 1: Create and save escrow entity FIRST
+        // ========================================
         EscrowAccountEntity escrow = EscrowAccountEntity.builder()
                 .escrowNumber(escrowNumber)
                 .checkoutSession(checkoutSession)
@@ -77,16 +79,28 @@ public class EscrowServiceImpl implements EscrowService {
         // Calculate platform fee and seller amount (e.g., 5% fee, 95% to seller)
         escrow.calculateFees();
 
-        // Create ledger account for this escrow (type: ESCROW)
-        LedgerAccountEntity escrowLedgerAccount = ledgerService.createEscrowAccount(escrow.getId());
-        escrow.setLedgerAccountId(escrowLedgerAccount.getId());
+        // Save escrow to get the ID
+        EscrowAccountEntity savedEscrow = escrowAccountRepo.save(escrow);
 
-        // Get buyer's wallet ledger account
+        log.info("Escrow entity created with ID: {}", savedEscrow.getId());
+
+        // ========================================
+        // STEP 2: Now create ledger account using escrow ID
+        // ========================================
+        LedgerAccountEntity escrowLedgerAccount = ledgerService.createEscrowAccount(savedEscrow.getId());
+
+        // Update escrow with ledger account ID
+        savedEscrow.setLedgerAccountId(escrowLedgerAccount.getId());
+
+        // ========================================
+        // STEP 3: Get buyer's wallet ledger account
+        // ========================================
         WalletEntity buyerWallet = walletService.getWalletByAccountId(buyer.getAccountId());
         LedgerAccountEntity buyerLedgerAccount = ledgerService.getOrCreateWalletAccount(buyerWallet);
 
-        // Move money from buyer wallet to escrow (debit buyer, credit escrow)
-        // Create escrow and ledger entry (existing code)
+        // ========================================
+        // STEP 4: Move money from buyer wallet to escrow
+        // ========================================
         LedgerEntryEntity ledgerEntry = ledgerService.createEntry(
                 buyerLedgerAccount,
                 escrowLedgerAccount,
@@ -98,8 +112,14 @@ public class EscrowServiceImpl implements EscrowService {
                 buyer
         );
 
-        EscrowAccountEntity savedEscrow = escrowAccountRepo.save(escrow);
+        // ========================================
+        // STEP 5: Save escrow again with ledger account ID
+        // ========================================
+        savedEscrow = escrowAccountRepo.save(savedEscrow);
 
+        // ========================================
+        // STEP 6: Create transaction history
+        // ========================================
         // Create transaction history for BUYER (PURCHASE)
         transactionHistoryService.createTransaction(
                 buyer,
@@ -107,7 +127,7 @@ public class EscrowServiceImpl implements EscrowService {
                 TransactionDirection.DEBIT,
                 amount,
                 "Purchase Payment",
-                String.format("Payment for order (Escrow: %s)", escrow.getEscrowNumber()),
+                String.format("Payment for order (Escrow: %s)", savedEscrow.getEscrowNumber()),
                 ledgerEntry.getId(),
                 "ESCROW",
                 savedEscrow.getId()
@@ -120,14 +140,14 @@ public class EscrowServiceImpl implements EscrowService {
                 TransactionDirection.DEBIT,
                 amount,
                 "Escrow Hold",
-                String.format("Money held in escrow: %s", escrow.getEscrowNumber()),
+                String.format("Money held in escrow: %s", savedEscrow.getEscrowNumber()),
                 ledgerEntry.getId(),
                 "ESCROW",
                 savedEscrow.getId()
         );
 
         log.info("Escrow created: {} - Amount: {} TZS, Fee: {} TZS, Seller receives: {} TZS",
-                escrowNumber, amount, escrow.getPlatformFeeAmount(), escrow.getSellerAmount());
+                escrowNumber, amount, savedEscrow.getPlatformFeeAmount(), savedEscrow.getSellerAmount());
 
         return savedEscrow;
     }
