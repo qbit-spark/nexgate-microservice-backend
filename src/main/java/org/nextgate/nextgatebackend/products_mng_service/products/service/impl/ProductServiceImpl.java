@@ -148,13 +148,8 @@ public class ProductServiceImpl implements ProductService {
         }
 
         // Installment Options
-        product.setInstallmentEnabled(request.getInstallmentEnabled());
-        if (request.getInstallmentEnabled()) {
-            product.setInstallmentPlans(productHelperMethods.convertInstallmentPlansToEntity(request.getInstallmentPlans()));
-            product.setDownPaymentRequired(request.getDownPaymentRequired());
-            product.setMinDownPaymentPercentage(request.getMinDownPaymentPercentage());
-        }
-
+        product.setInstallmentEnabled(false); // Disabled by default, enabled when plans are added
+        product.setMaxQuantityForInstallment(request.getMaxQuantityForInstallment());
 
         //8. Set initial status based on action
         if (action == ReqAction.SAVE_PUBLISH) {

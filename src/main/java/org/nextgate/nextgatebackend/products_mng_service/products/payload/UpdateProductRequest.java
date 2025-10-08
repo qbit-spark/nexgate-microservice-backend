@@ -112,16 +112,9 @@ public class UpdateProductRequest {
     // ===============================
     // INSTALLMENT OPTIONS
     // ===============================
+
     private Boolean installmentEnabled;
-
-    private List<InstallmentPlanRequest> installmentPlans;
-
-    private Boolean downPaymentRequired;
-
-    @DecimalMin(value = "0.0", message = "Down payment percentage cannot be negative")
-    @DecimalMax(value = "100.0", message = "Down payment percentage cannot exceed 100%")
-    @Digits(integer = 3, fraction = 2, message = "Down payment percentage must have at most 3 digits and 2 decimal places")
-    private BigDecimal minDownPaymentPercentage;
+    private Integer maxQuantityForInstallment;
 
     // ===============================
     // NESTED CLASSES (same as CreateProductRequest)

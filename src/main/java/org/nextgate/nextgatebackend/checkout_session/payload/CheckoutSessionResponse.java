@@ -59,6 +59,11 @@ public class CheckoutSessionResponse {
     // References
     private UUID createdOrderId;
     private UUID cartId;
+    private UUID groupIdToBeJoined; // ← EXISTING (for group purchase)
+
+    // NEW: Installment fields
+    private UUID selectedInstallmentPlanId;
+    private InstallmentConfigResponse installmentConfig;
 
     // Nested response classes
     @Data
@@ -168,5 +173,41 @@ public class CheckoutSessionResponse {
         private String errorMessage;
         private LocalDateTime attemptedAt;
         private String transactionId;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class InstallmentConfigResponse {
+        private UUID planId;
+        private String planName;
+        private Integer termMonths;
+        private BigDecimal apr;
+        private Integer downPaymentPercent;
+        private BigDecimal downPaymentAmount;
+        private BigDecimal financedAmount;
+        private BigDecimal monthlyPaymentAmount;
+        private BigDecimal totalInterest;
+        private BigDecimal totalAmount;
+        private LocalDateTime firstPaymentDate;
+        private Integer gracePeriodDays;
+        private String fulfillmentTiming;
+        private List<PaymentScheduleItemResponse> schedule;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class PaymentScheduleItemResponse {
+        private Integer paymentNumber;
+        private LocalDateTime dueDate;
+        private BigDecimal amount;
+        private BigDecimal principalPortion;
+        private BigDecimal interestPortion;
+        private BigDecimal remainingBalance;
     }
 }

@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.nextgate.nextgatebackend.authentication_service.utils.StringListJsonConverter;
+import org.nextgate.nextgatebackend.installment_purchase.entity.InstallmentPlanEntity;
 import org.nextgate.nextgatebackend.products_mng_service.categories.entity.ProductCategoryEntity;
 import org.nextgate.nextgatebackend.products_mng_service.products.enums.ProductCondition;
 import org.nextgate.nextgatebackend.products_mng_service.products.enums.ProductStatus;
@@ -147,26 +148,23 @@ public class ProductEntity {
     private Integer maxPerCustomer;
 
 
-
     // ===============================
     // NEW FIELDS - INSTALLMENT OPTIONS
     // ===============================
 
+    //  (enables/disables installment feature)
     @Column(name = "installment_enabled")
     private Boolean installmentEnabled = false;
 
-    @Column(name = "installment_plans", columnDefinition = "jsonb")
-    @Convert(converter = InstallmentPlansJsonConverter.class)
-    private List<Map<String, Object>> installmentPlans = new ArrayList<>();
+    // KEEP THIS (limits quantity for installments)
+    @Column(name = "max_quantity_for_installment")
+    private Integer maxQuantityForInstallment = 1;
 
-    @Column(name = "down_payment_required")
-    private Boolean downPaymentRequired = false;
+    // ADD THIS RELATIONSHIP (replaces the JSONB field)
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnoreProperties({"product", "hibernateLazyInitializer", "handler"})
+    private List<InstallmentPlanEntity> installmentPlans = new ArrayList<>();
 
-    @Column(name = "min_down_payment", precision = 10, scale = 2)
-    private BigDecimal minDownPayment;
-
-    @Column(name = "min_down_payment_percentage", precision = 5, scale = 2)
-    private BigDecimal minDownPaymentPercentage;
 
     // Relationships - The Key Part!
     @ManyToOne(fetch = FetchType.LAZY)
@@ -278,8 +276,14 @@ public class ProductEntity {
     }
 
     public boolean isInstallmentAvailable() {
-        return installmentEnabled != null && installmentEnabled;
+        return installmentEnabled != null
+                && installmentEnabled
+                && installmentPlans != null
+                && !installmentPlans.isEmpty()
+                && installmentPlans.stream().anyMatch(plan ->
+                plan.getIsActive() != null && plan.getIsActive());
     }
+
 
     public BigDecimal getGroupDiscount() {
         if (isGroupBuyingAvailable() && groupPrice != null) {
@@ -309,5 +313,12 @@ public class ProductEntity {
             return Math.min(maxOrderQuantity, stockQuantity);
         }
         return stockQuantity;
+    }
+
+    public int getActiveInstallmentPlansCount() {
+        if (installmentPlans == null) return 0;
+        return (int) installmentPlans.stream()
+                .filter(plan -> plan.getIsActive() != null && plan.getIsActive())
+                .count();
     }
 }

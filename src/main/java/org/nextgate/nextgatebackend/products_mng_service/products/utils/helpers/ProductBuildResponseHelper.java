@@ -3,6 +3,7 @@ package org.nextgate.nextgatebackend.products_mng_service.products.utils.helpers
 import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import org.nextgate.nextgatebackend.installment_purchase.utils.helpers.InstallmentPlanResponseHelper;
 import org.nextgate.nextgatebackend.products_mng_service.products.entity.ProductEntity;
 import org.nextgate.nextgatebackend.products_mng_service.products.enums.ProductStatus;
 import org.nextgate.nextgatebackend.products_mng_service.products.payload.ProductDetailedResponse;
@@ -21,6 +22,9 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class ProductBuildResponseHelper {
+
+    private final InstallmentPlanResponseHelper installmentPlanResponseHelper;
+
     public ProductDetailedResponse buildDetailedProductResponse(ProductEntity product) {
         return ProductDetailedResponse.builder()
                 // Basic Information
@@ -93,8 +97,8 @@ public class ProductBuildResponseHelper {
                 // NEW FEATURES - Group Buying
                 .groupBuying(buildGroupBuyingResponse(product))
 
-                // NEW FEATURES - Installment Options
-                .installmentOptions(buildInstallmentOptionsResponse(product))
+                // ✅ NEW FEATURES - Installment Options (USE NEW HELPER)
+                .installmentOptions(installmentPlanResponseHelper.buildDetailedInstallmentOptions(product))
 
                 // Purchase Options Summary
                 .purchaseOptions(buildPurchaseOptionsResponse(product))
@@ -153,10 +157,9 @@ public class ProductBuildResponseHelper {
                 .build();
     }
 
-
-// ===============================
-// COLOR RESPONSE BUILDER
-// ===============================
+    // ===============================
+    // COLOR RESPONSE BUILDER
+    // ===============================
 
     private List<ProductDetailedResponse.ColorDetailedResponse> buildColorResponses(List<Map<String, Object>> colors, BigDecimal basePrice) {
         if (colors == null || colors.isEmpty()) {
@@ -179,9 +182,9 @@ public class ProductBuildResponseHelper {
         }).toList();
     }
 
-// ===============================
-// PRICE RANGE CALCULATOR
-// ===============================
+    // ===============================
+    // PRICE RANGE CALCULATOR
+    // ===============================
 
     private ProductDetailedResponse.PriceRangeResponse calculatePriceRange(ProductEntity product) {
         BigDecimal minPrice = product.getPrice();
@@ -209,9 +212,9 @@ public class ProductBuildResponseHelper {
                 .build();
     }
 
-// ===============================
-// ORDERING LIMITS RESPONSE
-// ===============================
+    // ===============================
+    // ORDERING LIMITS RESPONSE
+    // ===============================
 
     private ProductDetailedResponse.OrderingLimitsResponse buildOrderingLimitsResponse(ProductEntity product) {
         return ProductDetailedResponse.OrderingLimitsResponse.builder()
@@ -226,9 +229,9 @@ public class ProductBuildResponseHelper {
                 .build();
     }
 
-// ===============================
-// GROUP BUYING RESPONSE
-// ===============================
+    // ===============================
+    // GROUP BUYING RESPONSE
+    // ===============================
 
     private ProductDetailedResponse.OrderingLimitsResponse.GroupBuyingDetailedResponse buildGroupBuyingResponse(ProductEntity product) {
         if (!product.isGroupBuyingAvailable()) {
@@ -240,12 +243,12 @@ public class ProductBuildResponseHelper {
 
         // In a real implementation, you'd fetch current group data from database
         // For now, we'll simulate some data
-        int currentGroupSize = 7; // This would come from actual group buying records
+        int currentGroupSize = 7;
         int remainingSlots = product.getGroupMaxSize() - currentGroupSize;
         double progressPercentage = ((double) currentGroupSize / product.getGroupMaxSize()) * 100;
 
         LocalDateTime expiresAt = LocalDateTime.now().plusHours(product.getGroupTimeLimitHours());
-        long timeRemainingHours = product.getGroupTimeLimitHours() - 24; // Simulated
+        long timeRemainingHours = product.getGroupTimeLimitHours() - 24;
 
         return ProductDetailedResponse.OrderingLimitsResponse.GroupBuyingDetailedResponse.builder()
                 .isEnabled(true)
@@ -260,159 +263,14 @@ public class ProductBuildResponseHelper {
                 .timeLimitHours(product.getGroupTimeLimitHours())
                 .timeRemainingHours(Math.max(timeRemainingHours, 0))
                 .expiresAt(expiresAt)
-                .status("ACTIVE") // Simplified since we removed minGroupSize requirement
+                .status("ACTIVE")
                 .canJoinGroup(currentGroupSize < product.getGroupMaxSize())
                 .build();
     }
 
-// ===============================
-// INSTALLMENT OPTIONS RESPONSE
-// ===============================
-
-    private ProductDetailedResponse.OrderingLimitsResponse.InstallmentOptionsDetailedResponse buildInstallmentOptionsResponse(ProductEntity product) {
-        if (!product.isInstallmentAvailable()) {
-            return ProductDetailedResponse.OrderingLimitsResponse.InstallmentOptionsDetailedResponse.builder()
-                    .isEnabled(false)
-                    .isAvailable(false)
-                    .build();
-        }
-
-        List<ProductDetailedResponse.OrderingLimitsResponse.InstallmentPlanDetailedResponse> plans = product.getInstallmentPlans().stream()
-                .map(planMap -> buildInstallmentPlanResponse(planMap, product))
-                .toList();
-
-        return ProductDetailedResponse.OrderingLimitsResponse.InstallmentOptionsDetailedResponse.builder()
-                .isEnabled(true)
-                .isAvailable(true)
-                .downPaymentRequired(product.getDownPaymentRequired())
-                .minDownPaymentPercentage(product.getMinDownPaymentPercentage())
-                .plans(plans)
-                .eligibilityStatus("ELIGIBLE") // This would be calculated based on user credit
-                .creditCheckRequired(false)
-                .build();
-    }
-
-    private ProductDetailedResponse.OrderingLimitsResponse.InstallmentPlanDetailedResponse buildInstallmentPlanResponse(Map<String, Object> planMap, ProductEntity product) {
-        Integer duration = (Integer) planMap.get("duration");
-        String interval = (String) planMap.get("interval");
-        BigDecimal interestRate = new BigDecimal(planMap.getOrDefault("interestRate", 0).toString());
-        String description = (String) planMap.get("description");
-
-        // Calculate installment details
-        ProductDetailedResponse.OrderingLimitsResponse.InstallmentCalculationResponse calculations = calculateInstallmentDetails(
-                product.getPrice(),
-                product.getMinDownPaymentPercentage(),
-                duration,
-                interval,
-                interestRate
-        );
-
-        return ProductDetailedResponse.OrderingLimitsResponse.InstallmentPlanDetailedResponse.builder()
-                .planId("plan-" + duration + interval.toLowerCase().substring(0, 1))
-                .duration(duration)
-                .interval(interval)
-                .interestRate(interestRate)
-                .description(description)
-                .calculations(calculations)
-                .paymentSchedule(generatePaymentSchedule(calculations, duration, interval))
-                .isPopular(duration == 6 && "MONTHS".equals(interval)) // Mark 6 months as popular
-                .build();
-    }
-
-// ===============================
-// INSTALLMENT CALCULATION
-// ===============================
-
-    private ProductDetailedResponse.OrderingLimitsResponse.InstallmentCalculationResponse calculateInstallmentDetails(
-            BigDecimal productPrice,
-            BigDecimal downPaymentPercentage,
-            Integer duration,
-            String interval,
-            BigDecimal interestRate) {
-
-        // Calculate down payment
-        BigDecimal downPayment = productPrice
-                .multiply(downPaymentPercentage)
-                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-
-        // Remaining amount after down payment
-        BigDecimal remainingAmount = productPrice.subtract(downPayment);
-
-        // Calculate interest (simple interest for this example)
-        BigDecimal totalInterest = remainingAmount
-                .multiply(interestRate)
-                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-
-        // Total amount to pay in installments
-        BigDecimal totalInstallmentAmount = remainingAmount.add(totalInterest);
-
-        // Payment amount per interval
-        BigDecimal paymentAmount = totalInstallmentAmount
-                .divide(BigDecimal.valueOf(duration), 2, RoundingMode.HALF_UP);
-
-        // Total amount (including down payment)
-        BigDecimal totalAmount = productPrice.add(totalInterest);
-
-        return ProductDetailedResponse.OrderingLimitsResponse.InstallmentCalculationResponse.builder()
-                .downPayment(downPayment)
-                .remainingAmount(remainingAmount)
-                .totalInterest(totalInterest)
-                .paymentAmount(paymentAmount)
-                .totalAmount(totalAmount)
-                .build();
-    }
-
-// ===============================
-// PAYMENT SCHEDULE GENERATOR
-// ===============================
-
-    private List<ProductDetailedResponse.OrderingLimitsResponse.PaymentScheduleResponse> generatePaymentSchedule(
-            ProductDetailedResponse.OrderingLimitsResponse.InstallmentCalculationResponse calculations,
-            Integer duration,
-            String interval) {
-
-        List<ProductDetailedResponse.OrderingLimitsResponse.PaymentScheduleResponse> schedule = new ArrayList<>();
-        LocalDateTime currentDate = LocalDateTime.now();
-
-        for (int i = 1; i <= duration; i++) {
-            LocalDateTime dueDate = calculateDueDate(currentDate, i, interval);
-
-            schedule.add(ProductDetailedResponse.OrderingLimitsResponse.PaymentScheduleResponse.builder()
-                    .paymentNumber(i)
-                    .amount(calculations.getPaymentAmount())
-                    .dueDate(dueDate)
-                    .description(buildPaymentDescription(i, duration, interval))
-                    .build());
-        }
-
-        return schedule;
-    }
-
-    private LocalDateTime calculateDueDate(LocalDateTime startDate, int paymentNumber, String interval) {
-        return switch (interval) {
-            case "DAYS" -> startDate.plusDays(paymentNumber * 1L);
-            case "WEEKS" -> startDate.plusWeeks(paymentNumber * 1L);
-            case "MONTHS" -> startDate.plusMonths(paymentNumber * 1L);
-            default -> startDate.plusMonths(paymentNumber * 1L);
-        };
-    }
-
-    private String buildPaymentDescription(int paymentNumber, int totalPayments, String interval) {
-        if (paymentNumber == totalPayments) {
-            return "Final payment";
-        }
-
-        return switch (interval) {
-            case "DAYS" -> "Day " + paymentNumber + " payment";
-            case "WEEKS" -> "Week " + paymentNumber + " payment";
-            case "MONTHS" -> "Month " + paymentNumber + " payment";
-            default -> "Payment " + paymentNumber;
-        };
-    }
-
-// ===============================
-// PURCHASE OPTIONS SUMMARY
-// ===============================
+    // ===============================
+    // PURCHASE OPTIONS SUMMARY
+    // ===============================
 
     private ProductDetailedResponse.OrderingLimitsResponse.PurchaseOptionsResponse buildPurchaseOptionsResponse(ProductEntity product) {
         boolean canBuyNow = product.isInStock();
@@ -569,7 +427,6 @@ public class ProductBuildResponseHelper {
                 .productDescription(product.getProductDescription())
                 .shortDescription(product.getShortDescription())
                 .productImages(product.getProductImages())
-
                 // Pricing Information
                 .price(product.getPrice())
                 .comparePrice(product.getComparePrice())
@@ -614,7 +471,9 @@ public class ProductBuildResponseHelper {
 
                 // Special Offers
                 .groupBuying(buildPublicGroupBuyingResponse(product))
-                .installmentOptions(buildPublicInstallmentResponse(product))
+
+                // ✅ Installment Options (USE NEW HELPER)
+                .installmentOptions(installmentPlanResponseHelper.buildPublicInstallmentOptions(product))
 
                 // Timestamp
                 .createdAt(product.getCreatedAt())
@@ -622,7 +481,8 @@ public class ProductBuildResponseHelper {
     }
 
     // Helper methods for building public nested responses
-    private List<ProductPublicResponse.ProductColorPublicResponse> buildPublicColorResponses(List<Map<String, Object>> colors, BigDecimal basePrice) {
+    private List<ProductPublicResponse.ProductColorPublicResponse> buildPublicColorResponses(
+            List<Map<String, Object>> colors, BigDecimal basePrice) {
         if (colors == null || colors.isEmpty()) {
             return new ArrayList<>();
         }
@@ -683,28 +543,4 @@ public class ProductBuildResponseHelper {
                 .build();
     }
 
-    private ProductPublicResponse.InstallmentPublicResponse buildPublicInstallmentResponse(ProductEntity product) {
-        if (!product.isInstallmentAvailable()) {
-            return ProductPublicResponse.InstallmentPublicResponse.builder()
-                    .isAvailable(false)
-                    .build();
-        }
-
-        List<ProductPublicResponse.InstallmentPlanPublicResponse> plans = product.getInstallmentPlans().stream()
-                .map(planMap -> ProductPublicResponse.InstallmentPlanPublicResponse.builder()
-                        .duration((Integer) planMap.get("duration"))
-                        .interval((String) planMap.get("interval"))
-                        .interestRate(new BigDecimal(planMap.getOrDefault("interestRate", 0).toString()))
-                        .description((String) planMap.get("description"))
-                        .build())
-                .toList();
-
-        return ProductPublicResponse.InstallmentPublicResponse.builder()
-                .isAvailable(true)
-                .plans(plans)
-                .downPaymentRequired(product.getDownPaymentRequired())
-                .minDownPaymentPercentage(product.getMinDownPaymentPercentage())
-                .build();
-    }
 }
-

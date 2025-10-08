@@ -110,6 +110,14 @@ public class CheckoutSessionEntity {
 
     private UUID groupIdToBeJoined; // For GROUP_PURCHASE type
 
+    @Column(name = "selected_installment_plan_id")
+    private UUID selectedInstallmentPlanId;
+
+    @Column(name = "installment_config", columnDefinition = "jsonb")
+    @Convert(converter = InstallmentConfigJsonConverter.class)
+    private InstallmentConfiguration installmentConfig;
+
+
     // Cart reference (for REGULAR_CART type)
     @Column(name = "cart_id")
     private UUID cartId;
@@ -253,5 +261,47 @@ public class CheckoutSessionEntity {
         private String errorMessage;
         private LocalDateTime attemptedAt;
         private String transactionId;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class InstallmentConfiguration {
+        private UUID planId;
+        private String planName;
+        private Integer termMonths;
+        private BigDecimal apr;
+
+        // Down payment
+        private Integer downPaymentPercent;      // Customer chose (e.g., 25%)
+        private BigDecimal downPaymentAmount;
+
+        // Financing
+        private BigDecimal financedAmount;       // After down payment
+        private BigDecimal monthlyPaymentAmount; // Per installment
+        private BigDecimal totalInterest;
+        private BigDecimal totalAmount;          // Grand total
+
+        // Timing
+        private LocalDateTime firstPaymentDate;
+        private Integer gracePeriodDays;
+        private String fulfillmentTiming;        // IMMEDIATE or AFTER_PAYMENT
+
+        // Full schedule preview
+        private List<PaymentScheduleItem> schedule;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PaymentScheduleItem {
+        private Integer paymentNumber;
+        private LocalDateTime dueDate;
+        private BigDecimal amount;
+        private BigDecimal principalPortion;
+        private BigDecimal interestPortion;
+        private BigDecimal remainingBalance;
     }
 }

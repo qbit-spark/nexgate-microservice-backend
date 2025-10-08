@@ -42,6 +42,8 @@ public class CheckoutSessionMapper {
                 .completedAt(entity.getCompletedAt())
                 .createdOrderId(entity.getCreatedOrderId())
                 .cartId(entity.getCartId())
+                .selectedInstallmentPlanId(entity.getSelectedInstallmentPlanId())
+                .installmentConfig(mapInstallmentConfigToResponse(entity.getInstallmentConfig()))
                 .build();
     }
 
@@ -202,6 +204,47 @@ public class CheckoutSessionMapper {
                         .unitPrice(item.getUnitPrice())
                         .total(item.getTotal())
                         .shopName(item.getShopName())
+                        .build())
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+
+    // NEW: Helper method
+    private CheckoutSessionResponse.InstallmentConfigResponse mapInstallmentConfigToResponse(
+            CheckoutSessionEntity.InstallmentConfiguration config) {
+        if (config == null) return null;
+
+        return CheckoutSessionResponse.InstallmentConfigResponse.builder()
+                .planId(config.getPlanId())
+                .planName(config.getPlanName())
+                .termMonths(config.getTermMonths())
+                .apr(config.getApr())
+                .downPaymentPercent(config.getDownPaymentPercent())
+                .downPaymentAmount(config.getDownPaymentAmount())
+                .financedAmount(config.getFinancedAmount())
+                .monthlyPaymentAmount(config.getMonthlyPaymentAmount())
+                .totalInterest(config.getTotalInterest())
+                .totalAmount(config.getTotalAmount())
+                .firstPaymentDate(config.getFirstPaymentDate())
+                .gracePeriodDays(config.getGracePeriodDays())
+                .fulfillmentTiming(config.getFulfillmentTiming())
+                .schedule(mapScheduleToResponse(config.getSchedule()))
+                .build();
+    }
+
+    // NEW: Helper method
+    private List<CheckoutSessionResponse.PaymentScheduleItemResponse> mapScheduleToResponse(
+            List<CheckoutSessionEntity.PaymentScheduleItem> schedule) {
+        if (schedule == null) return null;
+
+        return schedule.stream()
+                .map(item -> CheckoutSessionResponse.PaymentScheduleItemResponse.builder()
+                        .paymentNumber(item.getPaymentNumber())
+                        .dueDate(item.getDueDate())
+                        .amount(item.getAmount())
+                        .principalPortion(item.getPrincipalPortion())
+                        .interestPortion(item.getInterestPortion())
+                        .remainingBalance(item.getRemainingBalance())
                         .build())
                 .collect(java.util.stream.Collectors.toList());
     }

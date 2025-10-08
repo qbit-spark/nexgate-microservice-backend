@@ -272,39 +272,18 @@ public class ProductHelperMethods {
         // ===============================
         // NEW FIELDS - INSTALLMENT OPTIONS
         // ===============================
+
         if (request.getInstallmentEnabled() != null) {
             product.setInstallmentEnabled(request.getInstallmentEnabled());
-
-            if (request.getInstallmentEnabled()) {
-                if (request.getInstallmentPlans() != null) {
-                    product.setInstallmentPlans(convertInstallmentPlansToEntityFromUpdate(request.getInstallmentPlans()));
-                }
-                if (request.getDownPaymentRequired() != null) {
-                    product.setDownPaymentRequired(request.getDownPaymentRequired());
-                }
-                if (request.getMinDownPaymentPercentage() != null) {
-                    product.setMinDownPaymentPercentage(request.getMinDownPaymentPercentage());
-                }
-            } else {
-                // If disabling installments, clear all installment fields
-                product.setInstallmentPlans(new ArrayList<>());
-                product.setDownPaymentRequired(false);
-                product.setMinDownPaymentPercentage(BigDecimal.ZERO);
-            }
-        } else {
-            // Update individual installment fields if installments are already enabled
-            if (product.getInstallmentEnabled() != null && product.getInstallmentEnabled()) {
-                if (request.getInstallmentPlans() != null) {
-                    product.setInstallmentPlans(convertInstallmentPlansToEntityFromUpdate(request.getInstallmentPlans()));
-                }
-                if (request.getDownPaymentRequired() != null) {
-                    product.setDownPaymentRequired(request.getDownPaymentRequired());
-                }
-                if (request.getMinDownPaymentPercentage() != null) {
-                    product.setMinDownPaymentPercentage(request.getMinDownPaymentPercentage());
-                }
-            }
         }
+
+        if (request.getMaxQuantityForInstallment() != null) {
+            product.setMaxQuantityForInstallment(request.getMaxQuantityForInstallment());
+        }
+
+
+
+
 
         // System fields - always update these
         product.setEditedBy(account.getId());
@@ -333,23 +312,6 @@ public class ProductHelperMethods {
         return colors;
     }
 
-    public List<Map<String, Object>> convertInstallmentPlansToEntity(List<CreateProductRequest.InstallmentPlanRequest> planRequests) {
-        if (planRequests == null || planRequests.isEmpty()) {
-            return new ArrayList<>();
-        }
-
-        List<Map<String, Object>> plans = new ArrayList<>();
-        for (CreateProductRequest.InstallmentPlanRequest planRequest : planRequests) {
-            Map<String, Object> plan = new HashMap<>();
-            plan.put("duration", planRequest.getDuration());
-            plan.put("interval", planRequest.getInterval());
-            plan.put("interestRate", planRequest.getInterestRate() != null ? planRequest.getInterestRate() : BigDecimal.ZERO);
-            plan.put("description", planRequest.getDescription());
-            plans.add(plan);
-        }
-
-        return plans;
-    }
 
     // Also add this method to ProductHelperMethods for slug generation
     private String generateUniqueSlugForShop(String productName, UUID shopId) {
@@ -383,24 +345,6 @@ public class ProductHelperMethods {
         }
 
         return colors;
-    }
-
-    public List<Map<String, Object>> convertInstallmentPlansToEntityFromUpdate(List<UpdateProductRequest.InstallmentPlanRequest> planRequests) {
-        if (planRequests == null || planRequests.isEmpty()) {
-            return new ArrayList<>();
-        }
-
-        List<Map<String, Object>> plans = new ArrayList<>();
-        for (UpdateProductRequest.InstallmentPlanRequest planRequest : planRequests) {
-            Map<String, Object> plan = new HashMap<>();
-            plan.put("duration", planRequest.getDuration());
-            plan.put("interval", planRequest.getInterval());
-            plan.put("interestRate", planRequest.getInterestRate() != null ? planRequest.getInterestRate() : BigDecimal.ZERO);
-            plan.put("description", planRequest.getDescription());
-            plans.add(plan);
-        }
-
-        return plans;
     }
 
     private String createBaseSlug(String name) {

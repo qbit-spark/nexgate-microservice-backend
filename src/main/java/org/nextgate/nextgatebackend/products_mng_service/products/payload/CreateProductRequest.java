@@ -124,15 +124,7 @@ public class CreateProductRequest {
     // ===============================
 
     private Boolean installmentEnabled = false;
-
-    private List<InstallmentPlanRequest> installmentPlans;
-
-    private Boolean downPaymentRequired = false;
-
-    @DecimalMin(value = "0.0", message = "Down payment percentage cannot be negative")
-    @DecimalMax(value = "100.0", message = "Down payment percentage cannot exceed 100%")
-    @Digits(integer = 3, fraction = 2, message = "Down payment percentage must have at most 3 digits and 2 decimal places")
-    private BigDecimal minDownPaymentPercentage = BigDecimal.ZERO;
+    private Integer maxQuantityForInstallment = 1;
 
     // ===============================
     // NESTED CLASSES FOR VALIDATION
@@ -202,13 +194,7 @@ public class CreateProductRequest {
         return true;
     }
 
-    @AssertTrue(message = "At least one installment plan is required when installments are enabled")
-    public boolean hasInstallmentPlansWhenEnabled() {
-        if (installmentEnabled) {
-            return installmentPlans != null && !installmentPlans.isEmpty();
-        }
-        return true;
-    }
+
 
     @AssertTrue(message = "Group buying settings are required when group buying is enabled")
     public boolean hasGroupBuyingSettingsWhenEnabled() {
