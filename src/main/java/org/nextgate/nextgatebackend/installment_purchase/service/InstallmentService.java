@@ -18,131 +18,57 @@ public interface InstallmentService {
     // CORE OPERATIONS
     // ========================================
 
-    /**
-     * Create installment agreement after down payment is completed
-     * Called by PaymentOrchestrator after checkout payment succeeds
-     */
-    InstallmentAgreementEntity createInstallmentAgreement(
-            CheckoutSessionEntity checkoutSession
-    ) throws ItemNotFoundException, BadRequestException;
-
-//    /**
-//     * Process a scheduled installment payment
-//     * Called by scheduled job or manual payment
-//     */
-    InstallmentPaymentEntity processInstallmentPayment(
-            UUID paymentId
-    ) throws ItemNotFoundException, BadRequestException;
-
-//    /**
-//     * Handle missed/failed payment
-//     */
-    void handleMissedPayment(
-            UUID paymentId,
-            String failureReason
-    ) throws ItemNotFoundException;
+    InstallmentAgreementEntity createInstallmentAgreement(CheckoutSessionEntity checkoutSession) throws ItemNotFoundException, BadRequestException;
 
 
-
-//    /**
-//     * Calculate early payoff amount
-//     */
-    BigDecimal calculateEarlyPayoffAmount(
-            UUID agreementId
-    ) throws ItemNotFoundException;
+    InstallmentPaymentEntity processInstallmentPayment(UUID paymentId) throws ItemNotFoundException, BadRequestException;
 
 
-//    /**
-//     * Process early payoff
-//     */
-    InstallmentAgreementEntity processEarlyPayoff(
-            UUID agreementId
-    ) throws ItemNotFoundException, BadRequestException;
-//
-//    // ========================================
-//    // QUERY OPERATIONS - AGREEMENTS
-//    // ========================================
-//
-//    /**
-//     * Get agreement by ID
-//     */
-    InstallmentAgreementEntity getAgreementById(
-            UUID agreementId
-    ) throws ItemNotFoundException;
-//
-//    /**
-//     * Get agreement by agreement number
-//     */
-    InstallmentAgreementEntity getAgreementByNumber(
-            String agreementNumber
-    ) throws ItemNotFoundException;
+    void handleMissedPayment(UUID paymentId, String failureReason) throws ItemNotFoundException;
 
-//    /**
-//     * Get customer's agreements
-//     */
-    List<InstallmentAgreementEntity> getMyAgreements(
-            AccountEntity customer
-    );
-
-//
-//    /**
-//     * Get customer's agreements by status
-//     */
-    List<InstallmentAgreementEntity> getMyAgreementsByStatus(
-            AccountEntity customer,
-            AgreementStatus status
-    );
+    BigDecimal calculateEarlyPayoffAmount(UUID agreementId) throws ItemNotFoundException;
 
 
-//    /**
-//     * Get agreement by checkout session
-//     */
-    InstallmentAgreementEntity getAgreementByCheckoutSession(
-            UUID checkoutSessionId
-    ) throws ItemNotFoundException;
+    InstallmentAgreementEntity processEarlyPayoff(UUID agreementId) throws ItemNotFoundException, BadRequestException;
 
-//
-//    // ========================================
-//    // QUERY OPERATIONS - PAYMENTS
-//    // ========================================
-//
-//    /**
-//     * Get all payments for an agreement
-//     */
-    List<InstallmentPaymentEntity> getAgreementPayments(
-            UUID agreementId
-    ) throws ItemNotFoundException;
+    // ========================================
+    // QUERY OPERATIONS - AGREEMENTS
+    // ========================================
+
+    InstallmentAgreementEntity getAgreementById(UUID agreementId) throws ItemNotFoundException;
+
+    InstallmentAgreementEntity getAgreementByNumber(String agreementNumber) throws ItemNotFoundException;
 
 
-//    /**
-//     * Get next payment for agreement
-//     */
-    InstallmentPaymentEntity getNextPayment(
-            UUID agreementId
-    ) throws ItemNotFoundException;
+    List<InstallmentAgreementEntity> getMyAgreements(AccountEntity customer);
 
-//    /**
-//     * Get payments due today
-//     */
+
+    List<InstallmentAgreementEntity> getMyAgreementsByStatus(AccountEntity customer, AgreementStatus status);
+
+    InstallmentAgreementEntity getAgreementByCheckoutSession(UUID checkoutSessionId) throws ItemNotFoundException;
+
+    // ========================================
+    // QUERY OPERATIONS - PAYMENTS
+    // ========================================
+
+    List<InstallmentPaymentEntity> getAgreementPayments(UUID agreementId) throws ItemNotFoundException;
+
+    InstallmentPaymentEntity getNextPayment(UUID agreementId) throws ItemNotFoundException;
+
+
     List<InstallmentPaymentEntity> getPaymentsDueToday();
 
-//    /**
-//     * Get overdue payments
-//     */
+
     List<InstallmentPaymentEntity> getOverduePayments();
-//
-//    // ========================================
-//    // VALIDATION OPERATIONS
-//    // ========================================
-//
-//    /**
-//     * Check if customer can make early payment
-//     */
+
+    // ========================================
+    // VALIDATION OPERATIONS
+    // ========================================
+
+
     boolean canMakeEarlyPayment(UUID agreementId);
-//
-//    /**
-//     * Check if agreement can be cancelled
-//     */
+
+
     boolean canCancelAgreement(UUID agreementId);
 
 }

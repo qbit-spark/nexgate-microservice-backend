@@ -312,23 +312,6 @@ public class ProductHelperMethods {
         return colors;
     }
 
-    public List<Map<String, Object>> convertInstallmentPlansToEntity(List<CreateProductRequest.InstallmentPlanRequest> planRequests) {
-        if (planRequests == null || planRequests.isEmpty()) {
-            return new ArrayList<>();
-        }
-
-        List<Map<String, Object>> plans = new ArrayList<>();
-        for (CreateProductRequest.InstallmentPlanRequest planRequest : planRequests) {
-            Map<String, Object> plan = new HashMap<>();
-            plan.put("duration", planRequest.getDuration());
-            plan.put("interval", planRequest.getInterval());
-            plan.put("interestRate", planRequest.getInterestRate() != null ? planRequest.getInterestRate() : BigDecimal.ZERO);
-            plan.put("description", planRequest.getDescription());
-            plans.add(plan);
-        }
-
-        return plans;
-    }
 
     // Also add this method to ProductHelperMethods for slug generation
     private String generateUniqueSlugForShop(String productName, UUID shopId) {
@@ -362,24 +345,6 @@ public class ProductHelperMethods {
         }
 
         return colors;
-    }
-
-    public List<Map<String, Object>> convertInstallmentPlansToEntityFromUpdate(List<UpdateProductRequest.InstallmentPlanRequest> planRequests) {
-        if (planRequests == null || planRequests.isEmpty()) {
-            return new ArrayList<>();
-        }
-
-        List<Map<String, Object>> plans = new ArrayList<>();
-        for (UpdateProductRequest.InstallmentPlanRequest planRequest : planRequests) {
-            Map<String, Object> plan = new HashMap<>();
-            plan.put("duration", planRequest.getDuration());
-            plan.put("interval", planRequest.getInterval());
-            plan.put("interestRate", planRequest.getInterestRate() != null ? planRequest.getInterestRate() : BigDecimal.ZERO);
-            plan.put("description", planRequest.getDescription());
-            plans.add(plan);
-        }
-
-        return plans;
     }
 
     private String createBaseSlug(String name) {

@@ -749,7 +749,6 @@ public class InstallmentServiceImpl implements InstallmentService {
     }
 
 
-
     // ========================================
     //        CALCULATING EARLY PAYOFF AMOUNT
     // ========================================
@@ -1262,7 +1261,7 @@ public class InstallmentServiceImpl implements InstallmentService {
 
 
    // ========================================
-  // VALIDATION OPERATIONS
+   // VALIDATION OPERATIONS
   // ========================================
 
     @Override
@@ -1298,8 +1297,6 @@ public class InstallmentServiceImpl implements InstallmentService {
 
         return true;
     }
-
-
 
 
 

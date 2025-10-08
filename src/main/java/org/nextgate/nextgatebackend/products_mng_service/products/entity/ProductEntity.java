@@ -148,25 +148,22 @@ public class ProductEntity {
     private Integer maxPerCustomer;
 
 
-
     // ===============================
     // NEW FIELDS - INSTALLMENT OPTIONS
     // ===============================
 
-
-    // ✅ KEEP THIS (enables/disables installment feature)
+    //  (enables/disables installment feature)
     @Column(name = "installment_enabled")
     private Boolean installmentEnabled = false;
 
-    // ✅ KEEP THIS (limits quantity for installments)
+    // KEEP THIS (limits quantity for installments)
     @Column(name = "max_quantity_for_installment")
     private Integer maxQuantityForInstallment = 1;
 
-    // ✅ ADD THIS RELATIONSHIP (replaces the JSONB field)
+    // ADD THIS RELATIONSHIP (replaces the JSONB field)
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonIgnoreProperties({"product", "hibernateLazyInitializer", "handler"})
     private List<InstallmentPlanEntity> installmentPlans = new ArrayList<>();
-
 
 
     // Relationships - The Key Part!
