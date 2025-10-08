@@ -112,11 +112,14 @@ public class UpdateProductRequest {
     // ===============================
     // INSTALLMENT OPTIONS
     // ===============================
-    private Boolean installmentEnabled;
 
     private List<InstallmentPlanRequest> installmentPlans;
 
     private Boolean downPaymentRequired;
+
+
+    private Boolean installmentEnabled;
+    private Integer maxQuantityForInstallment;
 
     @DecimalMin(value = "0.0", message = "Down payment percentage cannot be negative")
     @DecimalMax(value = "100.0", message = "Down payment percentage cannot exceed 100%")

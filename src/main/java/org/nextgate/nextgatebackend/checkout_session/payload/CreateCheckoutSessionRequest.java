@@ -33,10 +33,13 @@ public class CreateCheckoutSessionRequest {
 
     private Map<String, Object> metadata;
 
-    private UUID installmentPlanId;
 
     // NEW: For GROUP_PURCHASE
     private UUID groupInstanceId;  // Optional: to join existing group
+
+    // NEW: For INSTALLMENT
+    private UUID installmentPlanId;              // Which plan customer selected
+    private Integer downPaymentPercent;          // Customer's chosen down payment %
 
     @Data
     @Builder

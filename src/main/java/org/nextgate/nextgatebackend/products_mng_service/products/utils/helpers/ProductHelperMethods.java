@@ -272,39 +272,18 @@ public class ProductHelperMethods {
         // ===============================
         // NEW FIELDS - INSTALLMENT OPTIONS
         // ===============================
+
         if (request.getInstallmentEnabled() != null) {
             product.setInstallmentEnabled(request.getInstallmentEnabled());
-
-            if (request.getInstallmentEnabled()) {
-                if (request.getInstallmentPlans() != null) {
-                    product.setInstallmentPlans(convertInstallmentPlansToEntityFromUpdate(request.getInstallmentPlans()));
-                }
-                if (request.getDownPaymentRequired() != null) {
-                    product.setDownPaymentRequired(request.getDownPaymentRequired());
-                }
-                if (request.getMinDownPaymentPercentage() != null) {
-                    product.setMinDownPaymentPercentage(request.getMinDownPaymentPercentage());
-                }
-            } else {
-                // If disabling installments, clear all installment fields
-                product.setInstallmentPlans(new ArrayList<>());
-                product.setDownPaymentRequired(false);
-                product.setMinDownPaymentPercentage(BigDecimal.ZERO);
-            }
-        } else {
-            // Update individual installment fields if installments are already enabled
-            if (product.getInstallmentEnabled() != null && product.getInstallmentEnabled()) {
-                if (request.getInstallmentPlans() != null) {
-                    product.setInstallmentPlans(convertInstallmentPlansToEntityFromUpdate(request.getInstallmentPlans()));
-                }
-                if (request.getDownPaymentRequired() != null) {
-                    product.setDownPaymentRequired(request.getDownPaymentRequired());
-                }
-                if (request.getMinDownPaymentPercentage() != null) {
-                    product.setMinDownPaymentPercentage(request.getMinDownPaymentPercentage());
-                }
-            }
         }
+
+        if (request.getMaxQuantityForInstallment() != null) {
+            product.setMaxQuantityForInstallment(request.getMaxQuantityForInstallment());
+        }
+
+
+
+
 
         // System fields - always update these
         product.setEditedBy(account.getId());

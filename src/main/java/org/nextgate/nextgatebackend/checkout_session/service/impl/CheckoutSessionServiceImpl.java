@@ -27,6 +27,9 @@ import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
 import org.nextgate.nextgatebackend.group_purchase_mng.entity.GroupPurchaseInstanceEntity;
 import org.nextgate.nextgatebackend.group_purchase_mng.repo.GroupPurchaseInstanceRepo;
 import org.nextgate.nextgatebackend.group_purchase_mng.service.GroupPurchaseService;
+import org.nextgate.nextgatebackend.installment_purchase.entity.InstallmentPlanEntity;
+import org.nextgate.nextgatebackend.installment_purchase.repo.InstallmentPlanRepo;
+import org.nextgate.nextgatebackend.installment_purchase.utils.InstallmentCalculator;
 import org.nextgate.nextgatebackend.payment_methods.entity.PaymentMethodsEntity;
 import org.nextgate.nextgatebackend.payment_methods.enums.PaymentMethodsType;
 import org.nextgate.nextgatebackend.products_mng_service.products.entity.ProductEntity;
@@ -55,6 +58,8 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
     private final PaymentOrchestrator paymentOrchestrator;
     private final ProductRepo productRepo;
     private final GroupPurchaseInstanceRepo groupPurchaseInstanceRepo;
+    private final InstallmentPlanRepo installmentPlanRepo;
+    private final InstallmentCalculator installmentCalculator;
 
 
     @Override
@@ -78,7 +83,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
             case REGULAR_DIRECTLY -> handleRegularDirectlyCheckout(request, authenticatedUser);
             case REGULAR_CART -> handleRegularCartCheckout(request, authenticatedUser);
             case GROUP_PURCHASE -> handleGroupPurchaseCheckout(request, authenticatedUser);
-            case INSTALLMENT -> throw new BadRequestException("INSTALLMENT checkout not implemented yet");
+            case INSTALLMENT -> handleInstallmentCheckout(request, authenticatedUser);
         };
     }
 
@@ -994,6 +999,208 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         log.info("GROUP_PURCHASE checkout session created: {}", savedSession.getSessionId());
 
         // 17. Return response
+        return mapper.toResponse(savedSession);
+    }
+
+
+
+
+       // ========================================
+      // INSTALLMENT CHECKOUT HANDLER
+     // ========================================
+
+    private CheckoutSessionResponse handleInstallmentCheckout(
+            CreateCheckoutSessionRequest request,
+            AccountEntity authenticatedUser) throws ItemNotFoundException, BadRequestException {
+
+        log.info("Processing INSTALLMENT checkout for user: {}", authenticatedUser.getUserName());
+
+        // ========================================
+        // 1. VALIDATE REQUEST
+        // ========================================
+        validator.validateInstallmentRequest(request);
+
+        // ========================================
+        // 2. EXTRACT DATA FROM REQUEST
+        // ========================================
+        UUID productId = request.getItems().get(0).getProductId();
+        Integer quantity = request.getItems().get(0).getQuantity();
+        UUID planId = request.getInstallmentPlanId();
+        Integer downPaymentPercent = request.getDownPaymentPercent();
+
+        log.debug("Extracted - Product: {}, Qty: {}, Plan: {}, Down: {}%",
+                productId, quantity, planId, downPaymentPercent);
+
+        // ========================================
+        // 3. FETCH AND VALIDATE PRODUCT
+        // ========================================
+        ProductEntity product = productRepo.findByProductIdAndIsDeletedFalse(productId)
+                .orElseThrow(() -> new ItemNotFoundException("Product not found"));
+
+        validator.validateProductForInstallment(product);
+        validator.validateQuantityForInstallment(quantity, product);
+
+        log.debug("Product validated: {}", product.getProductName());
+
+        // ========================================
+        // 4. FETCH AND VALIDATE INSTALLMENT PLAN
+        // ========================================
+        InstallmentPlanEntity plan = installmentPlanRepo.findById(planId)
+                .orElseThrow(() -> new ItemNotFoundException("Installment plan not found"));
+
+        validator.validateInstallmentPlan(plan, product);
+        validator.validateDownPaymentPercent(downPaymentPercent, plan);
+
+        log.debug("Plan validated: {}", plan.getPlanName());
+
+        // ========================================
+        // 5. CALCULATE INSTALLMENT CONFIGURATION
+        // ========================================
+        CheckoutSessionEntity.InstallmentConfiguration installmentConfig =
+                installmentCalculator.calculateInstallmentConfig(
+                        plan,
+                        product.getPrice(),
+                        quantity,
+                        downPaymentPercent
+                );
+
+        log.info("Installment config calculated - Down: {}, Monthly: {}, Total: {}",
+                installmentConfig.getDownPaymentAmount(),
+                installmentConfig.getMonthlyPaymentAmount(),
+                installmentConfig.getTotalAmount());
+
+        // ========================================
+        // 6. FORCE PAYMENT METHOD TO WALLET
+        // ========================================
+        // Similar to group purchase, installments require wallet
+        PaymentMethodsEntity paymentMethod =
+                validator.createVirtualWalletPaymentMethod(authenticatedUser);
+
+        log.info("Using wallet payment method for installment");
+
+        // ========================================
+        // 7. VALIDATE WALLET BALANCE FOR DOWN PAYMENT
+        // ========================================
+        BigDecimal downPaymentAmount = installmentConfig.getDownPaymentAmount();
+        BigDecimal walletBalance = walletService.getMyWalletBalance();
+
+        if (walletBalance.compareTo(downPaymentAmount) < 0) {
+            throw new BadRequestException(
+                    String.format("Insufficient wallet balance. Required: %s TZS, Available: %s TZS",
+                            downPaymentAmount, walletBalance)
+            );
+        }
+
+        log.debug("Wallet balance sufficient: {} TZS", walletBalance);
+
+        // ========================================
+        // 8. VALIDATE SHIPPING ADDRESS
+        // ========================================
+        validator.validateShippingAddress(request.getShippingAddressId(), authenticatedUser);
+        CheckoutSessionEntity.ShippingAddress shippingAddress =
+                helper.fetchShippingAddress(request.getShippingAddressId());
+
+        log.debug("Shipping address validated");
+
+        // ========================================
+        // 9. VALIDATE SHIPPING METHOD
+        // ========================================
+        validator.validateShippingMethod(request.getShippingMethodId());
+        CheckoutSessionEntity.ShippingMethod shippingMethod =
+                helper.createPlaceholderShippingMethod(request.getShippingMethodId());
+
+        log.debug("Shipping method validated: {}", shippingMethod.getName());
+
+        // ========================================
+        // 10. BUILD CHECKOUT ITEM (Using Regular Price)
+        // ========================================
+        CheckoutSessionEntity.CheckoutItem item = helper.fetchAndBuildCheckoutItem(
+                productId,
+                quantity
+        );
+
+        log.debug("Checkout item built: {}", item.getProductName());
+
+        // ========================================
+        // 11. CALCULATE PRICING (DOWN PAYMENT ONLY!)
+        // ========================================
+        // CRITICAL: pricing.total = DOWN PAYMENT, not full product price
+        CheckoutSessionEntity.PricingSummary pricing =
+                CheckoutSessionEntity.PricingSummary.builder()
+                        .subtotal(downPaymentAmount)
+                        .discount(BigDecimal.ZERO)
+                        .shippingCost(BigDecimal.ZERO) // Can add shipping cost if needed
+                        .tax(BigDecimal.ZERO) // Can add tax if needed
+                        .total(downPaymentAmount) // ← ONLY DOWN PAYMENT!
+                        .currency("TZS")
+                        .build();
+
+        log.info("Pricing calculated - Total (down payment): {} TZS", pricing.getTotal());
+
+        // ========================================
+        // 12. DETERMINE BILLING ADDRESS
+        // ========================================
+        CheckoutSessionEntity.BillingAddress billingAddress =
+                helper.determineBillingAddress(request, paymentMethod);
+
+        // ========================================
+        // 13. CREATE PAYMENT INTENT (WALLET ONLY)
+        // ========================================
+        CheckoutSessionEntity.PaymentIntent paymentIntent =
+                helper.createPaymentIntent(paymentMethod, pricing, authenticatedUser.getAccountId());
+
+        log.debug("Payment intent created: WALLET - {}", paymentIntent.getStatus());
+
+        // ========================================
+        // 14. CALCULATE EXPIRATION TIMES
+        // ========================================
+        LocalDateTime sessionExpiration = helper.calculateSessionExpiration();
+        LocalDateTime inventoryHoldExpiration = helper.calculateInventoryHoldExpiration();
+
+        // ========================================
+        // 15. HOLD INVENTORY
+        // ========================================
+        helper.holdInventory(productId, quantity, inventoryHoldExpiration);
+
+        log.info("Inventory held for {} items until {}", quantity, inventoryHoldExpiration);
+
+        // ========================================
+        // 16. BUILD AND SAVE CHECKOUT SESSION ENTITY
+        // ========================================
+        CheckoutSessionEntity checkoutSession = CheckoutSessionEntity.builder()
+                .sessionType(CheckoutSessionType.INSTALLMENT)
+                .customer(authenticatedUser)
+                .status(CheckoutSessionStatus.PENDING_PAYMENT)
+                .items(List.of(item))
+                .pricing(pricing) // ← DOWN PAYMENT ONLY
+                .shippingAddress(shippingAddress)
+                .billingAddress(billingAddress)
+                .shippingMethod(shippingMethod)
+                .paymentIntent(paymentIntent)
+                .paymentAttempts(new ArrayList<>())
+                .inventoryHeld(true)
+                .inventoryHoldExpiresAt(inventoryHoldExpiration)
+                .metadata(request.getMetadata())
+                .expiresAt(sessionExpiration)
+                .createdOrderId(null) // Will be set after agreement creation
+                .cartId(null)
+                .groupIdToBeJoined(null)
+                // NEW: Installment-specific fields
+                .selectedInstallmentPlanId(planId)
+                .installmentConfig(installmentConfig) // ← FULL CONFIG STORED HERE
+                .build();
+
+        // ========================================
+        // 17. SAVE TO DATABASE
+        // ========================================
+        CheckoutSessionEntity savedSession = checkoutSessionRepo.save(checkoutSession);
+
+        log.info("INSTALLMENT checkout session created: {} - Down payment: {} TZS",
+                savedSession.getSessionId(), downPaymentAmount);
+
+        // ========================================
+        // 18. BUILD AND RETURN RESPONSE
+        // ========================================
         return mapper.toResponse(savedSession);
     }
 

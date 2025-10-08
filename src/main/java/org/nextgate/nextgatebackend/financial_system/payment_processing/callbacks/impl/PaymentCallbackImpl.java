@@ -9,6 +9,7 @@ import org.nextgate.nextgatebackend.financial_system.payment_processing.callback
 import org.nextgate.nextgatebackend.financial_system.payment_processing.payloads.PaymentResult;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.group_purchase_mng.service.GroupPurchaseService;
+import org.nextgate.nextgatebackend.installment_purchase.service.InstallmentService; // ADD THIS
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PaymentCallbackImpl implements PaymentCallback {
 
     private final GroupPurchaseService groupPurchaseService;
+    private final InstallmentService installmentService;
 
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -38,35 +40,16 @@ public class PaymentCallbackImpl implements PaymentCallback {
         log.info("Buyer: {}", checkoutSession.getCustomer().getUserName());
         log.info("Seller: {}", escrow.getSeller().getUserName());
 
-        //We can have specific actions based on session type
-        switch (checkoutSession.getSessionType()){
-            case INSTALLMENT -> logPlaceholderAction("Something to be done about installment when successful");
-            case REGULAR_DIRECTLY -> logPlaceholderAction("Something to be done about regular directly when successful");
-            case REGULAR_CART -> logPlaceholderAction("Something to be done about regular cart when successful");
-            case GROUP_PURCHASE -> handleGroupPurchase(checkoutSession);
-            default -> log.warn("Unknown session type - no specific actions");
-
+        // Route to specific handler based on session type
+        switch (checkoutSession.getSessionType()) {
+            case INSTALLMENT -> handleInstallmentPayment(checkoutSession, escrow);
+            case REGULAR_DIRECTLY -> handleRegularDirectly(checkoutSession, escrow);
+            case REGULAR_CART -> handleRegularCart(checkoutSession, escrow);
+            case GROUP_PURCHASE -> handleGroupPurchase(checkoutSession, escrow);
+            default -> log.warn("Unknown session type: {}", checkoutSession.getSessionType());
         }
 
-        try {
-            // Placeholder actions - will implement step by step
-            logPlaceholderAction("Create order from checkout session");
-            logPlaceholderAction("Update inventory (deduct sold items)");
-
-            if (checkoutSession.getCartId() != null) {
-                logPlaceholderAction("Clear cart for cart-based checkout");
-            }
-
-            logPlaceholderAction("Send payment success email to buyer");
-            logPlaceholderAction("Send new order notification to seller");
-            logPlaceholderAction("Track payment success event for analytics");
-
-            log.info("✓ Payment success callback completed");
-
-        } catch (Exception e) {
-            log.error("✗ Error in payment success callback (non-critical)", e);
-            // Don't throw - payment already succeeded
-        }
+        log.info("✓ Payment success callback completed");
     }
 
     @Override
@@ -80,40 +63,35 @@ public class PaymentCallbackImpl implements PaymentCallback {
         log.warn("║          PAYMENT FAILURE CALLBACK                          ║");
         log.warn("╚════════════════════════════════════════════════════════════╝");
         log.warn("Checkout Session ID: {}", checkoutSession.getSessionId());
+        log.warn("Session Type: {}", checkoutSession.getSessionType());
         log.warn("Error Message: {}", errorMessage);
         log.warn("Payment Status: {}", result.getStatus());
         log.warn("Error Code: {}", result.getErrorCode());
         log.warn("Attempt #: {}", checkoutSession.getPaymentAttemptCount());
 
-        try {
-            // Placeholder actions
-            if (checkoutSession.getInventoryHeld() != null && checkoutSession.getInventoryHeld()) {
-                logPlaceholderAction("Release held inventory");
-                for (CheckoutSessionEntity.CheckoutItem item : checkoutSession.getItems()) {
-                    log.warn("  → Release {} units of product {} ({})",
-                            item.getQuantity(),
-                            item.getProductName(),
-                            item.getProductId());
-                }
+        // Release held inventory
+        if (checkoutSession.getInventoryHeld() != null && checkoutSession.getInventoryHeld()) {
+            log.warn("[TODO] Release held inventory");
+            for (CheckoutSessionEntity.CheckoutItem item : checkoutSession.getItems()) {
+                log.warn("  → Release {} units of product {} ({})",
+                        item.getQuantity(),
+                        item.getProductName(),
+                        item.getProductId());
             }
-
-            logPlaceholderAction("Send payment failure notification to buyer");
-            logPlaceholderAction("Track payment failure event for analytics");
-
-            int attemptCount = checkoutSession.getPaymentAttemptCount();
-            if (attemptCount < 5) {
-                log.warn("User can retry payment ({}/5 attempts)", attemptCount);
-                logPlaceholderAction("Send retry instructions email");
-            } else {
-                log.warn("Max payment attempts reached - session will expire");
-                logPlaceholderAction("Send session expiration notice");
-            }
-
-            log.warn("✓ Payment failure callback completed");
-
-        } catch (Exception e) {
-            log.error("✗ Error in payment failure callback", e);
         }
+
+        // Send failure notification
+        log.warn("[TODO] Send payment failure notification to buyer");
+
+        // Check retry attempts
+        int attemptCount = checkoutSession.getPaymentAttemptCount();
+        if (attemptCount < 5) {
+            log.warn("User can retry payment ({}/5 attempts)", attemptCount);
+        } else {
+            log.warn("Max payment attempts reached - session will expire");
+        }
+
+        log.warn("✓ Payment failure callback completed");
     }
 
     @Override
@@ -126,35 +104,94 @@ public class PaymentCallbackImpl implements PaymentCallback {
         log.info("║          PAYMENT PENDING CALLBACK                          ║");
         log.info("╚════════════════════════════════════════════════════════════╝");
         log.info("Checkout Session ID: {}", checkoutSession.getSessionId());
+        log.info("Session Type: {}", checkoutSession.getSessionType());
         log.info("External Reference: {}", result.getExternalReference());
         log.info("Payment URL: {}", result.getPaymentUrl());
         log.info("USSD Code: {}", result.getUssdCode());
 
-        try {
-            // Placeholder actions
-            logPlaceholderAction("Send payment pending notification with payment instructions");
-            logPlaceholderAction("Extend session expiration for external payment");
-            logPlaceholderAction("Schedule periodic payment status check");
+        log.info("[TODO] Send payment pending notification with instructions");
+        log.info("[TODO] Extend session expiration for external payment");
+        log.info("[TODO] Schedule periodic payment status check");
 
-            log.info("✓ Payment pending callback completed");
-
-        } catch (Exception e) {
-            log.error("✗ Error in payment pending callback", e);
-        }
+        log.info("✓ Payment pending callback completed");
     }
 
-    /**
-     * Helper method to log placeholder actions consistently
-     */
-    private void logPlaceholderAction(String action) {
-        log.info("  [TODO] {}", action);
-    }
+    // ========================================
+    // PRIVATE HANDLER METHODS
+    // ========================================
 
-    private void handleGroupPurchase(CheckoutSessionEntity checkoutSession) throws BadRequestException, ItemNotFoundException {
-        if (checkoutSession.getGroupIdToBeJoined() != null) {
-              groupPurchaseService.joinGroup(checkoutSession);
+    private void handleInstallmentPayment(
+            CheckoutSessionEntity checkoutSession,
+            EscrowAccountEntity escrow) throws BadRequestException, ItemNotFoundException {
+
+        log.info("╔════════════════════════════════════════════════════════════╗");
+        log.info("║          INSTALLMENT PAYMENT HANDLER                       ║");
+        log.info("╚════════════════════════════════════════════════════════════╝");
+
+        log.info("Processing installment payment...");
+        log.info("  Checkout Session: {}", checkoutSession.getSessionId());
+        log.info("  Down Payment: {} TZS", escrow.getTotalAmount());
+        log.info("  Installment Plan: {}", checkoutSession.getSelectedInstallmentPlanId());
+
+        // Create installment agreement
+        var agreement = installmentService.createInstallmentAgreement(checkoutSession);
+
+        log.info("✓ Installment agreement created successfully");
+        log.info("  Agreement Number: {}", agreement.getAgreementNumber());
+        log.info("  Agreement ID: {}", agreement.getAgreementId());
+        log.info("  Status: {}", agreement.getAgreementStatus());
+        log.info("  Number of Payments: {}", agreement.getNumberOfPayments());
+        log.info("  First Payment Date: {}", agreement.getFirstPaymentDate());
+        log.info("  Monthly Payment: {} TZS", agreement.getMonthlyPaymentAmount());
+        log.info("  Total Amount: {} TZS", agreement.getTotalAmount());
+        log.info("  Fulfillment: {}", agreement.getFulfillmentTiming());
+
+        if (agreement.getOrderId() != null) {
+            log.info("  Order Created: {}", agreement.getOrderId());
+            log.info("  Product will ship immediately (IMMEDIATE fulfillment)");
         } else {
-           groupPurchaseService.createGroupInstance(checkoutSession);
+            log.info("  Order: Not created yet (AFTER_PAYMENT fulfillment)");
+            log.info("  Product will ship after final payment");
+        }
+
+        log.info("[TODO] Send installment agreement confirmation email");
+        log.info("[TODO] Send payment schedule to customer");
+        log.info("[TODO] Set up payment reminders");
+    }
+
+    private void handleRegularDirectly(
+            CheckoutSessionEntity checkoutSession,
+            EscrowAccountEntity escrow) {
+
+        log.info("Handling REGULAR_DIRECTLY purchase");
+        log.info("[TODO] Create order from checkout session");
+        log.info("[TODO] Update inventory");
+        log.info("[TODO] Send order confirmation email");
+    }
+
+    private void handleRegularCart(
+            CheckoutSessionEntity checkoutSession,
+            EscrowAccountEntity escrow) {
+
+        log.info("Handling REGULAR_CART purchase");
+        log.info("[TODO] Create order from cart");
+        log.info("[TODO] Clear cart for customer");
+        log.info("[TODO] Update inventory");
+        log.info("[TODO] Send order confirmation email");
+    }
+
+    private void handleGroupPurchase(
+            CheckoutSessionEntity checkoutSession,
+            EscrowAccountEntity escrow) throws BadRequestException, ItemNotFoundException {
+
+        log.info("Handling GROUP_PURCHASE");
+
+        if (checkoutSession.getGroupIdToBeJoined() != null) {
+            groupPurchaseService.joinGroup(checkoutSession);
+            log.info("✓ Customer joined existing group");
+        } else {
+            groupPurchaseService.createGroupInstance(checkoutSession);
+            log.info("✓ New group instance created");
         }
     }
 }

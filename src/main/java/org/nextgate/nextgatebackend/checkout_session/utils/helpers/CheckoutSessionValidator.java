@@ -17,6 +17,7 @@ import org.nextgate.nextgatebackend.checkout_session.payload.UpdateCheckoutSessi
 import org.nextgate.nextgatebackend.financial_system.wallet.entity.WalletEntity;
 import org.nextgate.nextgatebackend.financial_system.wallet.service.WalletService;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
+import org.nextgate.nextgatebackend.installment_purchase.entity.InstallmentPlanEntity;
 import org.nextgate.nextgatebackend.payment_methods.entity.PaymentMethodsEntity;
 import org.nextgate.nextgatebackend.payment_methods.enums.PaymentMethodsType;
 import org.nextgate.nextgatebackend.payment_methods.repo.PaymentMethodRepository;
@@ -29,6 +30,7 @@ import org.nextgate.nextgatebackend.checkout_session.enums.CheckoutSessionType;
 import org.nextgate.nextgatebackend.products_mng_service.products.entity.ProductEntity;
 import org.nextgate.nextgatebackend.products_mng_service.products.enums.ProductStatus;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Slf4j
@@ -593,6 +595,179 @@ public class CheckoutSessionValidator {
         }
 
         log.debug("Product match validated for group");
+    }
+
+
+    // ========================================
+// ADD THESE METHODS TO EXISTING CheckoutSessionValidator
+// ========================================
+
+    public void validateInstallmentRequest(CreateCheckoutSessionRequest request)
+            throws BadRequestException {
+
+        log.debug("Validating INSTALLMENT checkout request");
+
+        // 1. Validate session type
+        if (request.getSessionType() != CheckoutSessionType.INSTALLMENT) {
+            throw new BadRequestException("Invalid session type. Expected: INSTALLMENT");
+        }
+
+        // 2. Validate exactly 1 item
+        if (request.getItems() == null || request.getItems().isEmpty()) {
+            throw new BadRequestException("INSTALLMENT must have items");
+        }
+
+        if (request.getItems().size() != 1) {
+            throw new BadRequestException("INSTALLMENT must have exactly 1 item");
+        }
+
+        // 3. Validate item details
+        CreateCheckoutSessionRequest.CheckoutItemDto item = request.getItems().get(0);
+
+        if (item.getProductId() == null) {
+            throw new BadRequestException("Product ID is required");
+        }
+
+        if (item.getQuantity() == null || item.getQuantity() < 1) {
+            throw new BadRequestException("Quantity must be at least 1");
+        }
+
+        // 4. Validate installment plan ID is provided
+        if (request.getInstallmentPlanId() == null) {
+            throw new BadRequestException("Installment plan ID is required");
+        }
+
+        // 5. Validate down payment percent is provided
+        if (request.getDownPaymentPercent() == null) {
+            throw new BadRequestException("Down payment percentage is required");
+        }
+
+        // 6. Validate shipping address
+        if (request.getShippingAddressId() == null) {
+            throw new BadRequestException("Shipping address is required");
+        }
+
+        // 7. Validate shipping method
+        if (request.getShippingMethodId() == null ||
+                request.getShippingMethodId().trim().isEmpty()) {
+            throw new BadRequestException("Shipping method is required");
+        }
+
+        log.debug("INSTALLMENT request validation passed");
+    }
+
+    public void validateProductForInstallment(ProductEntity product)
+            throws BadRequestException {
+
+        log.debug("Validating product for installment: {}", product.getProductId());
+
+        // 1. Validate product is not deleted
+        if (product.getIsDeleted() != null && product.getIsDeleted()) {
+            throw new BadRequestException("Product has been deleted");
+        }
+
+        // 2. Validate product status is ACTIVE
+        if (product.getStatus() != ProductStatus.ACTIVE) {
+            throw new BadRequestException(
+                    String.format("Product is not active. Status: %s", product.getStatus())
+            );
+        }
+
+        // 3. Validate installment is enabled
+        if (product.getInstallmentEnabled() == null || !product.getInstallmentEnabled()) {
+            throw new BadRequestException("Installment purchase is not enabled for this product");
+        }
+
+        log.debug("Product validation passed for installment");
+    }
+
+    public void validateQuantityForInstallment(Integer quantity, ProductEntity product)
+            throws BadRequestException {
+
+        log.debug("Validating quantity for installment: {} for product: {}",
+                quantity, product.getProductId());
+
+        // 1. Validate quantity is positive
+        if (quantity == null || quantity <= 0) {
+            throw new BadRequestException("Quantity must be greater than 0");
+        }
+
+        // 2. Validate quantity does not exceed product's installment limit
+        Integer maxQty = product.getMaxQuantityForInstallment();
+        if (maxQty != null && quantity > maxQty) {
+            throw new BadRequestException(
+                    String.format("Quantity (%d) exceeds max allowed for installment (%d)",
+                            quantity, maxQty)
+            );
+        }
+
+        // 3. Validate total amount doesn't exceed platform cap
+        BigDecimal totalCost = product.getPrice().multiply(BigDecimal.valueOf(quantity));
+        BigDecimal platformMax = BigDecimal.valueOf(5000); // $5,000 cap
+
+        if (totalCost.compareTo(platformMax) > 0) {
+            throw new BadRequestException(
+                    String.format("Total amount (%s TZS) exceeds platform maximum (%s TZS) for installment",
+                            totalCost, platformMax)
+            );
+        }
+
+        log.debug("Quantity validation passed for installment");
+    }
+
+    public void validateInstallmentPlan(InstallmentPlanEntity plan, ProductEntity product)
+            throws BadRequestException {
+
+        log.debug("Validating installment plan: {}", plan.getPlanId());
+
+        // 1. Validate plan is active
+        if (plan.getIsActive() == null || !plan.getIsActive()) {
+            throw new BadRequestException("Selected installment plan is not active");
+        }
+
+        // 2. Validate plan belongs to this product
+        if (!plan.getProduct().getProductId().equals(product.getProductId())) {
+            throw new BadRequestException("Plan does not belong to this product");
+        }
+
+        // 3. Validate plan is valid (has all required fields)
+        if (!plan.isValid()) {
+            throw new BadRequestException("Selected installment plan has invalid configuration");
+        }
+
+        log.debug("Plan validation passed");
+    }
+
+    public void validateDownPaymentPercent(
+            Integer downPaymentPercent,
+            InstallmentPlanEntity plan
+    ) throws BadRequestException {
+
+        log.debug("Validating down payment percent: {}% for plan min: {}%",
+                downPaymentPercent, plan.getMinDownPaymentPercent());
+
+        if (downPaymentPercent == null) {
+            throw new BadRequestException("Down payment percentage is required");
+        }
+
+        Integer minPercent = plan.getMinDownPaymentPercent();
+        Integer maxPercent = 50; // Platform max
+
+        if (downPaymentPercent < minPercent) {
+            throw new BadRequestException(
+                    String.format("Down payment (%d%%) is below minimum (%d%%)",
+                            downPaymentPercent, minPercent)
+            );
+        }
+
+        if (downPaymentPercent > maxPercent) {
+            throw new BadRequestException(
+                    String.format("Down payment (%d%%) exceeds maximum (%d%%)",
+                            downPaymentPercent, maxPercent)
+            );
+        }
+
+        log.debug("Down payment validation passed");
     }
 
 }
