@@ -55,7 +55,7 @@ public class CheckoutSessionValidator {
             case REGULAR_DIRECTLY -> validateRegularDirectlyRequest(request);
             case REGULAR_CART -> validateAndGetUserCart();
             case GROUP_PURCHASE -> validateGroupPurchaseRequest(request);
-            case INSTALLMENT -> throw new BadRequestException("INSTALLMENT checkout not implemented yet");
+            case INSTALLMENT -> validateInstallmentRequest(request);
             default -> throw new BadRequestException("Invalid checkout session type");
         }
     }
@@ -599,8 +599,8 @@ public class CheckoutSessionValidator {
 
 
     // ========================================
-// ADD THESE METHODS TO EXISTING CheckoutSessionValidator
-// ========================================
+   // ADD THESE METHODS TO EXISTING CheckoutSessionValidator
+  // ========================================
 
     public void validateInstallmentRequest(CreateCheckoutSessionRequest request)
             throws BadRequestException {
@@ -701,16 +701,6 @@ public class CheckoutSessionValidator {
             );
         }
 
-        // 3. Validate total amount doesn't exceed platform cap
-        BigDecimal totalCost = product.getPrice().multiply(BigDecimal.valueOf(quantity));
-        BigDecimal platformMax = BigDecimal.valueOf(5000); // $5,000 cap
-
-        if (totalCost.compareTo(platformMax) > 0) {
-            throw new BadRequestException(
-                    String.format("Total amount (%s TZS) exceeds platform maximum (%s TZS) for installment",
-                            totalCost, platformMax)
-            );
-        }
 
         log.debug("Quantity validation passed for installment");
     }
@@ -751,6 +741,7 @@ public class CheckoutSessionValidator {
         }
 
         Integer minPercent = plan.getMinDownPaymentPercent();
+        //Todo: this to be handled via admin settings
         Integer maxPercent = 50; // Platform max
 
         if (downPaymentPercent < minPercent) {
