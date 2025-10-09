@@ -16,7 +16,7 @@ import org.nextgate.nextgatebackend.financial_system.payment_processing.service.
 import org.nextgate.nextgatebackend.financial_system.payment_processing.service.WalletPaymentProcessor;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
-import org.nextgate.nextgatebackend.orders_mng.service.OrderService;
+import org.nextgate.nextgatebackend.order_mng_service.service.OrderService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

@@ -1,4 +1,4 @@
-package org.nextgate.nextgatebackend.orders_mng.service;
+package org.nextgate.nextgatebackend.order_mng_service.service;
 
 import org.nextgate.nextgatebackend.checkout_session.entity.CheckoutSessionEntity;
 import org.nextgate.nextgatebackend.financial_system.escrow.entity.EscrowAccountEntity;

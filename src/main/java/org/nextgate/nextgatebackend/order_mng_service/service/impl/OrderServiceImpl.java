@@ -1,9 +1,9 @@
-package org.nextgate.nextgatebackend.orders_mng.service.impl;
+package org.nextgate.nextgatebackend.order_mng_service.service.impl;
 
 import lombok.extern.slf4j.Slf4j;
 import org.nextgate.nextgatebackend.checkout_session.entity.CheckoutSessionEntity;
 import org.nextgate.nextgatebackend.financial_system.escrow.entity.EscrowAccountEntity;
-import org.nextgate.nextgatebackend.orders_mng.service.OrderService;
+import org.nextgate.nextgatebackend.order_mng_service.service.OrderService;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
