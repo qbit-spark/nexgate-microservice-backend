@@ -22,6 +22,7 @@ import org.nextgate.nextgatebackend.installment_purchase.entity.InstallmentPlanE
 import org.nextgate.nextgatebackend.installment_purchase.enums.AgreementStatus;
 import org.nextgate.nextgatebackend.installment_purchase.enums.PaymentStatus;
 import org.nextgate.nextgatebackend.installment_purchase.enums.FulfillmentTiming;
+import org.nextgate.nextgatebackend.installment_purchase.events.InstallmentAgreementCompletedEvent;
 import org.nextgate.nextgatebackend.installment_purchase.repo.InstallmentAgreementRepo;
 import org.nextgate.nextgatebackend.installment_purchase.repo.InstallmentPaymentRepo;
 import org.nextgate.nextgatebackend.installment_purchase.repo.InstallmentPlanRepo;
@@ -29,6 +30,7 @@ import org.nextgate.nextgatebackend.installment_purchase.service.InstallmentServ
 import org.nextgate.nextgatebackend.installment_purchase.utils.InstallmentValidator;
 import org.nextgate.nextgatebackend.products_mng_service.products.entity.ProductEntity;
 import org.nextgate.nextgatebackend.products_mng_service.products.repo.ProductRepo;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -58,6 +60,7 @@ public class InstallmentServiceImpl implements InstallmentService {
     private final WalletService walletService;
     private final LedgerService ledgerService;
     private final TransactionHistoryService transactionHistoryService;
+    private final ApplicationEventPublisher eventPublisher;
 
     // ========================================
     // AGREEMENT CREATION
@@ -1075,51 +1078,33 @@ public class InstallmentServiceImpl implements InstallmentService {
                 agreement.getOrderId() == null) {
 
             log.info("Fulfillment type: AFTER_PAYMENT");
-            log.info("Agreement is now complete - creating order and shipping product");
+            log.info("Agreement is now complete - order should be created (via event)");
 
-            // TODO: Create order
-            // OrderEntity order = orderService.createInstallmentOrder(agreement);
-            // agreement.setOrderId(order.getOrderId());
-            // agreement.setShippedAt(now);
-            // agreementRepo.save(agreement);
+            // ADD THIS: Publish event
+            try {
+                InstallmentAgreementCompletedEvent event =
+                        new InstallmentAgreementCompletedEvent(
+                                this,
+                                agreement.getAgreementId(),
+                                agreement,
+                                now,
+                                true  // IS early payoff
+                        );
 
-            log.info("[TODO] Create order for AFTER_PAYMENT fulfillment");
+                eventPublisher.publishEvent(event);
+
+                log.info("✓ InstallmentAgreementCompletedEvent published (early payoff)");
+
+            } catch (Exception e) {
+                log.error("Failed to publish event", e);
+            }
 
         } else if (agreement.getOrderId() != null) {
             log.info("Order already exists: {}", agreement.getOrderId());
-            log.info("Marking order as fully paid...");
-
-            // TODO: Update order payment status
-            // orderService.markOrderAsFullyPaid(agreement.getOrderId());
-
+            // TODO: Mark order as fully paid
             log.info("[TODO] Mark order as fully paid");
         }
 
-        // ========================================
-        // STEP 9: SEND NOTIFICATIONS
-        // ========================================
-        log.info("Sending completion notifications...");
-
-        // TODO: Send email
-        // emailService.sendEarlyPayoffConfirmation(
-        //     customer,
-        //     agreement,
-        //     payoffAmount,
-        //     savings
-        // );
-
-        log.info("[TODO] Email notification:");
-        log.info("  To: {}", customer.getEmail());
-        log.info("  Subject: Agreement Completed - You Saved {} TZS!", savings);
-        log.info("  Content: Thank you for paying off early");
-
-        // TODO: Send SMS
-        // smsService.sendEarlyPayoffConfirmation(customer.getPhoneNumber(), ...);
-        log.info("[TODO] SMS notification sent");
-
-        // TODO: In-app notification
-        // notificationService.createInAppNotification(...);
-        log.info("[TODO] In-app notification created");
 
         // ========================================
         // STEP 10: LOG ANALYTICS
@@ -1453,9 +1438,10 @@ public class InstallmentServiceImpl implements InstallmentService {
 
 
     private void handleAgreementCompletion(InstallmentAgreementEntity agreement) {
-        log.info("╔════════════════════════════════════════════════════════════╗");
-        log.info("║         AGREEMENT COMPLETION                               ║");
-        log.info("╚════════════════════════════════════════════════════════════╝");
+
+        log.info("╔════════════════════════════════════════════════════════╗");
+        log.info("║         AGREEMENT COMPLETION                           ║");
+        log.info("╚════════════════════════════════════════════════════════╝");
         log.info("Agreement: {}", agreement.getAgreementNumber());
 
         LocalDateTime now = LocalDateTime.now();
@@ -1468,19 +1454,41 @@ public class InstallmentServiceImpl implements InstallmentService {
         log.info("  Total Paid: {} TZS", agreement.getAmountPaid());
         log.info("  Completion Date: {}", now);
 
-        // Handle AFTER_PAYMENT fulfillment
+        // ========================================
+        // HANDLE FULFILLMENT
+        // ========================================
+
         if (agreement.getFulfillmentTiming() == FulfillmentTiming.AFTER_PAYMENT &&
                 agreement.getOrderId() == null) {
 
             log.info("Fulfillment Type: AFTER_PAYMENT");
-            log.info("Creating order now...");
+            log.info("Order should be created now (via event)");
 
-            // TODO: Create order
-            // OrderEntity order = orderService.createInstallmentOrder(agreement);
-            // agreement.setOrderId(order.getOrderId());
-            // agreement.setShippedAt(now);
 
-            log.info("[TODO] Create order and ship product");
+            // ADD THIS: Publish event for order creation
+            try {
+                InstallmentAgreementCompletedEvent event =
+                        new InstallmentAgreementCompletedEvent(
+                                this,
+                                agreement.getAgreementId(),
+                                agreement,
+                                now,
+                                false  // Not early payoff
+                        );
+
+                eventPublisher.publishEvent(event);
+
+                log.info("✓ InstallmentAgreementCompletedEvent published");
+                log.info("  Event will trigger:");
+                log.info("    - Order creation (AFTER_PAYMENT)");
+                log.info("    - Product shipment");
+                log.info("    - Completion notification");
+
+            } catch (Exception e) {
+                log.error("Failed to publish InstallmentAgreementCompletedEvent", e);
+                // Don't throw - agreement is still marked as completed
+            }
+
         } else if (agreement.getOrderId() != null) {
             log.info("Order already exists: {}", agreement.getOrderId());
 
@@ -1498,7 +1506,7 @@ public class InstallmentServiceImpl implements InstallmentService {
         // );
         log.info("[TODO] Send completion notification");
 
-        log.info("╚════════════════════════════════════════════════════════════╝");
+        log.info("╚════════════════════════════════════════════════════════╝");
     }
 
 }
