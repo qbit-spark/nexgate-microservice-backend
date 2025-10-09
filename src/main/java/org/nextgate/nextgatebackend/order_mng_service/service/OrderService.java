@@ -1,17 +1,27 @@
 package org.nextgate.nextgatebackend.order_mng_service.service;
 
-import org.nextgate.nextgatebackend.checkout_session.entity.CheckoutSessionEntity;
-import org.nextgate.nextgatebackend.financial_system.escrow.entity.EscrowAccountEntity;
+import org.apache.coyote.BadRequestException;
+import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 
+import java.util.List;
 import java.util.UUID;
 
-// Placeholder interface - will be implemented properly later
 public interface OrderService {
 
-    // Creates order from checkout session after successful payment
-    // Returns order ID (for now returns null - placeholder)
-    UUID createOrderFromCheckoutSession(
-            CheckoutSessionEntity checkoutSession,
-            EscrowAccountEntity escrow
-    );
+    /**
+     * Creates order from a completed checkout session
+     *
+     * Automatically handles all session types:
+     * - REGULAR_DIRECTLY: Direct purchase
+     * - REGULAR_CART: Cart checkout
+     * - INSTALLMENT: Installment purchase
+     * - GROUP_PURCHASE: Group buying
+     *
+     * @param checkoutSessionId The completed checkout session
+     * @return List containing the created order ID
+     * @throws ItemNotFoundException if session not found
+     * @throws BadRequestException if order cannot be created
+     */
+    List<UUID> createOrdersFromCheckoutSession(UUID checkoutSessionId)
+            throws ItemNotFoundException, BadRequestException;
 }

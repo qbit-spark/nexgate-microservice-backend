@@ -61,7 +61,6 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
     private final InstallmentPlanRepo installmentPlanRepo;
     private final InstallmentCalculator installmentCalculator;
 
-
     @Override
     @Transactional
     public CheckoutSessionResponse createCheckoutSession(CreateCheckoutSessionRequest request)
@@ -218,6 +217,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         log.info("Checkout session {} cancelled successfully by user: {}",
                 sessionId, authenticatedUser.getUserName());
     }
+
 
     // ========================================
    // UPDATE CHECKOUT SESSION
@@ -746,9 +746,8 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // ========================================
         // 13. BUILD & RETURN RESPONSE
         // ========================================
-        CheckoutSessionResponse response = mapper.toResponse(savedSession);
 
-        return response;
+        return mapper.toResponse(savedSession);
     }
 
 

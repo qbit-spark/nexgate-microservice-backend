@@ -2,8 +2,10 @@ package org.nextgate.nextgatebackend.financial_system.payment_processing.service
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.coyote.BadRequestException;
 import org.nextgate.nextgatebackend.checkout_session.entity.CheckoutSessionEntity;
 import org.nextgate.nextgatebackend.checkout_session.enums.CheckoutSessionStatus;
+import org.nextgate.nextgatebackend.checkout_session.enums.CheckoutSessionType;
 import org.nextgate.nextgatebackend.checkout_session.repo.CheckoutSessionRepo;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.callbacks.PaymentCallback;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.enums.PaymentMethod;
@@ -16,12 +18,17 @@ import org.nextgate.nextgatebackend.financial_system.payment_processing.service.
 import org.nextgate.nextgatebackend.financial_system.payment_processing.service.WalletPaymentProcessor;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
+import org.nextgate.nextgatebackend.order_mng_service.entity.OrderEntity;
+import org.nextgate.nextgatebackend.order_mng_service.repo.OrderRepository;
 import org.nextgate.nextgatebackend.order_mng_service.service.OrderService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
+
+import static org.nextgate.nextgatebackend.checkout_session.enums.CheckoutSessionType.*;
 
 @Service
 @RequiredArgsConstructor
@@ -33,11 +40,12 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
     private final ExternalPaymentProcessor externalPaymentProcessor;
     private final OrderService orderService;
     private final PaymentCallback paymentCallback;
+    private final OrderRepository orderRepo;
 
     @Override
     @Transactional
     public PaymentResponse processPayment(UUID checkoutSessionId)
-            throws ItemNotFoundException, RandomExceptions {
+            throws ItemNotFoundException, RandomExceptions, BadRequestException {
 
         PaymentRequest request = PaymentRequest.builder()
                 .checkoutSessionId(checkoutSessionId)
@@ -49,7 +57,7 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
     @Override
     @Transactional
     public PaymentResponse processPayment(PaymentRequest request)
-            throws ItemNotFoundException, RandomExceptions {
+            throws ItemNotFoundException, RandomExceptions, BadRequestException {
 
         log.info("Processing payment for checkout session: {}", request.getCheckoutSessionId());
 
@@ -103,7 +111,6 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
     }
 
 
-
     // Determines payment method from checkout session or request override
     private PaymentMethod determinePaymentMethod(
             CheckoutSessionEntity checkoutSession,
@@ -144,6 +151,7 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
             CheckoutSessionEntity checkoutSession,
             PaymentMethod paymentMethod) throws ItemNotFoundException, RandomExceptions {
 
+        //Todo: Here is where we can add more payment methods in the future
         return switch (paymentMethod) {
             case WALLET -> walletPaymentProcessor.processPayment(checkoutSession);
             case MPESA, TIGO_PESA, AIRTEL_MONEY, HALOPESA,
@@ -154,51 +162,157 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
     }
 
     // Handles successful payment
-    private PaymentResponse handleSuccessfulPayment(CheckoutSessionEntity checkoutSession, PaymentResult result) {
+    private PaymentResponse handleSuccessfulPayment(
+            CheckoutSessionEntity checkoutSession,
+            PaymentResult result) throws BadRequestException, ItemNotFoundException {
 
-        log.info("Payment successful for checkout session: {}", checkoutSession.getSessionId());
+        log.info("Payment successful for checkout session: {}",
+                checkoutSession.getSessionId());
 
-        // Update checkout session status
+        // ========================================
+        // 1. UPDATE CHECKOUT SESSION STATUS
+        // ========================================
         checkoutSession.setStatus(CheckoutSessionStatus.PAYMENT_COMPLETED);
         checkoutSession.setCompletedAt(LocalDateTime.now());
 
         // ========================================
-        // INVOKE SUCCESS CALLBACK
+        // 2. INVOKE SUCCESS CALLBACK
         // ========================================
-        try {
-            paymentCallback.onPaymentSuccess(checkoutSession, result.getEscrow());
-        } catch (Exception e) {
-            log.error("Payment callback failed, but payment was successful", e);
-            // Continue processing - callback failure shouldn't fail the payment
-        }
 
-        // Create order via OrderService (placeholder for now)
-        UUID orderId = orderService.createOrderFromCheckoutSession(checkoutSession, result.getEscrow());
+        paymentCallback.onPaymentSuccess(checkoutSession, result.getEscrow());
 
-        if (orderId != null) {
-            checkoutSession.setCreatedOrderId(orderId);
+
+        // ========================================
+        // 3. DETERMINE IF ORDER SHOULD BE CREATED NOW
+        // ========================================
+        UUID orderId = null;
+
+        boolean shouldCreateOrder = shouldCreateOrderNow(checkoutSession);
+
+        if (shouldCreateOrder) {
+            log.info("Creating order for session type: {}",
+                    checkoutSession.getSessionType());
+
+
+            List<UUID> orderIds = orderService.createOrdersFromCheckoutSession(
+                    checkoutSession.getSessionId()
+            );
+
+            orderId = orderIds.get(0);
+
+            // Session is already updated by OrderService, but update status
             checkoutSession.setStatus(CheckoutSessionStatus.COMPLETED);
-            log.info("Order created: {}", orderId);
+
+            log.info("✓ Order created: {}", orderId);
+
+        } else {
+            log.info("Order creation deferred for session type: {}",
+                    checkoutSession.getSessionType());
         }
 
+        // ========================================
+        // 4. SAVE SESSION
+        // ========================================
         checkoutSessionRepo.save(checkoutSession);
 
-        // Build response
+        // ========================================
+        // 5. BUILD RESPONSE
+        // ========================================
         return PaymentResponse.builder()
                 .success(true)
                 .status(PaymentStatus.SUCCESS)
-                .message("Payment completed successfully")
+                .message(buildSuccessMessage(checkoutSession.getSessionType(), orderId))
                 .checkoutSessionId(checkoutSession.getSessionId())
                 .escrowId(result.getEscrow().getId())
                 .escrowNumber(result.getEscrow().getEscrowNumber())
                 .orderId(orderId)
-                .orderNumber(orderId != null ? "ORD-" + orderId.toString().substring(0, 8) : null)
+                .orderNumber(orderId != null ? fetchOrderNumber(orderId) : null)
                 .paymentMethod(PaymentMethod.WALLET)
                 .amountPaid(result.getEscrow().getTotalAmount())
                 .platformFee(result.getEscrow().getPlatformFeeAmount())
                 .sellerAmount(result.getEscrow().getSellerAmount())
                 .currency(result.getEscrow().getCurrency())
                 .build();
+    }
+
+
+    // ========================================
+    // HELPER METHOD: SHOULD CREATE ORDER NOW?
+    // ========================================
+
+    private boolean shouldCreateOrderNow(CheckoutSessionEntity checkoutSession) {
+
+        return switch (checkoutSession.getSessionType()) {
+
+            case REGULAR_DIRECTLY, REGULAR_CART -> {
+                // Direct purchases: Create order immediately
+                log.debug("Direct purchase - create order now");
+                yield true;
+            }
+
+            case INSTALLMENT -> {
+                // Installment: Only if IMMEDIATE fulfillment
+                // AFTER_PAYMENT fulfillment waits until fully paid
+
+                CheckoutSessionEntity.InstallmentConfiguration config =
+                        checkoutSession.getInstallmentConfig();
+
+                if (config == null) {
+                    log.warn("Installment session missing config");
+                    yield false;
+                }
+
+                boolean isImmediate = "IMMEDIATE".equals(config.getFulfillmentTiming());
+
+                log.debug("Installment - fulfillment: {} - create order: {}",
+                        config.getFulfillmentTiming(), isImmediate);
+
+                yield isImmediate;
+            }
+
+            case GROUP_PURCHASE -> {
+                // Group purchase: NEVER create order on payment
+                // Orders created when group completes (by GroupPurchaseService)
+                log.debug("Group purchase - defer order creation until group completes");
+                yield false;
+            }
+        };
+    }
+
+
+    // ========================================
+    // HELPER METHOD: BUILD SUCCESS MESSAGE
+    // ========================================
+
+    private String buildSuccessMessage(CheckoutSessionType sessionType, UUID orderId) {
+
+        return switch (sessionType) {
+            case REGULAR_DIRECTLY, REGULAR_CART -> orderId != null
+                    ? "Payment completed successfully. Order created."
+                    : "Payment completed successfully.";
+
+            case INSTALLMENT -> orderId != null
+                    ? "Down payment completed. Order created and will ship soon."
+                    : "Down payment completed. Product ships after full payment.";
+
+            case GROUP_PURCHASE -> "Payment completed. Order will be created when group completes.";
+        };
+    }
+
+
+    // ========================================
+    // HELPER METHOD: FETCH ORDER NUMBER
+    // ========================================
+
+    private String fetchOrderNumber(UUID orderId) {
+        try {
+            return orderRepo.findById(orderId)
+                    .map(OrderEntity::getOrderNumber)
+                    .orElse("ORD-" + orderId.toString().substring(0, 8));
+        } catch (Exception e) {
+            log.warn("Failed to fetch order number: {}", e.getMessage());
+            return "ORD-" + orderId.toString().substring(0, 8);
+        }
     }
 
     // Handles pending payment (for external payments)
