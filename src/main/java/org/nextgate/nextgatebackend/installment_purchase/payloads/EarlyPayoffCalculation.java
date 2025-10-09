@@ -1,6 +1,7 @@
 package org.nextgate.nextgatebackend.installment_purchase.payloads;
 
 
+import lombok.Builder;
 import lombok.Data;
 import org.nextgate.nextgatebackend.checkout_session.payload.CheckoutSessionResponse;
 import org.nextgate.nextgatebackend.installment_purchase.enums.AgreementStatus;
@@ -11,6 +12,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 @Data
+@Builder
 public class EarlyPayoffCalculation {
 
     private UUID agreementId;

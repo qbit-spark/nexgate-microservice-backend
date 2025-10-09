@@ -4,7 +4,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.nextgate.nextgatebackend.financial_system.payment_processing.enums.PaymentStatus;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -14,36 +13,23 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class InstallmentPaymentResponse {
+public class ProcessPaymentResponse {
 
     private UUID paymentId;
-    private Integer paymentNumber;
+    private UUID agreementId;
+    private String agreementNumber;
 
-    private BigDecimal scheduledAmount;
-    private BigDecimal paidAmount;
-    private BigDecimal principalPortion;
-    private BigDecimal interestPortion;
-    private BigDecimal remainingBalance;
-    private BigDecimal lateFee;
+    private BigDecimal amount;
     private String currency;
-
-    private PaymentStatus paymentStatus;
-    private String paymentStatusDisplay;
-
-    private LocalDateTime dueDate;
-    private LocalDateTime paidAt;
-    private LocalDateTime attemptedAt;
-
     private String paymentMethod;
     private String transactionId;
-    private String failureReason;
-    private Integer retryCount;
 
-    private Integer daysUntilDue;
-    private Integer daysOverdue;
+    private String status;
+    private LocalDateTime processedAt;
 
-    private Boolean canPay;
-    private Boolean canRetry;
+    private String message;
+
+    private AgreementUpdate agreementUpdate;
 
     @Data
     @Builder
