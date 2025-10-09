@@ -9,6 +9,7 @@ import org.nextgate.nextgatebackend.financial_system.payment_processing.enums.Pa
 import org.nextgate.nextgatebackend.financial_system.payment_processing.enums.PaymentStatus;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Data
@@ -46,4 +47,6 @@ public class PaymentResponse {
     private String paymentUrl;        // URL to complete payment
     private String ussdCode;          // USSD code for mobile money
     private String referenceNumber;   // External payment reference
+
+
 }

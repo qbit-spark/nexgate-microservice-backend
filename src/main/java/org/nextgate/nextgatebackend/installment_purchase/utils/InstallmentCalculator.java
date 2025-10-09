@@ -95,7 +95,7 @@ public class InstallmentCalculator {
                 .divide(BigDecimal.valueOf(100), SCALE, ROUNDING);
     }
 
-    private BigDecimal calculatePeriodRate(
+    public BigDecimal calculatePeriodRate(
             BigDecimal apr,
             PaymentFrequency frequency,
             Integer customDays
@@ -117,7 +117,7 @@ public class InstallmentCalculator {
         return annualRate.divide(periodsPerYear, 6, ROUNDING);
     }
 
-    private BigDecimal calculateMonthlyPayment(
+    public BigDecimal calculateMonthlyPayment(
             BigDecimal principal,
             BigDecimal periodRate,
             Integer numberOfPayments
