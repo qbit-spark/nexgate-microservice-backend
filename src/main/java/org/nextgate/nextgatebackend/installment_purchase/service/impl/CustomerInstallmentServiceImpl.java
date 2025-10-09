@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.coyote.BadRequestException;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
-import org.nextgate.nextgatebackend.financial_system.payment_processing.payloads.PaymentResponse;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.installment_purchase.entity.InstallmentAgreementEntity;
 import org.nextgate.nextgatebackend.installment_purchase.entity.InstallmentPaymentEntity;
@@ -67,7 +66,6 @@ public class CustomerInstallmentServiceImpl implements CustomerInstallmentServic
         log.info("Fetching agreement: {} for customer: {}", agreementId, customer.getAccountId());
 
         InstallmentAgreementEntity agreement = installmentService.getAgreementById(agreementId);
-
         validateAgreementOwnership(agreement, customer);
 
         return toDetailedResponse(agreement);
@@ -82,7 +80,6 @@ public class CustomerInstallmentServiceImpl implements CustomerInstallmentServic
         log.info("Fetching agreement: {} for customer: {}", agreementNumber, customer.getAccountId());
 
         InstallmentAgreementEntity agreement = installmentService.getAgreementByNumber(agreementNumber);
-
         validateAgreementOwnership(agreement, customer);
 
         return toDetailedResponse(agreement);
@@ -90,7 +87,7 @@ public class CustomerInstallmentServiceImpl implements CustomerInstallmentServic
 
     @Override
     @Transactional(readOnly = true)
-    public List<InstallmentPaymentResponse> getAgreementPayments(
+    public List<InstallmentPaymentDetailResponse> getAgreementPayments(
             UUID agreementId, AccountEntity customer)
             throws ItemNotFoundException, BadRequestException {
 
@@ -102,13 +99,13 @@ public class CustomerInstallmentServiceImpl implements CustomerInstallmentServic
         List<InstallmentPaymentEntity> payments = installmentService.getAgreementPayments(agreementId);
 
         return payments.stream()
-                .map(this::toPaymentResponse)
+                .map(this::toPaymentDetailResponse)
                 .collect(Collectors.toList());
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<InstallmentPaymentResponse> getUpcomingPayments(AccountEntity customer) {
+    public List<InstallmentPaymentDetailResponse> getUpcomingPayments(AccountEntity customer) {
 
         log.info("Fetching upcoming payments for customer: {}", customer.getAccountId());
 
@@ -128,13 +125,13 @@ public class CustomerInstallmentServiceImpl implements CustomerInstallmentServic
                         return List.<InstallmentPaymentEntity>of().stream();
                     }
                 })
-                .map(this::toPaymentResponse)
+                .map(this::toPaymentDetailResponse)
                 .collect(Collectors.toList());
     }
 
     @Override
     @Transactional
-    public PaymentResponse makeManualPayment(
+    public ProcessPaymentResponse makeManualPayment(
             UUID agreementId, UUID paymentId, AccountEntity customer)
             throws ItemNotFoundException, BadRequestException {
 
@@ -144,11 +141,9 @@ public class CustomerInstallmentServiceImpl implements CustomerInstallmentServic
         validateAgreementOwnership(agreement, customer);
 
         InstallmentPaymentEntity payment = installmentService.processInstallmentPayment(paymentId);
+        InstallmentAgreementEntity updatedAgreement = installmentService.getAgreementById(agreementId);
 
-        InstallmentAgreementEntity updatedAgreement =
-                installmentService.getAgreementById(agreementId);
-
-        return PaymentResponse.builder()
+        return ProcessPaymentResponse.builder()
                 .paymentId(payment.getPaymentId())
                 .agreementId(updatedAgreement.getAgreementId())
                 .agreementNumber(updatedAgreement.getAgreementNumber())
@@ -165,7 +160,7 @@ public class CustomerInstallmentServiceImpl implements CustomerInstallmentServic
 
     @Override
     @Transactional
-    public PaymentResponse retryPayment(UUID paymentId, AccountEntity customer)
+    public ProcessPaymentResponse retryPayment(UUID paymentId, AccountEntity customer)
             throws ItemNotFoundException, BadRequestException {
 
         log.info("Retrying payment: {}", paymentId);
@@ -180,13 +175,10 @@ public class CustomerInstallmentServiceImpl implements CustomerInstallmentServic
             throw new BadRequestException("Payment cannot be retried");
         }
 
-        InstallmentPaymentEntity processedPayment =
-                installmentService.processInstallmentPayment(paymentId);
+        InstallmentPaymentEntity processedPayment = installmentService.processInstallmentPayment(paymentId);
+        InstallmentAgreementEntity updatedAgreement = installmentService.getAgreementById(agreement.getAgreementId());
 
-        InstallmentAgreementEntity updatedAgreement =
-                installmentService.getAgreementById(agreement.getAgreementId());
-
-        return PaymentResponse.builder()
+        return ProcessPaymentResponse.builder()
                 .paymentId(processedPayment.getPaymentId())
                 .agreementId(updatedAgreement.getAgreementId())
                 .agreementNumber(updatedAgreement.getAgreementNumber())
@@ -218,8 +210,7 @@ public class CustomerInstallmentServiceImpl implements CustomerInstallmentServic
         BigDecimal payoffAmount = installmentService.calculateEarlyPayoffAmount(agreementId);
 
         List<InstallmentPaymentEntity> remainingPayments = paymentRepo
-                .findByAgreementAndPaymentStatusOrderByPaymentNumberAsc(
-                        agreement, PaymentStatus.SCHEDULED);
+                .findByAgreementAndPaymentStatusOrderByPaymentNumberAsc(agreement, PaymentStatus.SCHEDULED);
 
         BigDecimal remainingPrincipal = remainingPayments.stream()
                 .map(InstallmentPaymentEntity::getPrincipalPortion)
@@ -249,7 +240,7 @@ public class CustomerInstallmentServiceImpl implements CustomerInstallmentServic
 
     @Override
     @Transactional
-    public PaymentResponse processEarlyPayoff(UUID agreementId, AccountEntity customer)
+    public ProcessPaymentResponse processEarlyPayoff(UUID agreementId, AccountEntity customer)
             throws ItemNotFoundException, BadRequestException {
 
         log.info("Processing early payoff for agreement: {}", agreementId);
@@ -258,11 +249,9 @@ public class CustomerInstallmentServiceImpl implements CustomerInstallmentServic
         validateAgreementOwnership(agreement, customer);
 
         BigDecimal payoffAmount = installmentService.calculateEarlyPayoffAmount(agreementId);
+        InstallmentAgreementEntity completedAgreement = installmentService.processEarlyPayoff(agreementId);
 
-        InstallmentAgreementEntity completedAgreement =
-                installmentService.processEarlyPayoff(agreementId);
-
-        return PaymentResponse.builder()
+        return ProcessPaymentResponse.builder()
                 .agreementId(completedAgreement.getAgreementId())
                 .agreementNumber(completedAgreement.getAgreementNumber())
                 .amount(payoffAmount)
@@ -277,8 +266,7 @@ public class CustomerInstallmentServiceImpl implements CustomerInstallmentServic
 
     @Override
     @Transactional
-    public void cancelAgreement(
-            UUID agreementId, CancelAgreementRequest request, AccountEntity customer)
+    public void cancelAgreement(UUID agreementId, CancelAgreementRequest request, AccountEntity customer)
             throws ItemNotFoundException, BadRequestException {
 
         log.info("Cancelling agreement: {}", agreementId);
@@ -294,14 +282,12 @@ public class CustomerInstallmentServiceImpl implements CustomerInstallmentServic
         agreement.setAgreementStatus(AgreementStatus.CANCELLED);
         agreement.setDeleteReason(request.getReason());
         agreement.setUpdatedAt(LocalDateTime.now());
-
         agreementRepo.save(agreement);
 
         log.info("Agreement {} cancelled successfully", agreementId);
     }
 
-    private void validateAgreementOwnership(
-            InstallmentAgreementEntity agreement, AccountEntity customer)
+    private void validateAgreementOwnership(InstallmentAgreementEntity agreement, AccountEntity customer)
             throws BadRequestException {
 
         if (!agreement.getCustomer().getAccountId().equals(customer.getAccountId())) {
@@ -309,8 +295,7 @@ public class CustomerInstallmentServiceImpl implements CustomerInstallmentServic
         }
     }
 
-    private InstallmentAgreementSummaryResponse toSummaryResponse(
-            InstallmentAgreementEntity agreement) {
+    private InstallmentAgreementSummaryResponse toSummaryResponse(InstallmentAgreementEntity agreement) {
 
         return InstallmentAgreementSummaryResponse.builder()
                 .agreementId(agreement.getAgreementId())
@@ -334,15 +319,12 @@ public class CustomerInstallmentServiceImpl implements CustomerInstallmentServic
                 .agreementStatusDisplay(agreement.getAgreementStatus().name())
                 .createdAt(agreement.getCreatedAt())
                 .completedAt(agreement.getCompletedAt())
-                .canMakeEarlyPayment(installmentService.canMakeEarlyPayment(
-                        agreement.getAgreementId()))
-                .canCancel(installmentService.canCancelAgreement(
-                        agreement.getAgreementId()))
+                .canMakeEarlyPayment(installmentService.canMakeEarlyPayment(agreement.getAgreementId()))
+                .canCancel(installmentService.canCancelAgreement(agreement.getAgreementId()))
                 .build();
     }
 
-    private InstallmentAgreementResponse toDetailedResponse(
-            InstallmentAgreementEntity agreement) {
+    private InstallmentAgreementResponse toDetailedResponse(InstallmentAgreementEntity agreement) {
 
         InstallmentAgreementResponse response = new InstallmentAgreementResponse();
         response.setAgreementId(agreement.getAgreementId());
@@ -389,43 +371,40 @@ public class CustomerInstallmentServiceImpl implements CustomerInstallmentServic
         response.setShippedAt(agreement.getShippedAt());
         response.setDeliveredAt(agreement.getDeliveredAt());
         response.setOrderId(agreement.getOrderId());
-        response.setCanMakeEarlyPayment(installmentService.canMakeEarlyPayment(
-                agreement.getAgreementId()));
-        response.setCanCancel(installmentService.canCancelAgreement(
-                agreement.getAgreementId()));
+        response.setCanMakeEarlyPayment(installmentService.canMakeEarlyPayment(agreement.getAgreementId()));
+        response.setCanCancel(installmentService.canCancelAgreement(agreement.getAgreementId()));
         response.setCanUpdatePaymentMethod(false);
 
         return response;
     }
 
-    private InstallmentPaymentResponse toPaymentResponse(InstallmentPaymentEntity payment) {
+    private InstallmentPaymentDetailResponse toPaymentDetailResponse(InstallmentPaymentEntity payment) {
 
-        InstallmentPaymentResponse response = new InstallmentPaymentResponse();
-        response.setPaymentId(payment.getPaymentId());
-        response.setPaymentNumber(payment.getPaymentNumber());
-        response.setScheduledAmount(payment.getScheduledAmount());
-        response.setPaidAmount(payment.getPaidAmount());
-        response.setPrincipalPortion(payment.getPrincipalPortion());
-        response.setInterestPortion(payment.getInterestPortion());
-        response.setRemainingBalance(payment.getRemainingBalance());
-        response.setLateFee(payment.getLateFee());
-        response.setCurrency(payment.getCurrency());
-        response.setPaymentStatus(org.nextgate.nextgatebackend.financial_system.payment_processing.enums.PaymentStatus.valueOf(
-                payment.getPaymentStatus().name()));
-        response.setPaymentStatusDisplay(payment.getPaymentStatus().name());
-        response.setDueDate(payment.getDueDate());
-        response.setPaidAt(payment.getPaidAt());
-        response.setAttemptedAt(payment.getAttemptedAt());
-        response.setPaymentMethod(payment.getPaymentMethod());
-        response.setTransactionId(payment.getTransactionId());
-        response.setFailureReason(payment.getFailureReason());
-        response.setRetryCount(payment.getRetryCount());
-        response.setCanPay(!payment.isPaid() && payment.isDue());
-        response.setCanRetry(payment.canRetry());
+        InstallmentPaymentDetailResponse response = InstallmentPaymentDetailResponse.builder()
+                .paymentId(payment.getPaymentId())
+                .paymentNumber(payment.getPaymentNumber())
+                .scheduledAmount(payment.getScheduledAmount())
+                .paidAmount(payment.getPaidAmount())
+                .principalPortion(payment.getPrincipalPortion())
+                .interestPortion(payment.getInterestPortion())
+                .remainingBalance(payment.getRemainingBalance())
+                .lateFee(payment.getLateFee())
+                .currency(payment.getCurrency())
+                .paymentStatus(payment.getPaymentStatus())
+                .paymentStatusDisplay(payment.getPaymentStatus().name())
+                .dueDate(payment.getDueDate())
+                .paidAt(payment.getPaidAt())
+                .attemptedAt(payment.getAttemptedAt())
+                .paymentMethod(payment.getPaymentMethod())
+                .transactionId(payment.getTransactionId())
+                .failureReason(payment.getFailureReason())
+                .retryCount(payment.getRetryCount())
+                .canPay(!payment.isPaid() && payment.isDue())
+                .canRetry(payment.canRetry())
+                .build();
 
         if (payment.getDueDate() != null) {
-            long daysUntil = java.time.Duration.between(
-                    LocalDateTime.now(), payment.getDueDate()).toDays();
+            long daysUntil = java.time.Duration.between(LocalDateTime.now(), payment.getDueDate()).toDays();
             response.setDaysUntilDue((int) daysUntil);
         }
 
@@ -436,10 +415,9 @@ public class CustomerInstallmentServiceImpl implements CustomerInstallmentServic
         return response;
     }
 
-    private PaymentResponseForInstallment.AgreementUpdate buildAgreementUpdate(
-            InstallmentAgreementEntity agreement) {
+    private ProcessPaymentResponse.AgreementUpdate buildAgreementUpdate(InstallmentAgreementEntity agreement) {
 
-        return PaymentResponseForInstallment.AgreementUpdate.builder()
+        return ProcessPaymentResponse.AgreementUpdate.builder()
                 .paymentsCompleted(agreement.getPaymentsCompleted())
                 .paymentsRemaining(agreement.getPaymentsRemaining())
                 .amountPaid(agreement.getAmountPaid())

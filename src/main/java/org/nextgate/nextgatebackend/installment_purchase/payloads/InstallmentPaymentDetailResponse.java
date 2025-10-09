@@ -4,7 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.nextgate.nextgatebackend.financial_system.payment_processing.enums.PaymentStatus;
+import org.nextgate.nextgatebackend.installment_purchase.enums.PaymentStatus;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -14,7 +14,7 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class InstallmentPaymentResponse {
+public class InstallmentPaymentDetailResponse {
 
     private UUID paymentId;
     private Integer paymentNumber;
@@ -44,19 +44,4 @@ public class InstallmentPaymentResponse {
 
     private Boolean canPay;
     private Boolean canRetry;
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class AgreementUpdate {
-        private Integer paymentsCompleted;
-        private Integer paymentsRemaining;
-        private BigDecimal amountPaid;
-        private BigDecimal amountRemaining;
-        private LocalDateTime nextPaymentDate;
-        private BigDecimal nextPaymentAmount;
-        private String agreementStatus;
-        private Boolean isCompleted;
-    }
 }
