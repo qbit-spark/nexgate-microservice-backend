@@ -87,6 +87,10 @@ public class OrderEntity {
     @Column(name = "escrow_id")
     private UUID escrowId;
 
+    private BigDecimal platformFee;
+
+    private BigDecimal sellerAmount;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private OrderStatus orderStatus;
@@ -143,12 +147,31 @@ public class OrderEntity {
     @Column(nullable = false, length = 10)
     private String currency = "TZS";
 
+    // Shipping tracking
+    @Column(name = "tracking_number", length = 100)
+    private String trackingNumber;
+
+    @Column(name = "carrier", length = 50)
+    private String carrier;
+
+    private LocalDateTime updatedAt;
+
+
+    @Column(name = "delivery_confirmed_at")
+    private LocalDateTime deliveryConfirmedAt;
+
+
+
+
     @Column(name = "metadata", columnDefinition = "jsonb")
     @Convert(converter = MetadataJsonConverter.class)
     private Map<String, Object> metadata = new HashMap<>();
 
     @Column(nullable = false)
     private Boolean isDeleted = false;
+
+    @Column(name = "cancelled_by")
+    private UUID cancelledBy;
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;

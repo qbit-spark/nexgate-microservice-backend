@@ -1078,9 +1078,8 @@ public class InstallmentServiceImpl implements InstallmentService {
                 agreement.getOrderId() == null) {
 
             log.info("Fulfillment type: AFTER_PAYMENT");
-            log.info("Agreement is now complete - order should be created (via event)");
+            log.info("Order should be created now (via event)");
 
-            // ADD THIS: Publish event
             try {
                 InstallmentAgreementCompletedEvent event =
                         new InstallmentAgreementCompletedEvent(
@@ -1101,7 +1100,6 @@ public class InstallmentServiceImpl implements InstallmentService {
 
         } else if (agreement.getOrderId() != null) {
             log.info("Order already exists: {}", agreement.getOrderId());
-            // TODO: Mark order as fully paid
             log.info("[TODO] Mark order as fully paid");
         }
 
@@ -1446,17 +1444,10 @@ public class InstallmentServiceImpl implements InstallmentService {
 
         LocalDateTime now = LocalDateTime.now();
 
-        // Update agreement status
         agreement.setAgreementStatus(AgreementStatus.COMPLETED);
         agreement.setCompletedAt(now);
 
         log.info("✓ Agreement marked as COMPLETED");
-        log.info("  Total Paid: {} TZS", agreement.getAmountPaid());
-        log.info("  Completion Date: {}", now);
-
-        // ========================================
-        // HANDLE FULFILLMENT
-        // ========================================
 
         if (agreement.getFulfillmentTiming() == FulfillmentTiming.AFTER_PAYMENT &&
                 agreement.getOrderId() == null) {
@@ -1464,8 +1455,7 @@ public class InstallmentServiceImpl implements InstallmentService {
             log.info("Fulfillment Type: AFTER_PAYMENT");
             log.info("Order should be created now (via event)");
 
-
-            // ADD THIS: Publish event for order creation
+            // Publish event for order creation
             try {
                 InstallmentAgreementCompletedEvent event =
                         new InstallmentAgreementCompletedEvent(
@@ -1479,32 +1469,18 @@ public class InstallmentServiceImpl implements InstallmentService {
                 eventPublisher.publishEvent(event);
 
                 log.info("✓ InstallmentAgreementCompletedEvent published");
-                log.info("  Event will trigger:");
-                log.info("    - Order creation (AFTER_PAYMENT)");
-                log.info("    - Product shipment");
-                log.info("    - Completion notification");
 
             } catch (Exception e) {
                 log.error("Failed to publish InstallmentAgreementCompletedEvent", e);
-                // Don't throw - agreement is still marked as completed
             }
 
         } else if (agreement.getOrderId() != null) {
             log.info("Order already exists: {}", agreement.getOrderId());
-
             // TODO: Mark order as fully paid
-            // orderService.markOrderAsFullyPaid(agreement.getOrderId());
             log.info("[TODO] Mark order as fully paid");
         }
 
         agreementRepo.save(agreement);
-
-        // TODO: Send completion notification
-        // notificationService.sendAgreementCompletionNotification(
-        //     agreement.getCustomer(),
-        //     agreement
-        // );
-        log.info("[TODO] Send completion notification");
 
         log.info("╚════════════════════════════════════════════════════════╝");
     }
