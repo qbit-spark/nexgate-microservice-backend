@@ -1054,6 +1054,7 @@ public class InstallmentServiceImpl implements InstallmentService {
         agreement.setNextPaymentAmount(null);
         agreement.setUpdatedAt(now);
 
+
         // Store early payoff info in metadata
         agreement.getMetadata().put("earlyPayoff", true);
         agreement.getMetadata().put("earlyPayoffAmount", payoffAmount.toString());
