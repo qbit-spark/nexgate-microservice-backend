@@ -208,16 +208,7 @@ public class OrderEntity {
         item.setOrder(null);
     }
 
-    public void calculateTotals() {
-        this.subtotal = items.stream()
-                .map(OrderItemEntity::getItemTotal)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        this.totalAmount = subtotal
-                .add(shippingFee != null ? shippingFee : BigDecimal.ZERO)
-                .add(tax != null ? tax : BigDecimal.ZERO)
-                .subtract(discount != null ? discount : BigDecimal.ZERO);
-    }
+   
 
     public boolean canBeCancelled() {
         return orderStatus == OrderStatus.PENDING_SHIPMENT;

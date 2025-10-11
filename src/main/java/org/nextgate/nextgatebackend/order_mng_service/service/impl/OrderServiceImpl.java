@@ -20,6 +20,7 @@ import org.nextgate.nextgatebackend.order_mng_service.enums.DeliveryStatus;
 import org.nextgate.nextgatebackend.order_mng_service.enums.OrderSource;
 import org.nextgate.nextgatebackend.order_mng_service.enums.OrderStatus;
 import org.nextgate.nextgatebackend.order_mng_service.repo.OrderRepository;
+import org.nextgate.nextgatebackend.order_mng_service.service.DeliveryConfirmationService;
 import org.nextgate.nextgatebackend.order_mng_service.service.OrderService;
 import org.nextgate.nextgatebackend.products_mng_service.products.entity.ProductEntity;
 import org.nextgate.nextgatebackend.products_mng_service.products.repo.ProductRepo;
@@ -46,6 +47,7 @@ public class OrderServiceImpl implements OrderService {
     private final InstallmentAgreementRepo agreementRepo;
     private final ProductRepo productRepo;
     private final ShopRepo shopRepo;
+    private final DeliveryConfirmationService deliveryConfirmationService;
 
     // ========================================
     // UNIVERSAL ORDER CREATION
@@ -99,7 +101,6 @@ public class OrderServiceImpl implements OrderService {
             case GROUP_PURCHASE -> createGroupOrder(session);
         };
     }
-
 
 
     // ========================================
@@ -255,7 +256,22 @@ public class OrderServiceImpl implements OrderService {
         log.info("✓ Order status validated");
 
         // ========================================
-        // 4. UPDATE ORDER
+        // 4. GENERATE DELIVERY CONFIRMATION CODE
+        // ========================================
+        log.info("Generating delivery confirmation code...");
+
+        String confirmationCode;
+        try {
+            confirmationCode = deliveryConfirmationService.generateConfirmationCode(order);
+            log.info("✓ Confirmation code generated: {}", confirmationCode);
+
+        } catch (Exception e) {
+            log.error("Failed to generate confirmation code", e);
+            throw new BadRequestException("Failed to generate confirmation code: " + e.getMessage());
+        }
+
+        // ========================================
+        // 5. UPDATE ORDER
         // ========================================
         LocalDateTime now = LocalDateTime.now();
 
@@ -274,20 +290,53 @@ public class OrderServiceImpl implements OrderService {
         log.info("  Shipped At: {}", now);
 
         // ========================================
-        // 5. SEND NOTIFICATIONS
+        // 6. SEND NOTIFICATIONS WITH CODE
         // ========================================
+        log.info("Sending shipping notification with confirmation code...");
+
         // TODO: Send notification to customer
-        // notificationService.sendOrderShippedNotification(
+        // notificationService.sendOrderShippedWithConfirmationCode(
         //     order.getBuyer(),
         //     order,
         //     trackingNumber,
-        //     carrier
+        //     carrier,
+        //     confirmationCode
         // );
 
-        log.info("[TODO] Send shipping notification to customer");
+        log.info("[TODO] Send notification to customer:");
+        log.info("  Recipient: {} ({})",
+                order.getBuyer().getUserName(),
+                order.getBuyer().getEmail());
+        log.info("  Subject: Your order has been shipped!");
+        log.info("  ");
+        log.info("  Message Template:");
+        log.info("  ┌─────────────────────────────────────────────────────┐");
+        log.info("  │ Hi {},                                    │", order.getBuyer().getFirstName());
+        log.info("  │                                                     │");
+        log.info("  │ Great news! Your order has been shipped.           │");
+        log.info("  │                                                     │");
+        log.info("  │ Order Number: {}                       │", order.getOrderNumber());
+        log.info("  │ Tracking Number: {}                                │", trackingNumber);
+        log.info("  │ Carrier: {}                                        │", carrier);
+        log.info("  │                                                     │");
+        log.info("  │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │");
+        log.info("  │                                                     │");
+        log.info("  │ 🔐 DELIVERY CONFIRMATION CODE: {}            │", confirmationCode);
+        log.info("  │                                                     │");
+        log.info("  │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │");
+        log.info("  │                                                     │");
+        log.info("  │ IMPORTANT: When you receive your package, please   │");
+        log.info("  │ enter this confirmation code to complete delivery. │");
+        log.info("  │                                                     │");
+        log.info("  │ • Code is valid for 30 days                        │");
+        log.info("  │ • Maximum 5 verification attempts                  │");
+        log.info("  │ • Lost your code? Request a new one in the app     │");
+        log.info("  │                                                     │");
+        log.info("  │ Thank you for shopping with us!                    │");
+        log.info("  └─────────────────────────────────────────────────────┘");
 
         log.info("╔════════════════════════════════════════════════════════╗");
-        log.info("║         ORDER SHIPPED SUCCESSFULLY                    ║");
+        log.info("║   ORDER SHIPPED - CONFIRMATION CODE SENT             ║");
         log.info("╚════════════════════════════════════════════════════════╝");
     }
 
@@ -374,14 +423,21 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
-    public void confirmDelivery(UUID orderId, AccountEntity customer)
-            throws ItemNotFoundException, BadRequestException {
+    public void confirmDelivery(
+            UUID orderId,
+            String confirmationCode,
+            AccountEntity customer,
+            String ipAddress,
+            String deviceInfo
+    ) throws ItemNotFoundException, BadRequestException {
 
         log.info("╔════════════════════════════════════════════════════════╗");
-        log.info("║         CONFIRMING DELIVERY (CUSTOMER)                ║");
+        log.info("║   CONFIRMING DELIVERY WITH CONFIRMATION CODE          ║");
         log.info("╚════════════════════════════════════════════════════════╝");
         log.info("Order ID: {}", orderId);
         log.info("Customer: {}", customer.getUserName());
+        log.info("IP Address: {}", ipAddress);
+        log.info("Device: {}", deviceInfo);
 
         // ========================================
         // 1. FETCH ORDER
@@ -406,41 +462,76 @@ public class OrderServiceImpl implements OrderService {
         // ========================================
         // 3. VALIDATE ORDER STATUS
         // ========================================
-        if (order.getOrderStatus() != OrderStatus.DELIVERED) {
+        if (order.getOrderStatus() != OrderStatus.SHIPPED) {
             throw new BadRequestException(
                     String.format("Cannot confirm delivery. Order status: %s. " +
-                                    "Order must be DELIVERED first.",
+                                    "Order must be SHIPPED first.",
                             order.getOrderStatus()));
         }
 
-        log.info("✓ Order status validated");
+        log.info("✓ Order status validated: SHIPPED");
 
         // ========================================
         // 4. CHECK IF ALREADY CONFIRMED
         // ========================================
         if (order.getIsDeliveryConfirmed() != null && order.getIsDeliveryConfirmed()) {
             log.warn("Delivery already confirmed");
-            return;
+            throw new BadRequestException("Delivery already confirmed for this order");
         }
 
         // ========================================
-        // 5. UPDATE ORDER
+        // 5. VERIFY CONFIRMATION CODE
+        // ========================================
+        log.info("Verifying confirmation code via DeliveryConfirmationService...");
+
+        boolean isVerified;
+        try {
+            isVerified = deliveryConfirmationService.verifyConfirmationCode(
+                    orderId,
+                    confirmationCode,
+                    customer,
+                    ipAddress,
+                    deviceInfo
+            );
+
+        } catch (BadRequestException e) {
+            // Re-throw validation errors (invalid code, max attempts, etc.)
+            throw e;
+
+        } catch (Exception e) {
+            log.error("Error during code verification", e);
+            throw new BadRequestException("Failed to verify confirmation code: " + e.getMessage());
+        }
+
+        if (!isVerified) {
+            log.error("Code verification returned false");
+            throw new BadRequestException("Invalid confirmation code");
+        }
+
+        log.info("✓ Confirmation code verified successfully!");
+
+        // ========================================
+        // 6. UPDATE ORDER STATUS
         // ========================================
         LocalDateTime now = LocalDateTime.now();
 
         order.setIsDeliveryConfirmed(true);
         order.setDeliveryConfirmedAt(now);
+        order.setDeliveredAt(now);
+        order.setDeliveryStatus(DeliveryStatus.DELIVERED);
         order.setOrderStatus(OrderStatus.COMPLETED);
         order.setUpdatedAt(now);
 
         orderRepo.save(order);
 
-        log.info("✓ Delivery confirmed by customer");
-        log.info("  Confirmed At: {}", now);
+        log.info("✓ Order updated:");
+        log.info("  Delivery Confirmed: true");
+        log.info("  Delivered At: {}", now);
+        log.info("  Delivery Status: DELIVERED");
         log.info("  Order Status: COMPLETED");
 
         // ========================================
-        // 6. RELEASE ESCROW (CRITICAL!)
+        // 7. RELEASE ESCROW (CRITICAL!)
         // ========================================
         try {
             log.info("Releasing escrow for order...");
@@ -452,7 +543,7 @@ public class OrderServiceImpl implements OrderService {
             // TODO: Create admin task for manual escrow release
             // adminTaskService.createUrgentTask(
             //     "Escrow Release Failed",
-            //     String.format("Order %s - Customer confirmed but escrow failed",
+            //     String.format("Order %s - Customer confirmed but escrow release failed",
             //         order.getOrderNumber()),
             //     orderId
             // );
@@ -463,7 +554,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         // ========================================
-        // 7. SEND NOTIFICATIONS
+        // 8. SEND NOTIFICATIONS
         // ========================================
         // TODO: Send completion notifications
         // notificationService.sendOrderCompletedNotification(
@@ -472,11 +563,14 @@ public class OrderServiceImpl implements OrderService {
         //     order
         // );
 
-        log.info("[TODO] Send order completion notifications");
+        log.info("[TODO] Send order completion notifications to buyer and seller");
 
         log.info("╔════════════════════════════════════════════════════════╗");
-        log.info("║         DELIVERY CONFIRMED - ORDER COMPLETE           ║");
+        log.info("║   DELIVERY CONFIRMED - ORDER COMPLETE ✓               ║");
         log.info("╚════════════════════════════════════════════════════════╝");
+        log.info("Seller will receive payment: {} {}",
+                order.getSellerAmount(),
+                order.getCurrency());
     }
 
 
@@ -1268,7 +1362,7 @@ public class OrderServiceImpl implements OrderService {
                     .product(product)
                     .productName(sessionItem.getProductName())
                     .productImage(sessionItem.getProductImage())
-                    .priceAtPurchase(sessionItem.getUnitPrice())
+                    .unitPrice(sessionItem.getUnitPrice())
                     .quantity(sessionItem.getQuantity())
                     .discount(sessionItem.getDiscountAmount())
                     .build();
@@ -1334,5 +1428,74 @@ public class OrderServiceImpl implements OrderService {
                 address.getState(),
                 address.getPostalCode(),
                 address.getCountry()).replaceAll(", ,", ",");
+    }
+
+    /**
+     * Regenerate confirmation code if customer lost it.
+     * Only the buyer can request this.
+     */
+    @Override
+    @Transactional
+    public String regenerateDeliveryConfirmationCode(UUID orderId, AccountEntity customer)
+            throws ItemNotFoundException, BadRequestException {
+
+        log.info("╔════════════════════════════════════════════════════════╗");
+        log.info("║   REGENERATING CONFIRMATION CODE                      ║");
+        log.info("╚════════════════════════════════════════════════════════╝");
+        log.info("Order ID: {}", orderId);
+        log.info("Customer: {}", customer.getUserName());
+
+        // Fetch order
+        OrderEntity order = orderRepo.findById(orderId)
+                .orElseThrow(() -> new ItemNotFoundException("Order not found"));
+
+        log.info("Order Number: {}", order.getOrderNumber());
+
+        // Validate customer
+        if (!order.getBuyer().getAccountId().equals(customer.getAccountId())) {
+            throw new BadRequestException("You are not the buyer of this order");
+        }
+
+        // Validate order status
+        if (order.getOrderStatus() != OrderStatus.SHIPPED) {
+            throw new BadRequestException(
+                    "Can only regenerate code for shipped orders");
+        }
+
+        // Check if already confirmed
+        if (order.getIsDeliveryConfirmed() != null && order.getIsDeliveryConfirmed()) {
+            throw new BadRequestException("Delivery already confirmed - cannot regenerate code");
+        }
+
+        log.info("✓ Validations passed");
+
+        // Regenerate code
+        try {
+            String newCode = deliveryConfirmationService.regenerateConfirmationCode(
+                    orderId,
+                    customer
+            );
+
+            log.info("✓ New confirmation code generated: {}", newCode);
+
+            // TODO: Send new code to customer
+            // notificationService.sendNewConfirmationCode(
+            //     order.getBuyer(),
+            //     order,
+            //     newCode
+            // );
+
+            log.info("[TODO] Send new confirmation code to customer");
+
+            log.info("╔════════════════════════════════════════════════════════╗");
+            log.info("║   NEW CONFIRMATION CODE SENT                          ║");
+            log.info("╚════════════════════════════════════════════════════════╝");
+
+            return newCode;
+
+        } catch (Exception e) {
+            log.error("Failed to regenerate confirmation code", e);
+            throw new BadRequestException("Failed to regenerate code: " + e.getMessage());
+        }
     }
 }

@@ -28,6 +28,7 @@ import org.nextgate.nextgatebackend.installment_purchase.repo.InstallmentPayment
 import org.nextgate.nextgatebackend.installment_purchase.repo.InstallmentPlanRepo;
 import org.nextgate.nextgatebackend.installment_purchase.service.InstallmentService;
 import org.nextgate.nextgatebackend.installment_purchase.utils.InstallmentValidator;
+import org.nextgate.nextgatebackend.order_mng_service.service.OrderService;
 import org.nextgate.nextgatebackend.products_mng_service.products.entity.ProductEntity;
 import org.nextgate.nextgatebackend.products_mng_service.products.repo.ProductRepo;
 import org.springframework.context.ApplicationEventPublisher;
@@ -61,6 +62,7 @@ public class InstallmentServiceImpl implements InstallmentService {
     private final LedgerService ledgerService;
     private final TransactionHistoryService transactionHistoryService;
     private final ApplicationEventPublisher eventPublisher;
+    private final OrderService orderService;
 
     // ========================================
     // AGREEMENT CREATION

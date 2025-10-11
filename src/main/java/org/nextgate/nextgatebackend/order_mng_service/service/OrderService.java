@@ -94,12 +94,7 @@ public interface OrderService {
     // ORDER STATUS UPDATES - CUSTOMER ACTIONS
     // ========================================
 
-    /**
-     * Customer confirms delivery.
-     * This triggers escrow release to seller.
-     */
-    void confirmDelivery(UUID orderId, AccountEntity customer)
-            throws ItemNotFoundException, BadRequestException;
+
 
     // ========================================
     // ORDER CANCELLATION
@@ -142,5 +137,20 @@ public interface OrderService {
      * CRITICAL: This is where seller gets paid!
      */
     void releaseEscrowForOrder(UUID orderId)
+            throws ItemNotFoundException, BadRequestException;
+
+    void confirmDelivery(
+            UUID orderId,
+            String confirmationCode,
+            AccountEntity customer,
+            String ipAddress,
+            String deviceInfo
+    ) throws ItemNotFoundException, BadRequestException;
+
+    /**
+     * Regenerate confirmation code if customer lost it.
+     * Only the buyer can request this.
+     */
+    String regenerateDeliveryConfirmationCode(UUID orderId, AccountEntity customer)
             throws ItemNotFoundException, BadRequestException;
 }
