@@ -6,6 +6,7 @@ import org.apache.coyote.BadRequestException;
 import org.nextgate.nextgatebackend.checkout_session.entity.CheckoutSessionEntity;
 import org.nextgate.nextgatebackend.checkout_session.enums.CheckoutSessionStatus;
 import org.nextgate.nextgatebackend.checkout_session.enums.CheckoutSessionType;
+import org.nextgate.nextgatebackend.checkout_session.events.PaymentCompletedEvent;
 import org.nextgate.nextgatebackend.checkout_session.repo.CheckoutSessionRepo;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.callbacks.PaymentCallback;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.enums.PaymentMethod;
@@ -21,6 +22,7 @@ import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
 import org.nextgate.nextgatebackend.order_mng_service.entity.OrderEntity;
 import org.nextgate.nextgatebackend.order_mng_service.repo.OrderRepository;
 import org.nextgate.nextgatebackend.order_mng_service.service.OrderService;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +43,7 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
     private final OrderService orderService;
     private final PaymentCallback paymentCallback;
     private final OrderRepository orderRepo;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -169,64 +172,56 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
         log.info("Payment successful for checkout session: {}",
                 checkoutSession.getSessionId());
 
-        // ========================================
-        // 1. UPDATE CHECKOUT SESSION STATUS
-        // ========================================
+        // Update checkout session status
         checkoutSession.setStatus(CheckoutSessionStatus.PAYMENT_COMPLETED);
         checkoutSession.setCompletedAt(LocalDateTime.now());
 
         // ========================================
-        // 2. INVOKE SUCCESS CALLBACK
+        // INVOKE SUCCESS CALLBACK
         // ========================================
-
-        paymentCallback.onPaymentSuccess(checkoutSession, result.getEscrow());
-
-
-        // ========================================
-        // 3. DETERMINE IF ORDER SHOULD BE CREATED NOW
-        // ========================================
-        UUID orderId = null;
-
-        boolean shouldCreateOrder = shouldCreateOrderNow(checkoutSession);
-
-        if (shouldCreateOrder) {
-            log.info("Creating order for session type: {}",
-                    checkoutSession.getSessionType());
-
-
-            List<UUID> orderIds = orderService.createOrdersFromCheckoutSession(
-                    checkoutSession.getSessionId()
-            );
-
-            orderId = orderIds.get(0);
-
-            // Session is already updated by OrderService, but update status
-            checkoutSession.setStatus(CheckoutSessionStatus.COMPLETED);
-
-            log.info("✓ Order created: {}", orderId);
-
-        } else {
-            log.info("Order creation deferred for session type: {}",
-                    checkoutSession.getSessionType());
+        try {
+            paymentCallback.onPaymentSuccess(checkoutSession, result.getEscrow());
+        } catch (Exception e) {
+            log.error("Payment callback failed, but payment was successful", e);
         }
 
         // ========================================
-        // 4. SAVE SESSION
+        // PUBLISH EVENT FOR ORDER CREATION
         // ========================================
+        try {
+            PaymentCompletedEvent event = new PaymentCompletedEvent(
+                    this,
+                    checkoutSession.getSessionId(),
+                    checkoutSession,
+                    result.getEscrow().getId().toString(),  // or escrow ID
+                    LocalDateTime.now()
+            );
+
+            eventPublisher.publishEvent(event);
+
+            log.info("✓ PaymentCompletedEvent published");
+            log.info("  Order creation will be handled asynchronously");
+
+        } catch (Exception e) {
+            log.error("Failed to publish PaymentCompletedEvent", e);
+            // Don't throw - payment succeeded
+        }
+
+        // Save session
         checkoutSessionRepo.save(checkoutSession);
 
         // ========================================
-        // 5. BUILD RESPONSE
+        // BUILD RESPONSE (WITHOUT ORDER ID)
         // ========================================
         return PaymentResponse.builder()
                 .success(true)
                 .status(PaymentStatus.SUCCESS)
-                .message(buildSuccessMessage(checkoutSession.getSessionType(), orderId))
+                .message(buildSuccessMessage(checkoutSession.getSessionType()))
                 .checkoutSessionId(checkoutSession.getSessionId())
                 .escrowId(result.getEscrow().getId())
                 .escrowNumber(result.getEscrow().getEscrowNumber())
-                .orderId(orderId)
-                .orderNumber(orderId != null ? fetchOrderNumber(orderId) : null)
+                .orderId(null)  // Will be set later by listener
+                .orderNumber(null)  // Will be set later
                 .paymentMethod(PaymentMethod.WALLET)
                 .amountPaid(result.getEscrow().getTotalAmount())
                 .platformFee(result.getEscrow().getPlatformFeeAmount())
@@ -234,6 +229,7 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
                 .currency(result.getEscrow().getCurrency())
                 .build();
     }
+
 
 
     // ========================================
@@ -284,18 +280,17 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
     // HELPER METHOD: BUILD SUCCESS MESSAGE
     // ========================================
 
-    private String buildSuccessMessage(CheckoutSessionType sessionType, UUID orderId) {
+    private String buildSuccessMessage(CheckoutSessionType sessionType) {
 
         return switch (sessionType) {
-            case REGULAR_DIRECTLY, REGULAR_CART -> orderId != null
-                    ? "Payment completed successfully. Order created."
-                    : "Payment completed successfully.";
+            case REGULAR_DIRECTLY, REGULAR_CART ->
+                    "Payment completed successfully. Your order is being created.";
 
-            case INSTALLMENT -> orderId != null
-                    ? "Down payment completed. Order created and will ship soon."
-                    : "Down payment completed. Product ships after full payment.";
+            case INSTALLMENT ->
+                    "Down payment completed successfully. Order is being processed.";
 
-            case GROUP_PURCHASE -> "Payment completed. Order will be created when group completes.";
+            case GROUP_PURCHASE ->
+                    "Payment completed. Order will be created when group completes.";
         };
     }
 

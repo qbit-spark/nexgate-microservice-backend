@@ -25,7 +25,8 @@ public class OrderItemEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
-    private UUID itemId;
+    @Column(name = "order_item_id")  // ← Add explicit column name
+    private UUID orderItemId;  // ← CHANGED from itemId to orderItemId
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", referencedColumnName = "orderId", nullable = false)
@@ -43,17 +44,26 @@ public class OrderItemEntity {
     @Column(nullable = false, length = 255)
     private String productName;
 
+    @Column(length = 100)
+    private String productSlug;  // ← ADD THIS if missing
+
     @Column(length = 500)
     private String productImage;
 
     @Column(nullable = false, precision = 10, scale = 2)
-    private BigDecimal priceAtPurchase;
+    private BigDecimal unitPrice;  // ← RENAME from priceAtPurchase
 
     @Column(nullable = false)
     private Integer quantity;
 
+    @Column(precision = 10, scale = 2)
+    private BigDecimal subtotal;  // ← ADD THIS
+
+    @Column(precision = 10, scale = 2)
+    private BigDecimal tax;  // ← ADD THIS
+
     @Column(nullable = false, precision = 10, scale = 2)
-    private BigDecimal itemTotal;
+    private BigDecimal total;  // ← RENAME from itemTotal
 
     @Enumerated(EnumType.STRING)
     private FulfillmentTiming fulfillmentTiming;
@@ -67,10 +77,17 @@ public class OrderItemEntity {
     @PrePersist
     @PreUpdate
     protected void calculateItemTotal() {
-        if (priceAtPurchase != null && quantity != null) {
-            this.itemTotal = priceAtPurchase.multiply(BigDecimal.valueOf(quantity));
+        if (unitPrice != null && quantity != null) {
+            this.subtotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
+
             if (discount != null) {
-                this.itemTotal = this.itemTotal.subtract(discount);
+                this.subtotal = this.subtotal.subtract(discount);
+            }
+
+            // Calculate total (subtotal + tax)
+            this.total = this.subtotal;
+            if (tax != null) {
+                this.total = this.total.add(tax);
             }
         }
     }
