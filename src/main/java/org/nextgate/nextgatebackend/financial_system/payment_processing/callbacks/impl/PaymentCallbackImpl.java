@@ -3,6 +3,7 @@ package org.nextgate.nextgatebackend.financial_system.payment_processing.callbac
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.coyote.BadRequestException;
+import org.nextgate.nextgatebackend.cart_service.entity.CartEntity;
 import org.nextgate.nextgatebackend.checkout_session.entity.CheckoutSessionEntity;
 import org.nextgate.nextgatebackend.checkout_session.enums.CheckoutSessionStatus;
 import org.nextgate.nextgatebackend.checkout_session.repo.CheckoutSessionRepo;
@@ -182,6 +183,9 @@ public class PaymentCallbackImpl implements PaymentCallback {
     private void handleRegularCart(
             CheckoutSessionEntity checkoutSession,
             EscrowAccountEntity escrow) {
+
+        checkoutSession.setStatus(CheckoutSessionStatus.PAYMENT_COMPLETED);
+        checkoutSessionRepo.save(checkoutSession);
 
         log.info("Handling REGULAR_CART purchase");
         log.info("[TODO] Create order from cart");
