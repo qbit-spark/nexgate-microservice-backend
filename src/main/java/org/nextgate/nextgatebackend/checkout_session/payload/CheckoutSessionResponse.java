@@ -79,7 +79,7 @@ public class CheckoutSessionResponse {
         private String productImage;
         private Integer quantity;
         private BigDecimal unitPrice;
-        private BigDecimal discountAmount;
+        //private BigDecimal discountAmount;
         private BigDecimal subtotal;
         private BigDecimal tax;
         private BigDecimal total;

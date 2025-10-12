@@ -369,8 +369,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // ========================================
         // 12. BUILD & RETURN RESPONSE
         // ========================================
-        CheckoutSessionResponse response = mapper.toResponse(updatedSession);
-        return response;
+        return mapper.toResponse(updatedSession);
     }
 
 

@@ -32,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
@@ -201,7 +202,6 @@ public class OrderServiceImpl implements OrderService {
     }
 
 
-
     // ========================================
     // ORDER STATUS UPDATES - SELLER ACTIONS
     // ========================================
@@ -210,10 +210,11 @@ public class OrderServiceImpl implements OrderService {
     @Transactional
     public void markOrderAsShipped(
             UUID orderId,
-            String trackingNumber,
-            String carrier,
             AccountEntity seller
     ) throws ItemNotFoundException, BadRequestException {
+
+        String trackingNumber = "TRACK-PLACEHOLDER" + orderId.toString().substring(0, 8).toUpperCase();
+        String carrier = "NextGate Shipping";
 
         log.info("╔════════════════════════════════════════════════════════╗");
         log.info("║         MARKING ORDER AS SHIPPED                      ║");
@@ -417,9 +418,9 @@ public class OrderServiceImpl implements OrderService {
     }
 
 
-     // ========================================
-     // ORDER STATUS UPDATES - CUSTOMER ACTIONS
-     // ========================================
+    // ========================================
+    // ORDER STATUS UPDATES - CUSTOMER ACTIONS
+    // ========================================
 
     @Override
     @Transactional
@@ -574,9 +575,9 @@ public class OrderServiceImpl implements OrderService {
     }
 
 
-     // ========================================
-     // ESCROW MANAGEMENT (CRITICAL!)
-     // ========================================
+    // ========================================
+    // ESCROW MANAGEMENT (CRITICAL!)
+    // ========================================
 
     @Override
     @Transactional
@@ -671,7 +672,6 @@ public class OrderServiceImpl implements OrderService {
                 order.getSeller().getShopName(),
                 order.getCurrency());
     }
-
 
 
     // ========================================
@@ -1276,6 +1276,8 @@ public class OrderServiceImpl implements OrderService {
             OrderSource orderSource
     ) throws ItemNotFoundException {
 
+        System.out.println("$$$$$$$$$$$$$$$$$$$$$$$$$$ Here are the session items: " + session.getItems());
+
         // Get shop from first item
         CheckoutSessionEntity.CheckoutItem firstItem = session.getItems().get(0);
         ShopEntity shop = shopRepo.findById(firstItem.getShopId())
@@ -1351,6 +1353,12 @@ public class OrderServiceImpl implements OrderService {
         // ========================================
         // 3. BUILD ORDER ITEMS
         // ========================================
+
+        // FIXED: Initialize the items list before adding items
+        if (order.getItems() == null) {
+            order.setItems(new ArrayList<>());
+        }
+
         for (CheckoutSessionEntity.CheckoutItem sessionItem : session.getItems()) {
 
             ProductEntity product = productRepo.findById(sessionItem.getProductId())
@@ -1367,7 +1375,7 @@ public class OrderServiceImpl implements OrderService {
                     .discount(sessionItem.getDiscountAmount())
                     .build();
 
-            order.addItem(orderItem);
+            order.getItems().add(orderItem);
 
             log.debug("✓ Order item added: {} x{}",
                     sessionItem.getProductName(),
@@ -1389,8 +1397,7 @@ public class OrderServiceImpl implements OrderService {
         log.debug("Validating session can create order");
 
         // Check status
-        if (session.getStatus() != CheckoutSessionStatus.PAYMENT_COMPLETED &&
-                session.getStatus() != CheckoutSessionStatus.COMPLETED) {
+        if (session.getStatus() != CheckoutSessionStatus.PAYMENT_COMPLETED) {
             throw new BadRequestException(
                     "Session must have completed payment. Current status: " +
                             session.getStatus());

@@ -176,6 +176,9 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
         checkoutSession.setStatus(CheckoutSessionStatus.PAYMENT_COMPLETED);
         checkoutSession.setCompletedAt(LocalDateTime.now());
 
+        checkoutSessionRepo.save(checkoutSession);
+
+
         // ========================================
         // INVOKE SUCCESS CALLBACK
         // ========================================

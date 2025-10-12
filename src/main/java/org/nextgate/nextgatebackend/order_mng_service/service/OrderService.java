@@ -79,8 +79,6 @@ public interface OrderService {
      */
     void markOrderAsShipped(
             UUID orderId,
-            String trackingNumber,
-            String carrier,
             AccountEntity seller
     ) throws ItemNotFoundException, BadRequestException;
 

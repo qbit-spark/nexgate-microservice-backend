@@ -116,16 +116,13 @@ public class OrderController {
 
     @PostMapping("/{orderId}/ship")
     public ResponseEntity<GlobeSuccessResponseBuilder> markOrderAsShipped(
-            @PathVariable UUID orderId,
-            @Valid @RequestBody MarkOrderAsShippedRequest request
+            @PathVariable UUID orderId
     ) throws ItemNotFoundException, BadRequestException {
 
         AccountEntity seller = getAuthenticatedAccount();
 
         orderService.markOrderAsShipped(
                 orderId,
-                request.getTrackingNumber(),
-                request.getCarrier(),
                 seller
         );
 
@@ -136,8 +133,8 @@ public class OrderController {
         OrderShippedResponse response = OrderShippedResponse.builder()
                 .orderId(orderId)
                 .orderNumber(confirmation.getOrder().getOrderNumber())
-                .trackingNumber(request.getTrackingNumber())
-                .carrier(request.getCarrier())
+                //.trackingNumber(confirmation.getTrackingNumber())
+                //.carrier(request.getCarrier())
                 .shippedAt(confirmation.getOrder().getShippedAt())
                 .message("Order marked as shipped. Confirmation code sent to customer.")
                 .confirmationCodeSent(true)

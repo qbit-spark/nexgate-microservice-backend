@@ -146,18 +146,145 @@ public class CheckoutSessionHelper {
         return buildCheckoutItemFromProduct(product, quantity);
     }
 
+
     private CheckoutSessionEntity.CheckoutItem buildCheckoutItemFromProduct(
             ProductEntity product,
-            Integer quantity) {
+            Integer quantity) throws ItemNotFoundException, BadRequestException {
 
+        log.debug("╔════════════════════════════════════════════════════════╗");
+        log.debug("║   BUILDING CHECKOUT ITEM                              ║");
+        log.debug("╚════════════════════════════════════════════════════════╝");
+        log.debug("Product: {} x{}", product.getProductName(), quantity);
+
+        // ========================================
+        // 1. VALIDATE PRODUCT
+        // ========================================
+        if (product.getStatus() != ProductStatus.ACTIVE) {
+            throw new BadRequestException("Product is not available for purchase");
+        }
+
+        if (!product.isInStock()) {
+            throw new BadRequestException("Product is out of stock");
+        }
+
+        if (!product.canOrderQuantity(quantity)) {
+            throw new BadRequestException(
+                    String.format("Invalid quantity. Min: %d, Max: %d",
+                            product.getMinOrderQuantity(),
+                            product.getMaxOrderQuantity())
+            );
+        }
+
+        if (product.getStockQuantity() < quantity) {
+            throw new BadRequestException(
+                    String.format("Insufficient stock. Available: %d, Requested: %d",
+                            product.getStockQuantity(), quantity)
+            );
+        }
+
+        // ========================================
+        // 2. GET BASE PRICING
+        // ========================================
         BigDecimal unitPrice = product.getPrice();
-        BigDecimal discountPerItem = product.getDiscountAmount(); // If product is on sale
-        BigDecimal discountAmount = discountPerItem.multiply(BigDecimal.valueOf(quantity));
-        BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
-        //Todo: here we handle Tax
-        BigDecimal tax = subtotal.multiply(BigDecimal.valueOf(0.0)); // 18% VAT
-        BigDecimal total = subtotal.add(tax).subtract(discountAmount);
 
+        if (unitPrice == null || unitPrice.compareTo(BigDecimal.ZERO) <= 0) {
+            log.error("Product has invalid price: {}", unitPrice);
+            throw new BadRequestException(
+                    String.format("Product '%s' has invalid price", product.getProductName())
+            );
+        }
+
+        log.debug("  Unit Price: {} TZS", unitPrice);
+
+        // ========================================
+        // 3. CALCULATE DISCOUNT (IF ON SALE)
+        // ========================================
+        BigDecimal discountPerItem = BigDecimal.ZERO;
+
+        if (product.isOnSale() && product.getComparePrice() != null) {
+            // Discount per item = comparePrice - currentPrice
+            discountPerItem = product.getComparePrice().subtract(unitPrice);
+
+            log.debug("  Product is on sale:");
+            log.debug("    Compare Price: {} TZS", product.getComparePrice());
+            log.debug("    Current Price: {} TZS", unitPrice);
+            log.debug("    Discount Per Item: {} TZS", discountPerItem);
+
+            // SAFETY: Discount can't be more than compare price (would be > 100% off)
+            if (discountPerItem.compareTo(product.getComparePrice()) > 0) {
+                log.warn("  ⚠️ Invalid discount detected - capping to zero");
+                discountPerItem = BigDecimal.ZERO;
+            }
+
+            // SAFETY: Discount can't be negative
+            if (discountPerItem.compareTo(BigDecimal.ZERO) < 0) {
+                log.warn("  ⚠️ Negative discount detected - setting to zero");
+                discountPerItem = BigDecimal.ZERO;
+            }
+        }
+
+        // Total discount for all items (discount per item × quantity)
+        BigDecimal totalDiscount = discountPerItem.multiply(BigDecimal.valueOf(quantity));
+
+        log.debug("  Total Discount: {} TZS (for {} items)", totalDiscount, quantity);
+
+        // ========================================
+        // 4. CALCULATE SUBTOTAL
+        // ========================================
+        // Subtotal = unit price × quantity (BEFORE any discount)
+        BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
+
+        log.debug("  Subtotal: {} TZS", subtotal);
+
+        // ========================================
+        // 5. CALCULATE TAX
+        // ========================================
+        // TODO: Implement proper tax calculation based on location/product type
+        BigDecimal tax = BigDecimal.ZERO;
+
+        log.debug("  Tax: {} TZS", tax);
+
+        // ========================================
+        // 6. CALCULATE FINAL TOTAL
+        // ========================================
+        // Total = subtotal + tax
+        // Note: Discount is tracked separately, not deducted here
+        BigDecimal total = subtotal.add(tax);
+
+        log.debug("  Total: {} TZS", total);
+
+        // ========================================
+        // 7. SAFETY VALIDATION
+        // ========================================
+        if (total.compareTo(BigDecimal.ZERO) <= 0) {
+            log.error("╔════════════════════════════════════════════════════════╗");
+            log.error("║   ⚠️  INVALID PRICING DETECTED  ⚠️                    ║");
+            log.error("╚════════════════════════════════════════════════════════╝");
+            log.error("Product: {}", product.getProductName());
+            log.error("  Unit Price: {} TZS", unitPrice);
+            log.error("  Quantity: {}", quantity);
+            log.error("  Compare Price: {}", product.getComparePrice());
+            log.error("  Discount Per Item: {} TZS", discountPerItem);
+            log.error("  Total Discount: {} TZS", totalDiscount);
+            log.error("  Subtotal: {} TZS", subtotal);
+            log.error("  Tax: {} TZS", tax);
+            log.error("  TOTAL: {} TZS ❌", total);
+
+            throw new BadRequestException(
+                    String.format(
+                            "Invalid pricing for product '%s'. Total cannot be negative or zero. " +
+                                    "Please contact support.",
+                            product.getProductName()
+                    )
+            );
+        }
+
+        log.debug("✓ Checkout item validated successfully");
+        log.debug("╚════════════════════════════════════════════════════════╝");
+
+        // ========================================
+        // 8. BUILD AND RETURN CHECKOUT ITEM
+        // ========================================
         return CheckoutSessionEntity.CheckoutItem.builder()
                 .productId(product.getProductId())
                 .productName(product.getProductName())
@@ -166,7 +293,7 @@ public class CheckoutSessionHelper {
                         ? product.getProductImages().get(0) : null)
                 .quantity(quantity)
                 .unitPrice(unitPrice)
-                .discountAmount(discountAmount)
+                .discountAmount(totalDiscount)  // Total discount for all items
                 .subtotal(subtotal)
                 .tax(tax)
                 .total(total)
@@ -178,6 +305,8 @@ public class CheckoutSessionHelper {
                 .build();
     }
 
+
+
     // ========================================
     // PRICING CALCULATION
     // ========================================
@@ -188,20 +317,17 @@ public class CheckoutSessionHelper {
 
         BigDecimal subtotal = BigDecimal.ZERO;
         BigDecimal totalTax = BigDecimal.ZERO;
-        BigDecimal totalDiscount = BigDecimal.ZERO;
 
         for (CheckoutSessionEntity.CheckoutItem item : items) {
             subtotal = subtotal.add(item.getSubtotal());
             totalTax = totalTax.add(item.getTax());
-            totalDiscount = totalDiscount.add(item.getDiscountAmount());
         }
 
         BigDecimal shippingCost = shippingMethod != null ? shippingMethod.getCost() : BigDecimal.ZERO;
-        BigDecimal total = subtotal.add(shippingCost).add(totalTax).subtract(totalDiscount);
+        BigDecimal total = subtotal.add(shippingCost).add(totalTax);
 
         return CheckoutSessionEntity.PricingSummary.builder()
                 .subtotal(subtotal.setScale(2, RoundingMode.HALF_UP))
-                .discount(totalDiscount.setScale(2, RoundingMode.HALF_UP))
                 .shippingCost(shippingCost.setScale(2, RoundingMode.HALF_UP))
                 .tax(totalTax.setScale(2, RoundingMode.HALF_UP))
                 .total(total.setScale(2, RoundingMode.HALF_UP))

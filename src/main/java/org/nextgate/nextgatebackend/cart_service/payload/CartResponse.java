@@ -54,7 +54,7 @@ public class CartResponse {
         private String productSlug;
         private String productImage;
         private BigDecimal unitPrice;
-        private BigDecimal discountAmount;
+       // private BigDecimal discountAmount;
         private Integer quantity;
         private BigDecimal itemSubtotal;
         private BigDecimal itemDiscount;
