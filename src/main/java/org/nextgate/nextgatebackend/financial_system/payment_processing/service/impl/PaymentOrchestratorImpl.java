@@ -167,7 +167,7 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
     // Handles successful payment
     private PaymentResponse handleSuccessfulPayment(
             CheckoutSessionEntity checkoutSession,
-            PaymentResult result) throws BadRequestException, ItemNotFoundException {
+            PaymentResult result) {
 
         log.info("Payment successful for checkout session: {}",
                 checkoutSession.getSessionId());

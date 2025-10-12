@@ -42,6 +42,7 @@ public class PaymentCompletedOrderCreationListener {
         log.info("╔════════════════════════════════════════════════════════╗");
         log.info("║   HANDLING PAYMENT COMPLETION - ORDER CREATION        ║");
         log.info("╚════════════════════════════════════════════════════════╝");
+        log.info("🎉 Payment completed! Let's create an order!");
         log.info("Checkout Session: {}", event.getCheckoutSessionId());
         log.info("Session Type: {}", event.getSession().getSessionType());
         log.info("Transaction ID: {}", event.getTransactionId());
@@ -51,11 +52,12 @@ public class PaymentCompletedOrderCreationListener {
             CheckoutSessionEntity session = event.getSession();
 
             // CHECK IF ORDER ALREADY EXISTS
-            if (session.getCreatedOrderId() != null) {
-                log.warn("Order already exists: {}", session.getCreatedOrderId());
-                log.warn("Skipping order creation");
-                return;
-            }
+//            if (session.getCreatedOrderId() != null) {
+//                log.warn("Order already exists: {}", session.getCreatedOrderId());
+//                log.warn("Skipping order creation");
+//                return;
+//            }
+
 
             // DETERMINE IF ORDER SHOULD BE CREATED NOW
             boolean shouldCreateOrder = shouldCreateOrderNow(session);

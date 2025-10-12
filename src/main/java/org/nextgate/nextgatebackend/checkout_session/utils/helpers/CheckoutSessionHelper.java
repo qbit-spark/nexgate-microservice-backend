@@ -13,19 +13,24 @@ import org.nextgate.nextgatebackend.checkout_session.payload.UpdateCheckoutSessi
 import org.nextgate.nextgatebackend.financial_system.wallet.entity.WalletEntity;
 import org.nextgate.nextgatebackend.financial_system.wallet.service.WalletService;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
+import org.nextgate.nextgatebackend.order_mng_service.entity.OrderEntity;
+import org.nextgate.nextgatebackend.order_mng_service.entity.OrderItemEntity;
+import org.nextgate.nextgatebackend.order_mng_service.enums.DeliveryStatus;
+import org.nextgate.nextgatebackend.order_mng_service.enums.OrderSource;
+import org.nextgate.nextgatebackend.order_mng_service.enums.OrderStatus;
 import org.nextgate.nextgatebackend.payment_methods.entity.PaymentMethodsEntity;
 import org.nextgate.nextgatebackend.payment_methods.enums.PaymentMethodsType;
 import org.nextgate.nextgatebackend.products_mng_service.products.entity.ProductEntity;
 import org.nextgate.nextgatebackend.products_mng_service.products.enums.ProductStatus;
 import org.nextgate.nextgatebackend.products_mng_service.products.repo.ProductRepo;
+import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.entity.ShopEntity;
+import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.repo.ShopRepo;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @Slf4j
 @Component
@@ -35,6 +40,7 @@ public class CheckoutSessionHelper {
     private final WalletService walletService;
     private final ProductRepo productRepo;
     private final CartRepo cartRepo;
+    private final ShopRepo shopRepo;
 
     // ========================================
     // BILLING ADDRESS DETERMINATION
@@ -617,4 +623,6 @@ public class CheckoutSessionHelper {
                 .currency("TZS")
                 .build();
     }
+
+
 }

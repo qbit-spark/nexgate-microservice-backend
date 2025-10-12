@@ -105,8 +105,13 @@ public class CheckoutSessionEntity {
     private LocalDateTime completedAt;
 
     // Reference to created order (after successful payment)
-    @Column(name = "created_order_id")
-    private UUID createdOrderId;
+//    @Column(name = "created_order_id")
+//    private UUID createdOrderId;
+
+
+    @Column(name = "created_order_ids", columnDefinition = "jsonb")
+    @Convert(converter = OrderIdsJsonConverter.class)
+    private List<UUID> createdOrderIds;
 
     private UUID groupIdToBeJoined; // For GROUP_PURCHASE type
 

@@ -834,4 +834,5 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
 
         log.info("╚════════════════════════════════════════════════════════╝");
     }
+
 }

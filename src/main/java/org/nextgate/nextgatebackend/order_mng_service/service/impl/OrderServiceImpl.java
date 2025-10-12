@@ -32,10 +32,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -59,47 +57,52 @@ public class OrderServiceImpl implements OrderService {
     public List<UUID> createOrdersFromCheckoutSession(UUID checkoutSessionId)
             throws ItemNotFoundException, BadRequestException {
 
-        log.info("╔════════════════════════════════════════════════════════╗");
-        log.info("║         CREATING ORDER FROM CHECKOUT SESSION          ║");
-        log.info("╚════════════════════════════════════════════════════════╝");
-        log.info("Checkout Session ID: {}", checkoutSessionId);
+        log.info("╔════════════════════════════════════════╗");
+        log.info("║  CREATING ORDER FROM CHECKOUT SESSION  ║");
+        log.info("╚════════════════════════════════════════╝");
+        log.info("Session ID: {}", checkoutSessionId);
 
-        // ========================================
-        // 1. FETCH CHECKOUT SESSION
-        // ========================================
-        CheckoutSessionEntity session = checkoutSessionRepo.findById(checkoutSessionId)
-                .orElseThrow(() -> new ItemNotFoundException(
-                        "Checkout session not found: " + checkoutSessionId));
+        // Fetch checkout session
+        CheckoutSessionEntity session = checkoutSessionRepo
+                .findById(checkoutSessionId)
+                .orElseThrow(() -> new ItemNotFoundException("Session not found"));
 
-        log.info("Session Details:");
-        log.info("  Type: {}", session.getSessionType());
-        log.info("  Status: {}", session.getStatus());
-        log.info("  Customer: {}", session.getCustomer().getUserName());
-        log.info("  Total: {} {}", session.getPricing().getTotal(),
-                session.getPricing().getCurrency());
+        log.info("Session Type: {}", session.getSessionType());
+        log.info("Customer: {}", session.getCustomer().getUserName());
 
-        // ========================================
-        // 2. VALIDATE SESSION
-        // ========================================
+        // Validate session
         validateSessionCanCreateOrder(session);
 
-        // ========================================
-        // 3. CHECK IF ORDER ALREADY EXISTS
-        // ========================================
+        // Check if order already exists
         if (session.getCreatedOrderId() != null) {
-            log.warn("Order already exists: {}", session.getCreatedOrderId());
+            log.warn("⚠ Order already exists: {}", session.getCreatedOrderId());
             return List.of(session.getCreatedOrderId());
         }
 
         // ========================================
-        // 4. DELEGATE BY SESSION TYPE
+        // DELEGATE TO SPECIFIC HANDLER
         // ========================================
-        log.info("Delegating to {} order creation handler", session.getSessionType());
-
         return switch (session.getSessionType()) {
-            case REGULAR_DIRECTLY, REGULAR_CART -> createDirectOrder(session);
-            case INSTALLMENT -> createInstallmentOrder(session);
-            case GROUP_PURCHASE -> createGroupOrder(session);
+
+            case REGULAR_DIRECTLY -> {
+                log.info("→ Handling DIRECT PURCHASE (single item, single shop)");
+                yield createDirectPurchaseOrder(session);
+            }
+
+            case REGULAR_CART -> {
+                log.info("→ Handling CART PURCHASE (multiple items, possibly multiple shops)");
+                yield createCartPurchaseOrders(session);
+            }
+
+            case INSTALLMENT -> {
+                log.info("→ Handling INSTALLMENT PURCHASE");
+                yield createInstallmentOrder(session);
+            }
+
+            case GROUP_PURCHASE -> {
+                log.info("→ Handling GROUP PURCHASE");
+                yield createGroupOrder(session);
+            }
         };
     }
 
@@ -675,8 +678,8 @@ public class OrderServiceImpl implements OrderService {
 
 
     // ========================================
-// INSTALLMENT-SPECIFIC METHODS
-// ========================================
+    // INSTALLMENT-SPECIFIC METHODS
+    // ========================================
 
     @Override
     @Transactional
@@ -810,9 +813,9 @@ public class OrderServiceImpl implements OrderService {
     }
 
 
-// ========================================
-// ORDER CANCELLATION
-// ========================================
+ // ========================================
+ // ORDER CANCELLATION
+ // ========================================
 
     @Override
     @Transactional
@@ -1066,30 +1069,165 @@ public class OrderServiceImpl implements OrderService {
     // DIRECT ORDER CREATION
     // ========================================
 
-    private List<UUID> createDirectOrder(CheckoutSessionEntity session)
-            throws ItemNotFoundException {
 
-        log.info("Creating DIRECT order");
+    /**
+     * Creates order for direct purchase (buy now button).
+     * Always creates exactly ONE order with ONE item from ONE shop.
+     */
+    private List<UUID> createDirectPurchaseOrder(CheckoutSessionEntity session)
+            throws ItemNotFoundException, BadRequestException {
 
-        // Build order
-        OrderEntity order = buildOrderFromCheckoutSession(
+        log.info("╔════════════════════════════════════════╗");
+        log.info("║      DIRECT PURCHASE ORDER             ║");
+        log.info("╚════════════════════════════════════════╝");
+
+        // ========================================
+        // VALIDATION: Must have exactly 1 item
+        // ========================================
+        if (session.getItems() == null || session.getItems().size() != 1) {
+            throw new BadRequestException(
+                    "Direct purchase must have exactly 1 item. Found: " +
+                            (session.getItems() != null ? session.getItems().size() : 0)
+            );
+        }
+
+        CheckoutSessionEntity.CheckoutItem item = session.getItems().get(0);
+
+        log.info("Product: {}", item.getProductName());
+        log.info("Quantity: {}", item.getQuantity());
+        log.info("Shop: {}", item.getShopName());
+        log.info("Total: {} {}", session.getPricing().getTotal(), session.getPricing().getCurrency());
+
+        // ========================================
+        // BUILD SINGLE ORDER
+        // ========================================
+        OrderEntity order = buildSingleOrder(
                 session,
+                item.getShopId(),
+                session.getItems(),  // All items (just 1 in this case)
                 OrderSource.DIRECT_PURCHASE
         );
 
-        // Save order
+        // ========================================
+        // SAVE ORDER
+        // ========================================
         OrderEntity savedOrder = orderRepo.save(order);
 
-        // Update session
+        log.info("✓ Direct purchase order created");
+        log.info("  Order Number: {}", savedOrder.getOrderNumber());
+        log.info("  Order ID: {}", savedOrder.getOrderId());
+
+        // ========================================
+        // UPDATE CHECKOUT SESSION
+        // ========================================
         session.setCreatedOrderId(savedOrder.getOrderId());
         session.setCompletedAt(LocalDateTime.now());
         checkoutSessionRepo.save(session);
 
-        log.info("✓ Direct order created: {}", savedOrder.getOrderNumber());
-        log.info("  Order ID: {}", savedOrder.getOrderId());
+        log.info("✓ Checkout session completed");
 
         return List.of(savedOrder.getOrderId());
     }
+
+
+    /**
+     * Creates order(s) for cart purchase.
+     * May create MULTIPLE orders if cart has items from different shops.
+     * Groups items by shop: one order per shop.
+     */
+    private List<UUID> createCartPurchaseOrders(CheckoutSessionEntity session)
+            throws ItemNotFoundException, BadRequestException {
+
+        log.info("╔════════════════════════════════════════╗");
+        log.info("║       CART PURCHASE ORDER(S)           ║");
+        log.info("╚════════════════════════════════════════╝");
+
+        // ========================================
+        // VALIDATION: Must have at least 1 item
+        // ========================================
+        if (session.getItems() == null || session.getItems().isEmpty()) {
+            throw new BadRequestException("Cart is empty");
+        }
+
+        log.info("Cart has {} items", session.getItems().size());
+
+        // ========================================
+        // GROUP ITEMS BY SHOP
+        // ========================================
+        Map<UUID, List<CheckoutSessionEntity.CheckoutItem>> itemsByShop =
+                session.getItems().stream()
+                        .collect(Collectors.groupingBy(
+                                CheckoutSessionEntity.CheckoutItem::getShopId
+                        ));
+
+        int shopCount = itemsByShop.size();
+        log.info("Items are from {} different shop(s)", shopCount);
+
+        // Log shop breakdown
+        itemsByShop.forEach((shopId, items) -> {
+            log.info("  → Shop {}: {} items",
+                    items.get(0).getShopName(),
+                    items.size());
+        });
+
+        // ========================================
+        // CREATE ONE ORDER PER SHOP
+        // ========================================
+        List<UUID> orderIds = new ArrayList<>();
+        int orderNumber = 1;
+
+        for (Map.Entry<UUID, List<CheckoutSessionEntity.CheckoutItem>> entry : itemsByShop.entrySet()) {
+
+            UUID shopId = entry.getKey();
+            List<CheckoutSessionEntity.CheckoutItem> shopItems = entry.getValue();
+
+            log.info("════════════════════════════════════════");
+            log.info("Creating order {}/{} for shop: {}",
+                    orderNumber, shopCount, shopItems.get(0).getShopName());
+            log.info("Items: {}", shopItems.size());
+
+            // Build order for this shop
+            OrderEntity order = buildSingleOrder(
+                    session,
+                    shopId,
+                    shopItems,
+                    OrderSource.CART_PURCHASE
+            );
+
+            // Save order
+            OrderEntity savedOrder = orderRepo.save(order);
+            orderIds.add(savedOrder.getOrderId());
+
+            log.info("✓ Order created: {}", savedOrder.getOrderNumber());
+            log.info("  Total: {} {}", savedOrder.getTotalAmount(), savedOrder.getCurrency());
+
+            orderNumber++;
+        }
+
+        // ========================================
+        // UPDATE CHECKOUT SESSION
+        // ========================================
+        // Store primary order ID
+        session.setCreatedOrderId(orderIds.get(0));
+
+        // Store all order IDs in metadata
+        session.getMetadata().put("orderCount", orderIds.size());
+        session.getMetadata().put("allOrderIds",
+                orderIds.stream().map(UUID::toString).collect(Collectors.toList()));
+
+        session.setCompletedAt(LocalDateTime.now());
+        checkoutSessionRepo.save(session);
+
+        log.info("════════════════════════════════════════");
+        log.info("✓ Cart purchase complete");
+        log.info("  Total orders created: {}", orderIds.size());
+        log.info("  Order IDs: {}", orderIds);
+        log.info("════════════════════════════════════════");
+
+        return orderIds;
+    }
+
+
 
     // ========================================
     // INSTALLMENT ORDER CREATION
@@ -1271,12 +1409,7 @@ public class OrderServiceImpl implements OrderService {
     // ORDER BUILDER
     // ========================================
 
-    private OrderEntity buildOrderFromCheckoutSession(
-            CheckoutSessionEntity session,
-            OrderSource orderSource
-    ) throws ItemNotFoundException {
-
-        System.out.println("$$$$$$$$$$$$$$$$$$$$$$$$$$ Here are the session items: " + session.getItems());
+    private OrderEntity buildOrderFromCheckoutSession(CheckoutSessionEntity session, OrderSource orderSource) throws ItemNotFoundException {
 
         // Get shop from first item
         CheckoutSessionEntity.CheckoutItem firstItem = session.getItems().get(0);
@@ -1504,5 +1637,202 @@ public class OrderServiceImpl implements OrderService {
             log.error("Failed to regenerate confirmation code", e);
             throw new BadRequestException("Failed to regenerate code: " + e.getMessage());
         }
+    }
+
+    /**
+     * Builds a single order entity for one shop.
+     * Used by both direct purchase and cart purchase handlers.
+     *
+     * @param session The checkout session
+     * @param shopId The shop ID (seller)
+     * @param items Items for THIS shop only
+     * @param orderSource DIRECT_PURCHASE or CART_PURCHASE
+     */
+    private OrderEntity buildSingleOrder(
+            CheckoutSessionEntity session,
+            UUID shopId,
+            List<CheckoutSessionEntity.CheckoutItem> items,
+            OrderSource orderSource
+    ) throws ItemNotFoundException {
+
+        log.info("════════════════════════════════════════");
+        log.info("  BUILDING ORDER");
+        log.info("════════════════════════════════════════");
+
+        // ========================================
+        // 1. FETCH SHOP
+        // ========================================
+        ShopEntity shop = shopRepo.findById(shopId)
+                .orElseThrow(() -> new ItemNotFoundException("Shop not found: " + shopId));
+
+        log.info("Shop: {}", shop.getShopName());
+        log.info("Items: {}", items.size());
+
+        // ========================================
+        // 2. CALCULATE TOTALS FOR THESE ITEMS
+        // ========================================
+        BigDecimal subtotal = items.stream()
+                .map(item -> item.getUnitPrice()
+                        .multiply(BigDecimal.valueOf(item.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal discount = items.stream()
+                .map(CheckoutSessionEntity.CheckoutItem::getDiscountAmount)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // ========================================
+        // SHIPPING CALCULATION
+        // ========================================
+        BigDecimal shippingFee;
+
+        if (orderSource == OrderSource.DIRECT_PURCHASE) {
+            // Direct purchase: full shipping cost
+            shippingFee = session.getPricing().getShippingCost();
+            log.info("Shipping (direct): {} TZS", shippingFee);
+
+        } else {
+            // Cart purchase: split shipping among shops
+            int totalShops = (int) session.getItems().stream()
+                    .map(CheckoutSessionEntity.CheckoutItem::getShopId)
+                    .distinct()
+                    .count();
+
+            if (totalShops == 1) {
+                // Only one shop in cart - full shipping
+                shippingFee = session.getPricing().getShippingCost();
+            } else {
+                // Multiple shops - split shipping equally
+                shippingFee = session.getPricing().getShippingCost()
+                        .divide(BigDecimal.valueOf(totalShops), 2, RoundingMode.HALF_UP);
+            }
+
+            log.info("Shipping (split {}/{}): {} TZS", 1, totalShops, shippingFee);
+        }
+
+        BigDecimal tax = BigDecimal.ZERO; // TODO: Calculate tax
+
+        BigDecimal totalAmount = subtotal
+                .subtract(discount)
+                .add(shippingFee)
+                .add(tax);
+
+        log.info("Financial breakdown:");
+        log.info("  Subtotal: {} TZS", subtotal);
+        log.info("  Discount: {} TZS", discount);
+        log.info("  Shipping: {} TZS", shippingFee);
+        log.info("  Tax: {} TZS", tax);
+        log.info("  Total: {} TZS", totalAmount);
+
+        // ========================================
+        // 3. CALCULATE PLATFORM FEE
+        // ========================================
+        BigDecimal platformFeePercent = BigDecimal.valueOf(5.0);
+        BigDecimal platformFee = totalAmount
+                .multiply(platformFeePercent)
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        BigDecimal sellerAmount = totalAmount.subtract(platformFee);
+
+        log.info("  Platform Fee (5%): {} TZS", platformFee);
+        log.info("  Seller Gets (95%): {} TZS", sellerAmount);
+
+        // ========================================
+        // 4. CREATE ORDER ENTITY
+        // ========================================
+        OrderEntity order = OrderEntity.builder()
+                // Parties
+                .buyer(session.getCustomer())
+                .seller(shop)
+
+                // Source & Reference
+                .orderSource(orderSource)
+                .checkoutSessionId(session.getSessionId())
+
+                // Financial
+                .subtotal(subtotal)
+                .shippingFee(shippingFee)
+                .tax(tax)
+                .discount(discount)
+                .totalAmount(totalAmount)
+                .platformFee(platformFee)
+                .sellerAmount(sellerAmount)
+
+                // Payment
+                .paymentMethod(session.getPaymentIntent().getProvider())
+                .amountPaid(totalAmount)
+                .amountRemaining(BigDecimal.ZERO)
+
+                // Escrow
+                .escrowId(null) // TODO: Link to escrow
+                .isEscrowReleased(false)
+
+                // Status
+                .orderStatus(OrderStatus.PENDING_SHIPMENT)
+                .deliveryStatus(DeliveryStatus.PENDING)
+
+                // Delivery
+                .deliveryAddress(serializeAddress(session.getShippingAddress()))
+                .deliveryInstructions(null)
+
+                // Tracking
+                .trackingNumber(null)
+                .carrier(null)
+
+                // Confirmation
+                .isDeliveryConfirmed(false)
+
+                // Timestamps
+                .orderedAt(LocalDateTime.now())
+
+                // Metadata
+                .metadata(new HashMap<>())
+                .currency(session.getPricing().getCurrency())
+
+                .isDeleted(false)
+                .build();
+
+        // ========================================
+        // 5. ADD ORDER ITEMS
+        // ========================================
+        if (order.getItems() == null) {
+            order.setItems(new ArrayList<>());
+        }
+
+        log.info("Adding order items:");
+
+        for (CheckoutSessionEntity.CheckoutItem sessionItem : items) {
+
+            log.info("  → {} x{}",
+                    sessionItem.getProductName(),
+                    sessionItem.getQuantity());
+
+            // Fetch product entity
+            ProductEntity product = productRepo
+                    .findById(sessionItem.getProductId())
+                    .orElseThrow(() -> new ItemNotFoundException(
+                            "Product not found: " + sessionItem.getProductId()
+                    ));
+
+            // Create order item
+            OrderItemEntity orderItem = OrderItemEntity.builder()
+                    .order(order)
+                    .product(product)
+                    .productName(sessionItem.getProductName())
+                    .productSlug(sessionItem.getProductSlug())
+                    .productImage(sessionItem.getProductImage())
+                    .unitPrice(sessionItem.getUnitPrice())
+                    .quantity(sessionItem.getQuantity())
+                    .discount(sessionItem.getDiscountAmount())
+                    .build();
+
+            order.getItems().add(orderItem);
+        }
+
+        log.info("✓ Order entity built");
+        log.info("  Shop: {}", shop.getShopName());
+        log.info("  Items: {}", items.size());
+        log.info("  Total: {} TZS", totalAmount);
+
+        return order;
     }
 }

@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.coyote.BadRequestException;
 import org.nextgate.nextgatebackend.cart_service.entity.CartEntity;
+import org.nextgate.nextgatebackend.cart_service.service.CartService;
 import org.nextgate.nextgatebackend.checkout_session.entity.CheckoutSessionEntity;
 import org.nextgate.nextgatebackend.checkout_session.enums.CheckoutSessionStatus;
 import org.nextgate.nextgatebackend.checkout_session.repo.CheckoutSessionRepo;
@@ -25,6 +26,7 @@ public class PaymentCallbackImpl implements PaymentCallback {
     private final GroupPurchaseService groupPurchaseService;
     private final InstallmentService installmentService;
     private final CheckoutSessionRepo checkoutSessionRepo;
+    private final CartService cartService;
 
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -33,7 +35,7 @@ public class PaymentCallbackImpl implements PaymentCallback {
             EscrowAccountEntity escrow) throws BadRequestException, ItemNotFoundException {
 
         log.info("╔════════════════════════════════════════════════════════════╗");
-        log.info("║          PAYMENT SUCCESS CALLBACK                          ║");
+        log.info("║          PAYMENT SUCCESS CALLBACK   (SYNCHRONOUS)          ║");
         log.info("╚════════════════════════════════════════════════════════════╝");
         log.info("Checkout Session ID: {}", checkoutSession.getSessionId());
         log.info("Session Type: {}", checkoutSession.getSessionType());
@@ -47,10 +49,10 @@ public class PaymentCallbackImpl implements PaymentCallback {
 
         // Route to specific handler based on session type
         switch (checkoutSession.getSessionType()) {
-            case INSTALLMENT -> handleInstallmentPayment(checkoutSession, escrow);
-            case REGULAR_DIRECTLY -> handleRegularDirectly(checkoutSession, escrow);
-            case REGULAR_CART -> handleRegularCart(checkoutSession, escrow);
-            case GROUP_PURCHASE -> handleGroupPurchase(checkoutSession, escrow);
+            case INSTALLMENT -> handleInstallmentPayment(checkoutSession);
+            case REGULAR_DIRECTLY -> handleRegularDirectly(checkoutSession);
+            case REGULAR_CART -> handleRegularCart(checkoutSession);
+            case GROUP_PURCHASE -> handleGroupPurchase(checkoutSession);
             default -> log.warn("Unknown session type: {}", checkoutSession.getSessionType());
         }
 
@@ -124,18 +126,14 @@ public class PaymentCallbackImpl implements PaymentCallback {
     // ========================================
     // PRIVATE HANDLER METHODS
     // ========================================
-
-    private void handleInstallmentPayment(
-            CheckoutSessionEntity checkoutSession,
-            EscrowAccountEntity escrow) throws BadRequestException, ItemNotFoundException {
+    private void handleInstallmentPayment(CheckoutSessionEntity checkoutSession) throws BadRequestException, ItemNotFoundException {
 
         log.info("╔════════════════════════════════════════════════════════════╗");
-        log.info("║          INSTALLMENT PAYMENT HANDLER                       ║");
+        log.info("║     HANDLING INSTALLMENT PAYMENT                           ║");
         log.info("╚════════════════════════════════════════════════════════════╝");
 
         log.info("Processing installment payment...");
         log.info("  Checkout Session: {}", checkoutSession.getSessionId());
-        log.info("  Down Payment: {} TZS", escrow.getTotalAmount());
         log.info("  Installment Plan: {}", checkoutSession.getSelectedInstallmentPlanId());
 
         // Create installment agreement
@@ -164,39 +162,41 @@ public class PaymentCallbackImpl implements PaymentCallback {
         log.info("[TODO] Set up payment reminders");
     }
 
-    private void handleRegularDirectly(
-            CheckoutSessionEntity checkoutSession,
-            EscrowAccountEntity escrow) {
+    private void handleRegularDirectly(CheckoutSessionEntity checkoutSession) {
+
+        log.info("╔════════════════════════════════════════════════════════════╗");
+        log.info("║     HANDLING REGULAR_DIRECTLY PURCHASE                     ║");
+        log.info("╚════════════════════════════════════════════════════════════╝");
 
         checkoutSession.setStatus(CheckoutSessionStatus.PAYMENT_COMPLETED);
         checkoutSessionRepo.save(checkoutSession);
-
 
         log.info("✓ Checkout session status updated to PAYMENT_COMPLETED");
-        //log.info("✓ Checkout session items{}", checkoutSession.getItems());
-        log.info("Handling REGULAR_DIRECTLY purchase");
-        log.info("[TODO] Create order from checkout session");
-        log.info("[TODO] Update inventory");
-        log.info("[TODO] Send order confirmation email");
+
     }
 
-    private void handleRegularCart(
-            CheckoutSessionEntity checkoutSession,
-            EscrowAccountEntity escrow) {
+    private void handleRegularCart(CheckoutSessionEntity checkoutSession) throws ItemNotFoundException {
+
+        log.info("╔════════════════════════════════════════════════════════════╗");
+        log.info("║     HANDLING REGULAR_CART PURCHASE                         ║");
+        log.info("╚════════════════════════════════════════════════════════════╝");
 
         checkoutSession.setStatus(CheckoutSessionStatus.PAYMENT_COMPLETED);
         checkoutSessionRepo.save(checkoutSession);
 
+        cartService.clearCart();
+
         log.info("Handling REGULAR_CART purchase");
-        log.info("[TODO] Create order from cart");
-        log.info("[TODO] Clear cart for customer");
-        log.info("[TODO] Update inventory");
-        log.info("[TODO] Send order confirmation email");
+        log.info("✓ Checkout session status updated to PAYMENT_COMPLETED");
+        log.info("[Clear cart for customer");
+
     }
 
-    private void handleGroupPurchase(
-            CheckoutSessionEntity checkoutSession,
-            EscrowAccountEntity escrow) throws BadRequestException, ItemNotFoundException {
+    private void handleGroupPurchase(CheckoutSessionEntity checkoutSession) throws BadRequestException, ItemNotFoundException {
+
+        log.info("╔════════════════════════════════════════════════════════════╗");
+        log.info("║     HANDLING GROUP_PURCHASE                                ║");
+        log.info("╚════════════════════════════════════════════════════════════╝");
 
         log.info("Handling GROUP_PURCHASE");
 
