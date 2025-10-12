@@ -173,7 +173,7 @@ public class WishlistServiceImpl implements WishlistService {
         Boolean isOnSale = false;
 
         if (product.isOnSale()) {
-            discountAmount = product.getDiscountAmount();
+            discountAmount = product.getTotalSavings();
             isOnSale = true;
         }
 

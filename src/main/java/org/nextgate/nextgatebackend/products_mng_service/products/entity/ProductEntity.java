@@ -235,7 +235,7 @@ public class ProductEntity {
         return comparePrice != null && comparePrice.compareTo(price) > 0;
     }
 
-    public BigDecimal getDiscountAmount() {
+    public BigDecimal getTotalSavings() {
         if (isOnSale()) {
             return comparePrice.subtract(price);
         }
@@ -244,7 +244,7 @@ public class ProductEntity {
 
     public BigDecimal getDiscountPercentage() {
         if (isOnSale()) {
-            return getDiscountAmount()
+            return getTotalSavings()
                     .multiply(BigDecimal.valueOf(100))
                     .divide(comparePrice, 2, BigDecimal.ROUND_HALF_UP);
         }

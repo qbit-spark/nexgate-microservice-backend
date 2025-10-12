@@ -216,7 +216,7 @@ public class CartServiceImpl implements CartService {
         BigDecimal totalPrice = itemSubtotal;
 
         if (product.isOnSale()) {
-            discountAmount = product.getDiscountAmount();
+            discountAmount = product.getTotalSavings();
             itemDiscount = discountAmount.multiply(BigDecimal.valueOf(cartItem.getQuantity()));
             totalPrice = itemSubtotal.subtract(itemDiscount);
         }
@@ -228,7 +228,7 @@ public class CartServiceImpl implements CartService {
                 .productSlug(product.getProductSlug())
                 .productImage(primaryImage)
                 .unitPrice(unitPrice)
-                .discountAmount(discountAmount)
+               // .discountAmount(discountAmount)
                 .quantity(cartItem.getQuantity())
                 .itemSubtotal(itemSubtotal)
                 .itemDiscount(itemDiscount)

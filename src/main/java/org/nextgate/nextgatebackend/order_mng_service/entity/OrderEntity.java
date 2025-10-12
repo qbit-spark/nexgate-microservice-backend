@@ -51,6 +51,7 @@ public class OrderEntity {
     private ShopEntity seller;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @Builder.Default  // ← ADD THIS
     private List<OrderItemEntity> items = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
@@ -198,10 +199,10 @@ public class OrderEntity {
         return String.format("ORD-%d-%s", year, randomPart);
     }
 
-    public void addItem(OrderItemEntity item) {
-        items.add(item);
-        item.setOrder(this);
-    }
+//    public void addItem(OrderItemEntity item) {
+//        items.add(item);
+//        item.setOrder(this);
+//    }
 
     public void removeItem(OrderItemEntity item) {
         items.remove(item);
