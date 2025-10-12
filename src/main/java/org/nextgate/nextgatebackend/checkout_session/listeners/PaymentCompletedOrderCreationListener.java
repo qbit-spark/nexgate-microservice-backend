@@ -52,11 +52,11 @@ public class PaymentCompletedOrderCreationListener {
             CheckoutSessionEntity session = event.getSession();
 
             // CHECK IF ORDER ALREADY EXISTS
-//            if (session.getCreatedOrderId() != null) {
-//                log.warn("Order already exists: {}", session.getCreatedOrderId());
-//                log.warn("Skipping order creation");
-//                return;
-//            }
+            if (session.getCreatedOrderId() != null) {
+                log.warn("Order already exists: {}", session.getCreatedOrderId());
+                log.warn("Skipping order creation");
+                return;
+            }
 
 
             // DETERMINE IF ORDER SHOULD BE CREATED NOW
