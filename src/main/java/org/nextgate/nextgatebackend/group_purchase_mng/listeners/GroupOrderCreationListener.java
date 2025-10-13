@@ -38,7 +38,7 @@ public class GroupOrderCreationListener {
 
     @EventListener
     @Async
-    @Transactional(readOnly = true)  // ✅ ADD THIS
+    @Transactional(readOnly = true)
     public void onGroupCompleted(GroupCompletedEvent event) {
 
         log.info("╔════════════════════════════════════════════════════════╗");
@@ -161,7 +161,7 @@ public class GroupOrderCreationListener {
                 List<UUID> orderIds = orderService
                         .createOrdersFromCheckoutSession(checkoutSessionId);
 
-                UUID orderId = orderIds.get(0);
+                UUID orderId = orderIds.getFirst();
 
                 log.info("✓ Order created: {} for {}", orderId, userName);
 

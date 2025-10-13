@@ -78,7 +78,7 @@ public class OrderServiceImpl implements OrderService {
         validateSessionCanCreateOrder(session);
 
         // ========================================
-        // 3. CHECK IF ORDERS ALREADY EXIST ✅ NEW
+        // 3. CHECK IF ORDERS ALREADY EXIST
         // ========================================
         if (session.getCreatedOrderIds() != null && !session.getCreatedOrderIds().isEmpty()) {
             log.warn("⚠ Orders already exist for session: {}", checkoutSessionId);
@@ -1198,7 +1198,7 @@ public class OrderServiceImpl implements OrderService {
 
             log.info("════════════════════════════════════════");
             log.info("Creating order {}/{} for shop: {}",
-                    orderNumber, shopCount, shopItems.get(0).getShopName());
+                    orderNumber, shopCount, shopItems.getFirst().getShopName());
             log.info("Items: {}", shopItems.size());
 
             // Build order for this shop
