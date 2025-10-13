@@ -40,7 +40,7 @@ public class CheckoutSessionMapper {
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .completedAt(entity.getCompletedAt())
-                .createdOrderId(entity.getCreatedOrderId())
+                .createdOrderIds(entity.getCreatedOrderIds())
                 .cartId(entity.getCartId())
                 .selectedInstallmentPlanId(entity.getSelectedInstallmentPlanId())
                 .installmentConfig(mapInstallmentConfigToResponse(entity.getInstallmentConfig()))

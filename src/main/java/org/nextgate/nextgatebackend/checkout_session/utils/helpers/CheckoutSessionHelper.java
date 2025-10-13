@@ -103,7 +103,7 @@ public class CheckoutSessionHelper {
                 .id(shippingMethodId)
                 .name("Standard Shipping")
                 .carrier("DHL")
-                .cost(BigDecimal.valueOf(5000)) // 5000 TZS
+                .cost(BigDecimal.ZERO) // Will be calculated later
                 .estimatedDays("3-5 business days")
                 .estimatedDelivery(LocalDateTime.now().plusDays(5).toString())
                 .build();
@@ -299,7 +299,6 @@ public class CheckoutSessionHelper {
                         ? product.getProductImages().get(0) : null)
                 .quantity(quantity)
                 .unitPrice(unitPrice)
-                .discountAmount(totalDiscount)  // Total discount for all items
                 .subtotal(subtotal)
                 .tax(tax)
                 .total(total)
@@ -577,7 +576,6 @@ public class CheckoutSessionHelper {
                         ? product.getProductImages().get(0) : null)
                 .quantity(quantity)
                 .unitPrice(unitPrice) // Group price
-                .discountAmount(discountAmount) // Savings vs regular price
                 .subtotal(subtotal)
                 .tax(tax)
                 .total(total)
@@ -598,12 +596,10 @@ public class CheckoutSessionHelper {
 
         BigDecimal subtotal = BigDecimal.ZERO;
         BigDecimal totalTax = BigDecimal.ZERO;
-        BigDecimal totalDiscount = BigDecimal.ZERO;
 
         for (CheckoutSessionEntity.CheckoutItem item : items) {
             subtotal = subtotal.add(item.getSubtotal());
             totalTax = totalTax.add(item.getTax());
-            totalDiscount = totalDiscount.add(item.getDiscountAmount());
         }
 
         BigDecimal shippingCost = shippingMethod != null ?
@@ -611,18 +607,14 @@ public class CheckoutSessionHelper {
 
         BigDecimal total = subtotal.add(shippingCost).add(totalTax);
 
-        log.debug("Group purchase pricing calculated - Total: {} TZS (Savings: {} TZS)",
-                total, totalDiscount);
+
 
         return CheckoutSessionEntity.PricingSummary.builder()
                 .subtotal(subtotal.setScale(2, RoundingMode.HALF_UP))
-                .discount(totalDiscount.setScale(2, RoundingMode.HALF_UP))
                 .shippingCost(shippingCost.setScale(2, RoundingMode.HALF_UP))
                 .tax(totalTax.setScale(2, RoundingMode.HALF_UP))
                 .total(total.setScale(2, RoundingMode.HALF_UP))
                 .currency("TZS")
                 .build();
     }
-
-
 }

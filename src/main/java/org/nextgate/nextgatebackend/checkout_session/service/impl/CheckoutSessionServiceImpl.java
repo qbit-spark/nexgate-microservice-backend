@@ -734,7 +734,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
                 .inventoryHoldExpiresAt(inventoryHoldExpiration)
                 .metadata(request.getMetadata())
                 .expiresAt(sessionExpiration)
-                .createdOrderId(null)
+                .createdOrderIds(null)
                 .cartId(null) // For REGULAR_DIRECTLY, no cart reference
                 .build();
 
@@ -865,7 +865,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
                 .inventoryHoldExpiresAt(inventoryHoldExpiration)
                 .metadata(request.getMetadata())
                 .expiresAt(sessionExpiration)
-                .createdOrderId(null)
+                .createdOrderIds(null)
                 .cartId(cart.getCartId()) // Link to cart
                 .build();
 
@@ -1180,7 +1180,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
                 .inventoryHoldExpiresAt(inventoryHoldExpiration)
                 .metadata(request.getMetadata())
                 .expiresAt(sessionExpiration)
-                .createdOrderId(null) // Will be set after agreement creation
+                .createdOrderIds(null) // Will be set after agreement creation
                 .cartId(null)
                 .groupIdToBeJoined(null)
                 // NEW: Installment-specific fields

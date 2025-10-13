@@ -62,7 +62,9 @@ public class OrderServiceImpl implements OrderService {
         log.info("╚════════════════════════════════════════╝");
         log.info("Session ID: {}", checkoutSessionId);
 
-        // Fetch checkout session
+        // ========================================
+        // 1. FETCH SESSION
+        // ========================================
         CheckoutSessionEntity session = checkoutSessionRepo
                 .findById(checkoutSessionId)
                 .orElseThrow(() -> new ItemNotFoundException("Session not found"));
@@ -70,19 +72,27 @@ public class OrderServiceImpl implements OrderService {
         log.info("Session Type: {}", session.getSessionType());
         log.info("Customer: {}", session.getCustomer().getUserName());
 
-        // Validate session
+        // ========================================
+        // 2. VALIDATE SESSION
+        // ========================================
         validateSessionCanCreateOrder(session);
 
-        // Check if order already exists
-        if (session.getCreatedOrderId() != null) {
-            log.warn("⚠ Order already exists: {}", session.getCreatedOrderId());
-            return List.of(session.getCreatedOrderId());
+        // ========================================
+        // 3. CHECK IF ORDERS ALREADY EXIST ✅ NEW
+        // ========================================
+        if (session.getCreatedOrderIds() != null && !session.getCreatedOrderIds().isEmpty()) {
+            log.warn("⚠ Orders already exist for session: {}", checkoutSessionId);
+            log.warn("  Order IDs: {}", session.getCreatedOrderIds());
+            log.warn("  Skipping order creation (idempotency check)");
+            return session.getCreatedOrderIds(); // ✅ Return existing orders
         }
 
+        log.info("No existing orders found - proceeding with creation");
+
         // ========================================
-        // DELEGATE TO SPECIFIC HANDLER
+        // 4. DELEGATE TO SPECIFIC HANDLER
         // ========================================
-        return switch (session.getSessionType()) {
+        List<UUID> createdOrderIds = switch (session.getSessionType()) {
 
             case REGULAR_DIRECTLY -> {
                 log.info("→ Handling DIRECT PURCHASE (single item, single shop)");
@@ -104,6 +114,12 @@ public class OrderServiceImpl implements OrderService {
                 yield createGroupOrder(session);
             }
         };
+
+        log.info("✓ Order creation complete");
+        log.info("  Created {} order(s)", createdOrderIds.size());
+        log.info("  Order IDs: {}", createdOrderIds);
+
+        return createdOrderIds;
     }
 
 
@@ -813,9 +829,9 @@ public class OrderServiceImpl implements OrderService {
     }
 
 
- // ========================================
- // ORDER CANCELLATION
- // ========================================
+    // ========================================
+    // ORDER CANCELLATION
+    // ========================================
 
     @Override
     @Transactional
@@ -1069,7 +1085,6 @@ public class OrderServiceImpl implements OrderService {
     // DIRECT ORDER CREATION
     // ========================================
 
-
     /**
      * Creates order for direct purchase (buy now button).
      * Always creates exactly ONE order with ONE item from ONE shop.
@@ -1118,9 +1133,9 @@ public class OrderServiceImpl implements OrderService {
         log.info("  Order ID: {}", savedOrder.getOrderId());
 
         // ========================================
-        // UPDATE CHECKOUT SESSION
+        // UPDATE CHECKOUT SESSION - NEW WAY
         // ========================================
-        session.setCreatedOrderId(savedOrder.getOrderId());
+        session.setCreatedOrderIds(List.of(savedOrder.getOrderId()));
         session.setCompletedAt(LocalDateTime.now());
         checkoutSessionRepo.save(session);
 
@@ -1205,15 +1220,13 @@ public class OrderServiceImpl implements OrderService {
         }
 
         // ========================================
-        // UPDATE CHECKOUT SESSION
+        // UPDATE CHECKOUT SESSION - NEW WAY
         // ========================================
-        // Store primary order ID
-        session.setCreatedOrderId(orderIds.get(0));
+        session.setCreatedOrderIds(orderIds); // ✅ NEW: Store ALL order IDs
 
-        // Store all order IDs in metadata
+        // Store metadata for convenience
         session.getMetadata().put("orderCount", orderIds.size());
-        session.getMetadata().put("allOrderIds",
-                orderIds.stream().map(UUID::toString).collect(Collectors.toList()));
+        session.getMetadata().put("primaryOrderId", orderIds.get(0).toString());
 
         session.setCompletedAt(LocalDateTime.now());
         checkoutSessionRepo.save(session);
@@ -1226,7 +1239,6 @@ public class OrderServiceImpl implements OrderService {
 
         return orderIds;
     }
-
 
 
     // ========================================
@@ -1306,7 +1318,7 @@ public class OrderServiceImpl implements OrderService {
         // ========================================
         // 8. UPDATE SESSION
         // ========================================
-        session.setCreatedOrderId(savedOrder.getOrderId());
+        session.setCreatedOrderIds(List.of(savedOrder.getOrderId()));
         session.setCompletedAt(LocalDateTime.now());
         checkoutSessionRepo.save(session);
 
@@ -1394,7 +1406,7 @@ public class OrderServiceImpl implements OrderService {
         // ========================================
         // 7. UPDATE SESSION
         // ========================================
-        session.setCreatedOrderId(savedOrder.getOrderId());
+        session.setCreatedOrderIds(List.of(savedOrder.getOrderId()));
         session.setCompletedAt(LocalDateTime.now());
         checkoutSessionRepo.save(session);
 
@@ -1505,7 +1517,6 @@ public class OrderServiceImpl implements OrderService {
                     .productImage(sessionItem.getProductImage())
                     .unitPrice(sessionItem.getUnitPrice())
                     .quantity(sessionItem.getQuantity())
-                    .discount(sessionItem.getDiscountAmount())
                     .build();
 
             order.getItems().add(orderItem);
@@ -1643,9 +1654,9 @@ public class OrderServiceImpl implements OrderService {
      * Builds a single order entity for one shop.
      * Used by both direct purchase and cart purchase handlers.
      *
-     * @param session The checkout session
-     * @param shopId The shop ID (seller)
-     * @param items Items for THIS shop only
+     * @param session     The checkout session
+     * @param shopId      The shop ID (seller)
+     * @param items       Items for THIS shop only
      * @param orderSource DIRECT_PURCHASE or CART_PURCHASE
      */
     private OrderEntity buildSingleOrder(
@@ -1676,10 +1687,6 @@ public class OrderServiceImpl implements OrderService {
                         .multiply(BigDecimal.valueOf(item.getQuantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal discount = items.stream()
-                .map(CheckoutSessionEntity.CheckoutItem::getDiscountAmount)
-                .filter(Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         // ========================================
         // SHIPPING CALCULATION
@@ -1713,13 +1720,11 @@ public class OrderServiceImpl implements OrderService {
         BigDecimal tax = BigDecimal.ZERO; // TODO: Calculate tax
 
         BigDecimal totalAmount = subtotal
-                .subtract(discount)
                 .add(shippingFee)
                 .add(tax);
 
         log.info("Financial breakdown:");
         log.info("  Subtotal: {} TZS", subtotal);
-        log.info("  Discount: {} TZS", discount);
         log.info("  Shipping: {} TZS", shippingFee);
         log.info("  Tax: {} TZS", tax);
         log.info("  Total: {} TZS", totalAmount);
@@ -1752,7 +1757,6 @@ public class OrderServiceImpl implements OrderService {
                 .subtotal(subtotal)
                 .shippingFee(shippingFee)
                 .tax(tax)
-                .discount(discount)
                 .totalAmount(totalAmount)
                 .platformFee(platformFee)
                 .sellerAmount(sellerAmount)
@@ -1822,7 +1826,6 @@ public class OrderServiceImpl implements OrderService {
                     .productImage(sessionItem.getProductImage())
                     .unitPrice(sessionItem.getUnitPrice())
                     .quantity(sessionItem.getQuantity())
-                    .discount(sessionItem.getDiscountAmount())
                     .build();
 
             order.getItems().add(orderItem);

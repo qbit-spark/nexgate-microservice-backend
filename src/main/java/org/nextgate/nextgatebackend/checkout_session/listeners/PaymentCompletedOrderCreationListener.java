@@ -52,8 +52,8 @@ public class PaymentCompletedOrderCreationListener {
             CheckoutSessionEntity session = event.getSession();
 
             // CHECK IF ORDER ALREADY EXISTS
-            if (session.getCreatedOrderId() != null) {
-                log.warn("Order already exists: {}", session.getCreatedOrderId());
+            if (session.getCreatedOrderIds() != null && !session.getCreatedOrderIds().isEmpty()) {
+                log.warn("Orders already exist: {}", session.getCreatedOrderIds());
                 log.warn("Skipping order creation");
                 return;
             }
@@ -86,7 +86,7 @@ public class PaymentCompletedOrderCreationListener {
             );
 
             if (orderCreated) {
-                log.info("✓ Order created successfully");
+                log.info("✓ Order(s) created successfully");
 
                 CheckoutSessionEntity updatedSession =
                         checkoutSessionRepo.findById(session.getSessionId())
@@ -100,7 +100,8 @@ public class PaymentCompletedOrderCreationListener {
                         log.info("✓ Session status updated to COMPLETED");
                     }
 
-                    log.info("✓ Order ID: {}", updatedSession.getCreatedOrderId());
+                    // ✅ NEW: Log all created order IDs
+                    log.info("✓ Order IDs: {}", updatedSession.getCreatedOrderIds());
                 }
 
             } else {
