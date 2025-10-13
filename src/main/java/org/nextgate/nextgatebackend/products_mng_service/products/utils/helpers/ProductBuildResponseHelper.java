@@ -38,7 +38,6 @@ public class ProductBuildResponseHelper {
                 // Pricing Information
                 .price(product.getPrice())
                 .comparePrice(product.getComparePrice())
-                .discountAmount(product.getTotalSavings())
                 .discountPercentage(product.getDiscountPercentage())
                 .isOnSale(product.isOnSale())
 
@@ -430,7 +429,6 @@ public class ProductBuildResponseHelper {
                 // Pricing Information
                 .price(product.getPrice())
                 .comparePrice(product.getComparePrice())
-                //.discountAmount(product.getTotalSavings())
                 .discountPercentage(product.getDiscountPercentage())
                 .isOnSale(product.isOnSale())
 

@@ -209,7 +209,6 @@ public class CheckoutSessionEntity {
     @AllArgsConstructor
     public static class PricingSummary {
         private BigDecimal subtotal;
-        private BigDecimal discount;
         private BigDecimal shippingCost;
         private BigDecimal tax;
         private BigDecimal total;

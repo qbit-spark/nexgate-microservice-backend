@@ -68,8 +68,6 @@ public class OrderItemEntity {
     @Enumerated(EnumType.STRING)
     private FulfillmentTiming fulfillmentTiming;
 
-    @Column(precision = 10, scale = 2)
-    private BigDecimal discount;
 
     @Column(columnDefinition = "TEXT")
     private String itemNotes;
@@ -79,10 +77,6 @@ public class OrderItemEntity {
     protected void calculateItemTotal() {
         if (unitPrice != null && quantity != null) {
             this.subtotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
-
-            if (discount != null) {
-                this.subtotal = this.subtotal.subtract(discount);
-            }
 
             // Calculate total (subtotal + tax)
             this.total = this.subtotal;

@@ -89,7 +89,6 @@ public class CheckoutSessionMapper {
                         .productImage(item.getProductImage())
                         .quantity(item.getQuantity())
                         .unitPrice(item.getUnitPrice())
-                        //.discountAmount(item.getDiscountAmount())
                         .subtotal(item.getSubtotal())
                         .tax(item.getTax())
                         .total(item.getTotal())
@@ -108,7 +107,6 @@ public class CheckoutSessionMapper {
 
         return CheckoutSessionResponse.PricingSummaryResponse.builder()
                 .subtotal(pricing.getSubtotal())
-                .discount(pricing.getDiscount())
                 .shippingCost(pricing.getShippingCost())
                 .tax(pricing.getTax())
                 .total(pricing.getTotal())

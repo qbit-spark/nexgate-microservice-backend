@@ -559,7 +559,6 @@ public class CheckoutSessionHelper {
 
         // Calculate discount (regularPrice - groupPrice)
         BigDecimal discountPerItem = product.getPrice().subtract(product.getGroupPrice());
-        BigDecimal discountAmount = discountPerItem.multiply(BigDecimal.valueOf(quantity));
 
         BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
 

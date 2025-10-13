@@ -1450,7 +1450,6 @@ public class OrderServiceImpl implements OrderService {
                 .subtotal(session.getPricing().getSubtotal())
                 .shippingFee(session.getPricing().getShippingCost())
                 .tax(session.getPricing().getTax())
-                .discount(session.getPricing().getDiscount())
                 .totalAmount(totalAmount)
                 .platformFee(platformFee)          // ADD THIS
                 .sellerAmount(sellerAmount)        // ADD THIS

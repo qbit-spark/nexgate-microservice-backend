@@ -81,7 +81,6 @@ public class OrderMapper {
                 .subtotal(order.getSubtotal())
                 .shippingFee(order.getShippingFee())
                 .tax(order.getTax())
-                .discount(order.getDiscount())
                 .totalAmount(order.getTotalAmount())
                 .platformFee(order.getPlatformFee())
                 .sellerAmount(order.getSellerAmount())

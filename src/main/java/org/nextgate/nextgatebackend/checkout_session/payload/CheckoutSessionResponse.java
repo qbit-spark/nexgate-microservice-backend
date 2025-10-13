@@ -97,7 +97,6 @@ public class CheckoutSessionResponse {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class PricingSummaryResponse {
         private BigDecimal subtotal;
-        private BigDecimal discount;
         private BigDecimal shippingCost;
         private BigDecimal tax;
         private BigDecimal total;

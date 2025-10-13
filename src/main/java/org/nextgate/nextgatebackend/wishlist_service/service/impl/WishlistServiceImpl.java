@@ -169,11 +169,9 @@ public class WishlistServiceImpl implements WishlistService {
 
         // Real-time price calculations
         BigDecimal unitPrice = product.getPrice();
-        BigDecimal discountAmount = BigDecimal.ZERO;
         Boolean isOnSale = false;
 
         if (product.isOnSale()) {
-            discountAmount = product.getTotalSavings();
             isOnSale = true;
         }
 
@@ -184,7 +182,6 @@ public class WishlistServiceImpl implements WishlistService {
                 .productSlug(product.getProductSlug())
                 .productImage(primaryImage)
                 .unitPrice(unitPrice)
-                .discountAmount(discountAmount)
                 .isOnSale(isOnSale)
                 .shop(WishlistResponse.ShopSummary.builder()
                         .shopId(product.getShop().getShopId())

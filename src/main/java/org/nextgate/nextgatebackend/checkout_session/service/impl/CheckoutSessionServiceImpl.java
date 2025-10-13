@@ -1126,7 +1126,6 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         CheckoutSessionEntity.PricingSummary pricing =
                 CheckoutSessionEntity.PricingSummary.builder()
                         .subtotal(downPaymentAmount)
-                        .discount(BigDecimal.ZERO)
                         .shippingCost(BigDecimal.ZERO) // Can add shipping cost if needed
                         .tax(BigDecimal.ZERO) // Can add tax if needed
                         .total(downPaymentAmount) // ← ONLY DOWN PAYMENT!
