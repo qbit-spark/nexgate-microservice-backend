@@ -7,6 +7,7 @@ import org.nextgate.nextgatebackend.checkout_session.enums.CheckoutSessionStatus
 import org.nextgate.nextgatebackend.checkout_session.enums.CheckoutSessionType;
 import org.nextgate.nextgatebackend.checkout_session.events.PaymentCompletedEvent;
 import org.nextgate.nextgatebackend.checkout_session.repo.CheckoutSessionRepo;
+import org.nextgate.nextgatebackend.group_purchase_mng.service.GroupPurchaseService;
 import org.nextgate.nextgatebackend.order_mng_service.service.OrderService;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
@@ -33,6 +34,7 @@ public class PaymentCompletedOrderCreationListener {
 
     private final OrderService orderService;
     private final CheckoutSessionRepo checkoutSessionRepo;
+    private final GroupPurchaseService groupPurchaseService;
 
     @EventListener
     @Async
@@ -65,10 +67,30 @@ public class PaymentCompletedOrderCreationListener {
             if (!shouldCreateOrder) {
                 log.info("Order creation deferred for session type: {}",
                         session.getSessionType());
-                log.info("Order will be created when:");
 
+                // ========================================
+                // ✅ FOR GROUP_PURCHASE: CHECK COMPLETION AFTER TRANSACTION
+                // ========================================
                 if (session.getSessionType() == CheckoutSessionType.GROUP_PURCHASE) {
                     log.info("  → Group reaches full capacity");
+
+                    UUID groupInstanceId = session.getGroupIdToBeJoined();
+
+                    if (groupInstanceId != null) {
+                        log.info("Checking if group is complete: {}", groupInstanceId);
+
+                        try {
+                            // Check completion AFTER transaction committed
+                            groupPurchaseService.checkAndPublishGroupCompletion(groupInstanceId);
+
+                        } catch (Exception e) {
+                            log.error("Error checking group completion", e);
+                        }
+
+                    } else {
+                        log.warn("⚠️  No group instance ID found - cannot check completion");
+                    }
+
                 } else if (session.getSessionType() == CheckoutSessionType.INSTALLMENT) {
                     log.info("  → All installment payments completed");
                 }

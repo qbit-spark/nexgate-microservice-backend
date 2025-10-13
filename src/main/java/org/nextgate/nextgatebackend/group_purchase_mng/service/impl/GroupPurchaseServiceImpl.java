@@ -150,11 +150,14 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
                 customer.getAccountId(), savedGroup.getGroupInstanceId());
 
 
-        // Publish event if group completed
-        checkAndCompleteGroup(savedGroup);
+        // ✅ NEW CODE:
+        boolean isGroupFull = savedGroup.isFull();
+        log.info("Group created. Full: {} ({}/{})",
+                isGroupFull,
+                savedGroup.getSeatsOccupied(),
+                savedGroup.getTotalSeats());
 
-        // 11. Return created group
-        return savedGroup;
+        return savedGroup;  // Transaction commits here
     }
 
     @Override
@@ -295,10 +298,14 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
         log.info("User {} successfully joined group {}",
                 customer.getAccountId(), checkoutSession.getGroupIdToBeJoined());
 
-        // Publish event if group completed
-        checkAndCompleteGroup(savedGroup);
 
-        return savedGroup;
+        boolean isGroupFull = savedGroup.isFull();
+        log.info("Group joined. Full: {} ({}/{})",
+                isGroupFull,
+                savedGroup.getSeatsOccupied(),
+                savedGroup.getTotalSeats());
+
+        return savedGroup;  // Transaction commits here
     }
 
 
@@ -504,15 +511,14 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
         groupPurchaseInstanceRepo.save(targetGroup);
 
 
-        // Publish events if groups completed
-        checkAndCompleteGroup(targetGroup);
+        boolean isGroupFull = targetGroup.isFull();
+        log.info("Transfer complete. Target group full: {} ({}/{})",
+                isGroupFull,
+                targetGroup.getSeatsOccupied(),
+                targetGroup.getTotalSeats());
 
-        log.info("Transfer completed successfully. User {} moved {} seats from {} to {}",
-                authenticatedUser.getAccountId(), quantity,
-                sourceGroup.getGroupCode(), targetGroup.getGroupCode());
+        return targetParticipant;  // Transaction commits here
 
-        // 18. Return target participant
-        return targetParticipant;
     }
 
 
@@ -687,7 +693,6 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
     }
 
 
-
     @Override
     @Transactional(readOnly = true)
     public boolean canJoinGroup(
@@ -858,6 +863,33 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
         log.info("╔════════════════════════════════════════════════════════╗");
         log.info("║   GROUP COMPLETION PROCESSING COMPLETE                ║");
         log.info("╚════════════════════════════════════════════════════════╝");
+    }
+
+
+    /**
+     * Check if group is complete and publish event if needed.
+     * Called AFTER transaction commits to ensure data is persisted.
+     *
+     * @param groupInstanceId Group to check
+     */
+    @Override
+    public void checkAndPublishGroupCompletion(UUID groupInstanceId) {
+
+        log.info("Checking group completion for: {}", groupInstanceId);
+
+        // Fetch group in NEW context (data is now committed)
+        GroupPurchaseInstanceEntity group = groupPurchaseInstanceRepo
+                .findById(groupInstanceId)
+                .orElseThrow(() -> new RuntimeException("Group not found: " + groupInstanceId));
+
+        log.info("Group status: {}, Seats: {}/{}, Full: {}",
+                group.getStatus(),
+                group.getSeatsOccupied(),
+                group.getTotalSeats(),
+                group.isFull());
+
+        // Now check and complete (publishes event if needed)
+        checkAndCompleteGroup(group);
     }
 
 }

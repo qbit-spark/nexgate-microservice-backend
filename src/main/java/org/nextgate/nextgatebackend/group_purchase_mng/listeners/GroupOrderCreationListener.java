@@ -3,14 +3,18 @@ package org.nextgate.nextgatebackend.group_purchase_mng.listeners;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.nextgate.nextgatebackend.group_purchase_mng.entity.GroupParticipantEntity;
+import org.nextgate.nextgatebackend.group_purchase_mng.entity.GroupPurchaseInstanceEntity;
 import org.nextgate.nextgatebackend.group_purchase_mng.enums.ParticipantStatus;
 import org.nextgate.nextgatebackend.group_purchase_mng.events.GroupCompletedEvent;
 import org.nextgate.nextgatebackend.group_purchase_mng.repo.GroupParticipantRepo;
+import org.nextgate.nextgatebackend.group_purchase_mng.repo.GroupPurchaseInstanceRepo;
 import org.nextgate.nextgatebackend.order_mng_service.service.OrderService;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,28 +33,33 @@ public class GroupOrderCreationListener {
 
     private final OrderService orderService;
     private final GroupParticipantRepo participantRepo;
+    private final GroupPurchaseInstanceRepo groupPurchaseInstanceRepo;
+
 
     @EventListener
     @Async
-    @Transactional
+    @Transactional(readOnly = true)  // ✅ ADD THIS
     public void onGroupCompleted(GroupCompletedEvent event) {
 
         log.info("╔════════════════════════════════════════════════════════╗");
         log.info("║   HANDLING GROUP COMPLETION - ORDER CREATION          ║");
         log.info("╚════════════════════════════════════════════════════════╝");
         log.info("Group ID: {}", event.getGroupInstanceId());
-        log.info("Group Code: {}", event.getGroup().getGroupCode());
-        log.info("Product: {}", event.getGroup().getProductName());
-        log.info("Completed At: {}", event.getCompletedAt());
 
         try {
-            // ========================================
-            // 1. GET ALL ACTIVE PARTICIPANTS
-            // ========================================
+            // Fetch fresh group with active session
+            GroupPurchaseInstanceEntity group = groupPurchaseInstanceRepo
+                    .findById(event.getGroupInstanceId())
+                    .orElseThrow(() -> new RuntimeException(
+                            "Group not found: " + event.getGroupInstanceId()));
+
+            log.info("Group Code: {}", group.getGroupCode());
+            log.info("Product: {}", group.getProductName());
+            log.info("Completed At: {}", group.getCompletedAt());
+
+            // Get all active participants
             List<GroupParticipantEntity> allParticipants =
-                    participantRepo.findByGroupInstanceOrderByJoinedAtAsc(
-                            event.getGroup()
-                    );
+                    participantRepo.findByGroupInstanceOrderByJoinedAtAsc(group);
 
             List<GroupParticipantEntity> activeParticipants = allParticipants.stream()
                     .filter(p -> p.getStatus() == ParticipantStatus.ACTIVE)
@@ -65,9 +74,7 @@ public class GroupOrderCreationListener {
                 return;
             }
 
-            // ========================================
-            // 2. CREATE ORDERS FOR EACH PARTICIPANT
-            // ========================================
+            // Create orders for each participant
             int successCount = 0;
             int failCount = 0;
             List<String> failedParticipants = new ArrayList<>();
@@ -85,13 +92,10 @@ public class GroupOrderCreationListener {
                         participantId);
 
                 try {
-                    // ========================================
-                    // ATTEMPT ORDER CREATION WITH RETRY
-                    // ========================================
                     boolean orderCreated = createOrderWithRetry(
                             checkoutSessionId,
                             userName,
-                            3  // max attempts
+                            3
                     );
 
                     if (orderCreated) {
@@ -112,14 +116,12 @@ public class GroupOrderCreationListener {
                 }
             }
 
-            // ========================================
-            // 3. LOG SUMMARY
-            // ========================================
+            // Log summary
             log.info("╔════════════════════════════════════════════════════════╗");
             log.info("║   ORDER CREATION COMPLETE                              ║");
             log.info("╚════════════════════════════════════════════════════════╝");
             log.info("Group: {} ({})",
-                    event.getGroup().getGroupCode(),
+                    group.getGroupCode(),
                     event.getGroupInstanceId());
             log.info("Total Participants: {}", activeParticipants.size());
             log.info("Orders Created: {} ✓", successCount);
@@ -131,21 +133,6 @@ public class GroupOrderCreationListener {
                 log.warn("╚════════════════════════════════════════════════════════╝");
                 log.warn("Failed participants ({}):", failCount);
                 failedParticipants.forEach(name -> log.warn("  - {}", name));
-
-                // TODO: Create admin task
-                // adminTaskService.createTask(
-                //     "Group Order Creation Failed",
-                //     String.format("Group %s has %d failed orders",
-                //         event.getGroup().getGroupCode(), failCount),
-                //     failedParticipants
-                // );
-
-                // TODO: Send alert to admins
-                // alertService.sendAlert(
-                //     AlertLevel.HIGH,
-                //     "Group order creation failures",
-                //     details
-                // );
             }
 
         } catch (Exception e) {
@@ -153,16 +140,8 @@ public class GroupOrderCreationListener {
             log.error("║   ⚠ CRITICAL ERROR IN ORDER CREATION ⚠                ║");
             log.error("╚════════════════════════════════════════════════════════╝");
             log.error("Group: {}", event.getGroupInstanceId(), e);
-
-            // TODO: Alert admins immediately
-            // alertService.sendCriticalAlert(
-            //     "Group order creation failed catastrophically",
-            //     event.getGroupInstanceId(),
-            //     e
-            // );
         }
     }
-
 
     // ========================================
     // HELPER METHOD: CREATE ORDER WITH RETRY
