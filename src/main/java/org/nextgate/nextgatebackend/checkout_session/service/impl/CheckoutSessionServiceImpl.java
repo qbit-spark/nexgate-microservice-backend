@@ -899,8 +899,8 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         UUID groupInstanceId = request.getGroupInstanceId();
 
         // 3. Extract product and quantity
-        UUID productId = request.getItems().get(0).getProductId();
-        Integer quantity = request.getItems().get(0).getQuantity();
+        UUID productId = request.getItems().getFirst().getProductId();
+        Integer quantity = request.getItems().getFirst().getQuantity();
 
         // 4. Fetch and validate product
         ProductEntity product = productRepo.findByProductIdAndIsDeletedFalse(productId)

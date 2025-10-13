@@ -6,6 +6,7 @@ import org.apache.coyote.BadRequestException;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.authentication_service.repo.AccountRepo;
 import org.nextgate.nextgatebackend.checkout_session.entity.CheckoutSessionEntity;
+import org.nextgate.nextgatebackend.checkout_session.repo.CheckoutSessionRepo;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.group_purchase_mng.entity.GroupParticipantEntity;
 import org.nextgate.nextgatebackend.group_purchase_mng.entity.GroupPurchaseInstanceEntity;
@@ -43,7 +44,8 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
     private final AccountRepo accountRepo;
     private final GroupPurchaseValidator validator;
     private final ApplicationEventPublisher eventPublisher;
-
+    private final CheckoutSessionRepo checkoutSessionRepo;
+    
     @Override
     @Transactional
     public GroupPurchaseInstanceEntity createGroupInstance(
@@ -112,6 +114,15 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
         log.info("Group instance created: {} with code: {}",
                 savedGroup.getGroupInstanceId(), savedGroup.getGroupCode());
 
+        // ========================================
+        //          LINK CHECKOUT SESSION TO GROUP
+        // ========================================
+        checkoutSession.setGroupIdToBeJoined(savedGroup.getGroupInstanceId());
+        checkoutSessionRepo.save(checkoutSession);
+
+        log.info("✓ Checkout session linked to group: {}", savedGroup.getGroupInstanceId());
+
+
         // 9. Create participant record with purchase history
         GroupParticipantEntity participant = GroupParticipantEntity.builder()
                 .groupInstance(savedGroup)
@@ -138,17 +149,6 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
         log.info("Participant created for user: {} in group: {}",
                 customer.getAccountId(), savedGroup.getGroupInstanceId());
 
-        // 10. Check if group is already complete (user bought all seats)
-        if (savedGroup.isFull()) {
-            log.info("Group {} is already full, marking as COMPLETED",
-                    savedGroup.getGroupInstanceId());
-            savedGroup.setStatus(GroupStatus.COMPLETED);
-            savedGroup.setCompletedAt(now);
-            groupPurchaseInstanceRepo.save(savedGroup);
-
-            // TODO: Trigger order creation for all participants
-            log.info("Group completed - orders should be created");
-        }
 
         // Publish event if group completed
         checkAndCompleteGroup(savedGroup);
@@ -288,15 +288,6 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
         log.info("Group {} seats updated: {}/{}",
                 checkoutSession.getGroupIdToBeJoined(), group.getSeatsOccupied(), group.getTotalSeats());
 
-        // 12. Check if group is now complete
-        if (group.isFull()) {
-            log.info("Group {} is now full, marking as COMPLETED", checkoutSession.getGroupIdToBeJoined());
-            group.setStatus(GroupStatus.COMPLETED);
-            group.setCompletedAt(now);
-
-            // TODO: Trigger order creation for ALL participants
-            log.info("Group completed - orders should be created for all participants");
-        }
 
         // 13. Save and return group
         GroupPurchaseInstanceEntity savedGroup = groupPurchaseInstanceRepo.save(group);
@@ -505,17 +496,6 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
         targetGroup.setSeatsOccupied(targetGroup.getSeatsOccupied() + quantity);
         targetGroup.setUpdatedAt(now);
 
-        // 16. Check if target group is now complete
-        if (targetGroup.isFull()) {
-            log.info("Target group {} is now full, marking as COMPLETED",
-                    targetGroupId);
-
-            targetGroup.setStatus(GroupStatus.COMPLETED);
-            targetGroup.setCompletedAt(now);
-
-            // TODO: Trigger order creation for ALL participants
-            log.info("Target group completed - orders should be created");
-        }
 
         // 17. Save everything
         groupParticipantRepo.save(sourceParticipant);
@@ -761,9 +741,12 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
     }
 
 
+
     /**
      * Checks if group is full and handles completion.
      * Publishes GroupCompletedEvent if group just became full.
+     *
+     * IMPORTANT: This method is idempotent - safe to call multiple times.
      *
      * Call this after any operation that changes seatsOccupied:
      * - createGroupInstance()
@@ -772,7 +755,9 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
      */
     private void checkAndCompleteGroup(GroupPurchaseInstanceEntity group) {
 
-        // Check if group is full
+        // ========================================
+        // 1. CHECK IF GROUP IS FULL
+        // ========================================
         if (!group.isFull()) {
             log.debug("Group {} not full yet: {}/{}",
                     group.getGroupCode(),
@@ -781,13 +766,30 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
             return;
         }
 
-        // Check if already completed (avoid duplicate events)
-        if (group.getStatus() != GroupStatus.OPEN) {
-            log.debug("Group {} already completed/failed, skipping",
-                    group.getGroupCode());
+        // ========================================
+        // 2. CHECK IF ALREADY PROCESSED (IDEMPOTENCY)
+        // ========================================
+        // Allow processing if:
+        // - Status is OPEN (group just became full)
+        // - Status is COMPLETED but completedAt is null (edge case: status set but not saved)
+
+        if (group.getStatus() == GroupStatus.COMPLETED && group.getCompletedAt() != null) {
+            // Already completed AND saved - event already published
+            log.debug("Group {} already completed and processed at {}, skipping",
+                    group.getGroupCode(), group.getCompletedAt());
             return;
         }
 
+        if (group.getStatus() != GroupStatus.OPEN && group.getStatus() != GroupStatus.COMPLETED) {
+            // Status is FAILED or DELETED - don't process
+            log.debug("Group {} has status {}, cannot complete",
+                    group.getGroupCode(), group.getStatus());
+            return;
+        }
+
+        // ========================================
+        // 3. LOG COMPLETION
+        // ========================================
         log.info("╔════════════════════════════════════════════════════════╗");
         log.info("║         GROUP COMPLETED                                ║");
         log.info("╚════════════════════════════════════════════════════════╝");
@@ -796,19 +798,33 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
         log.info("Product: {}", group.getProductName());
         log.info("Participants: {}", group.getTotalParticipants());
         log.info("Total Seats: {}/{}", group.getSeatsOccupied(), group.getTotalSeats());
+        log.info("Previous Status: {}", group.getStatus());
 
-        // Mark as completed
+        // ========================================
+        // 4. MARK AS COMPLETED
+        // ========================================
         LocalDateTime now = LocalDateTime.now();
         group.setStatus(GroupStatus.COMPLETED);
         group.setCompletedAt(now);
         group.setUpdatedAt(now);
 
-        // Save immediately
-        groupPurchaseInstanceRepo.save(group);
+        // ========================================
+        // 5. SAVE IMMEDIATELY
+        // ========================================
+        try {
+            groupPurchaseInstanceRepo.save(group);
+            log.info("✓ Group marked as COMPLETED");
+            log.info("  Completed At: {}", now);
 
-        log.info("✓ Group marked as COMPLETED");
+        } catch (Exception e) {
+            log.error("Failed to save completed group", e);
+            // This is critical - if we can't save, don't publish event
+            return;
+        }
 
-        // Publish event for async processing
+        // ========================================
+        // 6. PUBLISH EVENT FOR ASYNC PROCESSING
+        // ========================================
         try {
             GroupCompletedEvent event = new GroupCompletedEvent(
                     this,
@@ -828,10 +844,19 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
 
         } catch (Exception e) {
             log.error("Failed to publish GroupCompletedEvent", e);
+
             // Don't throw - group is still marked as completed
             // Event listeners can pick this up via scheduled job
+
+            // TODO: Create admin task for manual intervention
+            log.error("⚠️  MANUAL ACTION REQUIRED:");
+            log.error("   Group: {} ({})", group.getGroupCode(), group.getGroupInstanceId());
+            log.error("   Status: COMPLETED but event not published");
+            log.error("   Action: Run scheduled job to process completed groups");
         }
 
+        log.info("╔════════════════════════════════════════════════════════╗");
+        log.info("║   GROUP COMPLETION PROCESSING COMPLETE                ║");
         log.info("╚════════════════════════════════════════════════════════╝");
     }
 
