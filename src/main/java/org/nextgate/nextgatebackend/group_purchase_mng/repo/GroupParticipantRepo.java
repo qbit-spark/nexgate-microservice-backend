@@ -5,6 +5,8 @@ import org.nextgate.nextgatebackend.group_purchase_mng.entity.GroupParticipantEn
 import org.nextgate.nextgatebackend.group_purchase_mng.entity.GroupPurchaseInstanceEntity;
 import org.nextgate.nextgatebackend.group_purchase_mng.enums.ParticipantStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -22,6 +24,14 @@ public interface GroupParticipantRepo extends JpaRepository<GroupParticipantEnti
     List<GroupParticipantEntity> findByGroupInstanceOrderByJoinedAtAsc(
             GroupPurchaseInstanceEntity groupInstance);
 
+    // ✅ NEW: For explicit eager loading with user relationship
+    @Query("SELECT p FROM GroupParticipantEntity p " +
+            "JOIN FETCH p.user " +
+            "WHERE p.groupInstance = :group " +
+            "ORDER BY p.joinedAt ASC")
+    List<GroupParticipantEntity> findWithUserByGroup(
+            @Param("group") GroupPurchaseInstanceEntity group);
+
     // Find user's active participations
     List<GroupParticipantEntity> findByUserAndStatusOrderByJoinedAtDesc(
             AccountEntity user, ParticipantStatus status);
@@ -29,7 +39,5 @@ public interface GroupParticipantRepo extends JpaRepository<GroupParticipantEnti
     // Find by checkout session
     Optional<GroupParticipantEntity> findByCheckoutSessionId(UUID checkoutSessionId);
 
-
     List<GroupParticipantEntity> findByUser(AccountEntity user);
-
 }

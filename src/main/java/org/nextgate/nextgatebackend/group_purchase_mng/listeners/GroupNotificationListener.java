@@ -17,6 +17,8 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.List;
 
+import static org.springframework.transaction.event.TransactionPhase.AFTER_COMMIT;
+
 /**
  * Listens for GroupCompletedEvent and sends notifications to participants.
  */
@@ -30,9 +32,9 @@ public class GroupNotificationListener {
     private final GroupPurchaseInstanceRepo groupPurchaseInstanceRepo;
 
 
-    @EventListener
+//    @TransactionalEventListener(phase = AFTER_COMMIT)
     @Async
-    @Transactional()
+    @Transactional
     public void onGroupCompleted(GroupCompletedEvent event) {
 
         log.info("╔════════════════════════════════════════════════════════╗");
