@@ -45,10 +45,6 @@ public class GroupOrderCreationListener {
 
     /**
      * Handles group completion event and creates orders for all participants.
-     *
-     * @TransactionalEventListener ensures this runs AFTER the transaction commits
-     * @Async executes in separate thread pool
-     * @Transactional creates new transaction for order creation
      */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Async
