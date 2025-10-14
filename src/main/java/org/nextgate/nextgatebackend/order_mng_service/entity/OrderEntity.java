@@ -70,8 +70,6 @@ public class OrderEntity {
     @Column(precision = 10, scale = 2)
     private BigDecimal tax;
 
-    @Column(precision = 10, scale = 2)
-    private BigDecimal discount;
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal totalAmount;

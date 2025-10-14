@@ -210,16 +210,8 @@ public class CartServiceImpl implements CartService {
 
         // Real-time price calculations
         BigDecimal unitPrice = product.getPrice();
-        BigDecimal discountAmount = BigDecimal.ZERO;
         BigDecimal itemSubtotal = unitPrice.multiply(BigDecimal.valueOf(cartItem.getQuantity()));
-        BigDecimal itemDiscount = BigDecimal.ZERO;
-        BigDecimal totalPrice = itemSubtotal;
 
-        if (product.isOnSale()) {
-            discountAmount = product.getTotalSavings();
-            itemDiscount = discountAmount.multiply(BigDecimal.valueOf(cartItem.getQuantity()));
-            totalPrice = itemSubtotal.subtract(itemDiscount);
-        }
 
         return CartResponse.CartItemResponse.builder()
                 .itemId(cartItem.getItemId())
@@ -228,11 +220,9 @@ public class CartServiceImpl implements CartService {
                 .productSlug(product.getProductSlug())
                 .productImage(primaryImage)
                 .unitPrice(unitPrice)
-               // .discountAmount(discountAmount)
                 .quantity(cartItem.getQuantity())
                 .itemSubtotal(itemSubtotal)
-                .itemDiscount(itemDiscount)
-                .totalPrice(totalPrice)
+                .totalPrice(itemSubtotal)
                 .shop(CartResponse.ShopSummary.builder()
                         .shopId(product.getShop().getShopId())
                         .shopName(product.getShop().getShopName())

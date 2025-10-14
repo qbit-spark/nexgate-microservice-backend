@@ -40,7 +40,6 @@ public class OrderResponse {
     private BigDecimal subtotal;
     private BigDecimal shippingFee;
     private BigDecimal tax;
-    private BigDecimal discount;
     private BigDecimal totalAmount;
     private BigDecimal platformFee;
     private BigDecimal sellerAmount;

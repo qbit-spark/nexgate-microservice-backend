@@ -734,7 +734,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
                 .inventoryHoldExpiresAt(inventoryHoldExpiration)
                 .metadata(request.getMetadata())
                 .expiresAt(sessionExpiration)
-                .createdOrderId(null)
+                .createdOrderIds(null)
                 .cartId(null) // For REGULAR_DIRECTLY, no cart reference
                 .build();
 
@@ -865,7 +865,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
                 .inventoryHoldExpiresAt(inventoryHoldExpiration)
                 .metadata(request.getMetadata())
                 .expiresAt(sessionExpiration)
-                .createdOrderId(null)
+                .createdOrderIds(null)
                 .cartId(cart.getCartId()) // Link to cart
                 .build();
 
@@ -899,8 +899,8 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         UUID groupInstanceId = request.getGroupInstanceId();
 
         // 3. Extract product and quantity
-        UUID productId = request.getItems().get(0).getProductId();
-        Integer quantity = request.getItems().get(0).getQuantity();
+        UUID productId = request.getItems().getFirst().getProductId();
+        Integer quantity = request.getItems().getFirst().getQuantity();
 
         // 4. Fetch and validate product
         ProductEntity product = productRepo.findByProductIdAndIsDeletedFalse(productId)
@@ -1126,7 +1126,6 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         CheckoutSessionEntity.PricingSummary pricing =
                 CheckoutSessionEntity.PricingSummary.builder()
                         .subtotal(downPaymentAmount)
-                        .discount(BigDecimal.ZERO)
                         .shippingCost(BigDecimal.ZERO) // Can add shipping cost if needed
                         .tax(BigDecimal.ZERO) // Can add tax if needed
                         .total(downPaymentAmount) // ← ONLY DOWN PAYMENT!
@@ -1180,7 +1179,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
                 .inventoryHoldExpiresAt(inventoryHoldExpiration)
                 .metadata(request.getMetadata())
                 .expiresAt(sessionExpiration)
-                .createdOrderId(null) // Will be set after agreement creation
+                .createdOrderIds(null) // Will be set after agreement creation
                 .cartId(null)
                 .groupIdToBeJoined(null)
                 // NEW: Installment-specific fields

@@ -67,4 +67,6 @@ public interface GroupPurchaseService {
             GroupPurchaseInstanceEntity group,
             AccountEntity user);
 
+    void checkAndPublishGroupCompletion(UUID groupInstanceId);
+
 }

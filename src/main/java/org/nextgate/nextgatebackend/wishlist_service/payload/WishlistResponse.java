@@ -52,7 +52,6 @@ public class WishlistResponse {
         private String productSlug;
         private String productImage;
         private BigDecimal unitPrice;
-        private BigDecimal discountAmount;
         private Boolean isOnSale;
         private ShopSummary shop;
         private ProductAvailability availability;

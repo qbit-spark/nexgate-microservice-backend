@@ -30,7 +30,6 @@ public class ProductDetailedResponse {
     // Pricing Information
     private BigDecimal price;
     private BigDecimal comparePrice;
-    private BigDecimal discountAmount;
     private BigDecimal discountPercentage;
     private Boolean isOnSale;
 

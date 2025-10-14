@@ -167,7 +167,7 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
     // Handles successful payment
     private PaymentResponse handleSuccessfulPayment(
             CheckoutSessionEntity checkoutSession,
-            PaymentResult result) throws BadRequestException, ItemNotFoundException {
+            PaymentResult result) {
 
         log.info("Payment successful for checkout session: {}",
                 checkoutSession.getSessionId());
@@ -235,49 +235,6 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
 
 
 
-    // ========================================
-    // HELPER METHOD: SHOULD CREATE ORDER NOW?
-    // ========================================
-
-    private boolean shouldCreateOrderNow(CheckoutSessionEntity checkoutSession) {
-
-        return switch (checkoutSession.getSessionType()) {
-
-            case REGULAR_DIRECTLY, REGULAR_CART -> {
-                // Direct purchases: Create order immediately
-                log.debug("Direct purchase - create order now");
-                yield true;
-            }
-
-            case INSTALLMENT -> {
-                // Installment: Only if IMMEDIATE fulfillment
-                // AFTER_PAYMENT fulfillment waits until fully paid
-
-                CheckoutSessionEntity.InstallmentConfiguration config =
-                        checkoutSession.getInstallmentConfig();
-
-                if (config == null) {
-                    log.warn("Installment session missing config");
-                    yield false;
-                }
-
-                boolean isImmediate = "IMMEDIATE".equals(config.getFulfillmentTiming());
-
-                log.debug("Installment - fulfillment: {} - create order: {}",
-                        config.getFulfillmentTiming(), isImmediate);
-
-                yield isImmediate;
-            }
-
-            case GROUP_PURCHASE -> {
-                // Group purchase: NEVER create order on payment
-                // Orders created when group completes (by GroupPurchaseService)
-                log.debug("Group purchase - defer order creation until group completes");
-                yield false;
-            }
-        };
-    }
-
 
     // ========================================
     // HELPER METHOD: BUILD SUCCESS MESSAGE
@@ -287,7 +244,7 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
 
         return switch (sessionType) {
             case REGULAR_DIRECTLY, REGULAR_CART ->
-                    "Payment completed successfully. Your order is being created.";
+                    "Payment completed successfully. Your order is being processed.";
 
             case INSTALLMENT ->
                     "Down payment completed successfully. Order is being processed.";

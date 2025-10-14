@@ -13,19 +13,24 @@ import org.nextgate.nextgatebackend.checkout_session.payload.UpdateCheckoutSessi
 import org.nextgate.nextgatebackend.financial_system.wallet.entity.WalletEntity;
 import org.nextgate.nextgatebackend.financial_system.wallet.service.WalletService;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
+import org.nextgate.nextgatebackend.order_mng_service.entity.OrderEntity;
+import org.nextgate.nextgatebackend.order_mng_service.entity.OrderItemEntity;
+import org.nextgate.nextgatebackend.order_mng_service.enums.DeliveryStatus;
+import org.nextgate.nextgatebackend.order_mng_service.enums.OrderSource;
+import org.nextgate.nextgatebackend.order_mng_service.enums.OrderStatus;
 import org.nextgate.nextgatebackend.payment_methods.entity.PaymentMethodsEntity;
 import org.nextgate.nextgatebackend.payment_methods.enums.PaymentMethodsType;
 import org.nextgate.nextgatebackend.products_mng_service.products.entity.ProductEntity;
 import org.nextgate.nextgatebackend.products_mng_service.products.enums.ProductStatus;
 import org.nextgate.nextgatebackend.products_mng_service.products.repo.ProductRepo;
+import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.entity.ShopEntity;
+import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.repo.ShopRepo;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @Slf4j
 @Component
@@ -35,6 +40,7 @@ public class CheckoutSessionHelper {
     private final WalletService walletService;
     private final ProductRepo productRepo;
     private final CartRepo cartRepo;
+    private final ShopRepo shopRepo;
 
     // ========================================
     // BILLING ADDRESS DETERMINATION
@@ -97,7 +103,7 @@ public class CheckoutSessionHelper {
                 .id(shippingMethodId)
                 .name("Standard Shipping")
                 .carrier("DHL")
-                .cost(BigDecimal.valueOf(5000)) // 5000 TZS
+                .cost(BigDecimal.ZERO) // Will be calculated later
                 .estimatedDays("3-5 business days")
                 .estimatedDelivery(LocalDateTime.now().plusDays(5).toString())
                 .build();
@@ -293,7 +299,6 @@ public class CheckoutSessionHelper {
                         ? product.getProductImages().get(0) : null)
                 .quantity(quantity)
                 .unitPrice(unitPrice)
-                .discountAmount(totalDiscount)  // Total discount for all items
                 .subtotal(subtotal)
                 .tax(tax)
                 .total(total)
@@ -554,7 +559,6 @@ public class CheckoutSessionHelper {
 
         // Calculate discount (regularPrice - groupPrice)
         BigDecimal discountPerItem = product.getPrice().subtract(product.getGroupPrice());
-        BigDecimal discountAmount = discountPerItem.multiply(BigDecimal.valueOf(quantity));
 
         BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
 
@@ -571,7 +575,6 @@ public class CheckoutSessionHelper {
                         ? product.getProductImages().get(0) : null)
                 .quantity(quantity)
                 .unitPrice(unitPrice) // Group price
-                .discountAmount(discountAmount) // Savings vs regular price
                 .subtotal(subtotal)
                 .tax(tax)
                 .total(total)
@@ -592,12 +595,10 @@ public class CheckoutSessionHelper {
 
         BigDecimal subtotal = BigDecimal.ZERO;
         BigDecimal totalTax = BigDecimal.ZERO;
-        BigDecimal totalDiscount = BigDecimal.ZERO;
 
         for (CheckoutSessionEntity.CheckoutItem item : items) {
             subtotal = subtotal.add(item.getSubtotal());
             totalTax = totalTax.add(item.getTax());
-            totalDiscount = totalDiscount.add(item.getDiscountAmount());
         }
 
         BigDecimal shippingCost = shippingMethod != null ?
@@ -605,12 +606,10 @@ public class CheckoutSessionHelper {
 
         BigDecimal total = subtotal.add(shippingCost).add(totalTax);
 
-        log.debug("Group purchase pricing calculated - Total: {} TZS (Savings: {} TZS)",
-                total, totalDiscount);
+
 
         return CheckoutSessionEntity.PricingSummary.builder()
                 .subtotal(subtotal.setScale(2, RoundingMode.HALF_UP))
-                .discount(totalDiscount.setScale(2, RoundingMode.HALF_UP))
                 .shippingCost(shippingCost.setScale(2, RoundingMode.HALF_UP))
                 .tax(totalTax.setScale(2, RoundingMode.HALF_UP))
                 .total(total.setScale(2, RoundingMode.HALF_UP))

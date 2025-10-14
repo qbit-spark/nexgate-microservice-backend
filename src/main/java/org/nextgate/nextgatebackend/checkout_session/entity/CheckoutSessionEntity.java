@@ -104,9 +104,10 @@ public class CheckoutSessionEntity {
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
-    // Reference to created order (after successful payment)
-    @Column(name = "created_order_id")
-    private UUID createdOrderId;
+
+    @Column(name = "created_order_ids", columnDefinition = "jsonb")
+    @Convert(converter = OrderIdsJsonConverter.class)
+    private List<UUID> createdOrderIds;
 
     private UUID groupIdToBeJoined; // For GROUP_PURCHASE type
 
@@ -158,6 +159,25 @@ public class CheckoutSessionEntity {
         return paymentAttempts != null ? paymentAttempts.size() : 0;
     }
 
+
+    // Helper methods for easier access
+    public UUID getPrimaryOrderId() {
+        return (createdOrderIds != null && !createdOrderIds.isEmpty())
+                ? createdOrderIds.get(0)
+                : null;
+    }
+
+    public void addCreatedOrderId(UUID orderId) {
+        if (this.createdOrderIds == null) {
+            this.createdOrderIds = new ArrayList<>();
+        }
+        this.createdOrderIds.add(orderId);
+    }
+
+    public void setCreatedOrderIds(List<UUID> orderIds) {
+        this.createdOrderIds = (orderIds != null) ? orderIds : new ArrayList<>();
+    }
+
     // ========================================
     // NESTED CLASSES FOR JSON STORAGE
     // ========================================
@@ -173,7 +193,6 @@ public class CheckoutSessionEntity {
         private String productImage;
         private Integer quantity;
         private BigDecimal unitPrice;
-        private BigDecimal discountAmount;
         private BigDecimal subtotal;
         private BigDecimal tax;
         private BigDecimal total;
@@ -190,7 +209,6 @@ public class CheckoutSessionEntity {
     @AllArgsConstructor
     public static class PricingSummary {
         private BigDecimal subtotal;
-        private BigDecimal discount;
         private BigDecimal shippingCost;
         private BigDecimal tax;
         private BigDecimal total;

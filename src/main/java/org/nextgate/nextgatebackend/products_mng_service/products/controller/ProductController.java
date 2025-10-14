@@ -37,7 +37,7 @@ public class ProductController {
 
         GlobeSuccessResponseBuilder response = productService.createProduct(shopId, request, action);
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        return ResponseEntity.ok(response);
     }
 
 

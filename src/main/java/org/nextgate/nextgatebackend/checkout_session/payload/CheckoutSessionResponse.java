@@ -57,7 +57,7 @@ public class CheckoutSessionResponse {
     private LocalDateTime completedAt;
 
     // References
-    private UUID createdOrderId;
+    private List<UUID> createdOrderIds;
     private UUID cartId;
     private UUID groupIdToBeJoined; // ← EXISTING (for group purchase)
 
@@ -79,7 +79,6 @@ public class CheckoutSessionResponse {
         private String productImage;
         private Integer quantity;
         private BigDecimal unitPrice;
-        //private BigDecimal discountAmount;
         private BigDecimal subtotal;
         private BigDecimal tax;
         private BigDecimal total;
@@ -88,6 +87,7 @@ public class CheckoutSessionResponse {
         private String shopLogo;
         private Boolean availableForCheckout;
         private Integer availableQuantity;
+        private List<UUID> createdOrderIds;
     }
 
     @Data
@@ -97,7 +97,6 @@ public class CheckoutSessionResponse {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class PricingSummaryResponse {
         private BigDecimal subtotal;
-        private BigDecimal discount;
         private BigDecimal shippingCost;
         private BigDecimal tax;
         private BigDecimal total;
