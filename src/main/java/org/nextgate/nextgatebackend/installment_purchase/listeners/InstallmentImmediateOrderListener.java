@@ -2,6 +2,9 @@ package org.nextgate.nextgatebackend.installment_purchase.listeners;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.nextgate.nextgatebackend.checkout_session.entity.CheckoutSessionEntity;
+import org.nextgate.nextgatebackend.checkout_session.enums.CheckoutSessionStatus;
+import org.nextgate.nextgatebackend.checkout_session.repo.CheckoutSessionRepo;
 import org.nextgate.nextgatebackend.installment_purchase.entity.InstallmentAgreementEntity;
 import org.nextgate.nextgatebackend.installment_purchase.events.InstallmentAgreementCreatedEvent;
 import org.nextgate.nextgatebackend.installment_purchase.repo.InstallmentAgreementRepo;
@@ -11,6 +14,8 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.List;
 import java.util.UUID;
@@ -26,35 +31,29 @@ public class InstallmentImmediateOrderListener {
 
     private final OrderService orderService;
     private final InstallmentAgreementRepo agreementRepo;
+    private final CheckoutSessionRepo checkoutSessionRepo;
 
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT) // ← CHANGE THIS
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onAgreementCreated(InstallmentAgreementCreatedEvent event) {
 
         log.info("╔════════════════════════════════════════════════════════════╗");
         log.info("║   HANDLING INSTALLMENT AGREEMENT CREATED (ASYNC)           ║");
+        log.info("║   Phase: AFTER_COMMIT                                      ║"); // ← ADD THIS
         log.info("╚════════════════════════════════════════════════════════════╝");
         log.info("Agreement ID: {}", event.getAgreementId());
-        log.info("Agreement Number: {}", event.getAgreement().getAgreementNumber());
-        log.info("Requires Immediate Order: {}", event.isRequiresImmediateOrder());
 
         try {
-            // ========================================
-            // CHECK IF ORDER SHOULD BE CREATED
-            // ========================================
-
+            // Check if order should be created
             if (!event.isRequiresImmediateOrder()) {
                 log.info("AFTER_PAYMENT fulfillment - no order needed now");
                 return;
             }
 
-            log.info("IMMEDIATE fulfillment - creating order asynchronously...");
-
             // ========================================
-            // CHECK IF ORDER ALREADY EXISTS
+            // IDEMPOTENCY CHECK
             // ========================================
-
             InstallmentAgreementEntity agreement = agreementRepo
                     .findById(event.getAgreementId())
                     .orElse(null);
@@ -69,10 +68,24 @@ public class InstallmentImmediateOrderListener {
                 return;
             }
 
+            // Check checkout session
+            CheckoutSessionEntity session = checkoutSessionRepo
+                    .findById(event.getCheckoutSessionId())
+                    .orElse(null);
+
+            if (session != null &&
+                    session.getCreatedOrderIds() != null &&
+                    !session.getCreatedOrderIds().isEmpty()) {
+                log.info("Order already created for session: {}",
+                        session.getCreatedOrderIds());
+                return;
+            }
+
+            log.info("IMMEDIATE fulfillment - creating order asynchronously...");
+
             // ========================================
             // CREATE ORDER WITH RETRY
             // ========================================
-
             boolean orderCreated = createOrderWithRetry(
                     event.getCheckoutSessionId(),
                     event.getAgreementId(),
@@ -81,25 +94,11 @@ public class InstallmentImmediateOrderListener {
 
             if (orderCreated) {
                 log.info("✓ Order created successfully for IMMEDIATE fulfillment");
-
-                InstallmentAgreementEntity updatedAgreement = agreementRepo
-                        .findById(event.getAgreementId())
-                        .orElse(null);
-
-                if (updatedAgreement != null && updatedAgreement.getOrderId() != null) {
-                    log.info("✓ Agreement updated with order ID: {}",
-                            updatedAgreement.getOrderId());
-                }
-
             } else {
                 log.error("✗ Failed to create order after retries");
                 log.error("⚠️ MANUAL INTERVENTION REQUIRED");
                 log.error("  Agreement: {}", agreement.getAgreementNumber());
             }
-
-            log.info("╔════════════════════════════════════════════════════════════╗");
-            log.info("║   ORDER CREATION COMPLETE                                  ║");
-            log.info("╚════════════════════════════════════════════════════════════╝");
 
         } catch (Exception e) {
             log.error("╔════════════════════════════════════════════════════════════╗");
@@ -109,11 +108,11 @@ public class InstallmentImmediateOrderListener {
         }
     }
 
+
     private boolean createOrderWithRetry(
             UUID checkoutSessionId,
             UUID agreementId,
-            int maxAttempts
-    ) {
+            int maxAttempts) {
 
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
@@ -122,9 +121,10 @@ public class InstallmentImmediateOrderListener {
                 List<UUID> orderIds = orderService
                         .createOrdersFromCheckoutSession(checkoutSessionId);
 
-                UUID orderId = orderIds.get(0);
+                UUID orderId = orderIds.getFirst();
                 log.info("✓ Order created: {}", orderId);
 
+                // Update agreement
                 InstallmentAgreementEntity agreement = agreementRepo
                         .findById(agreementId)
                         .orElse(null);
@@ -135,6 +135,20 @@ public class InstallmentImmediateOrderListener {
                     log.info("✓ Agreement linked to order");
                 }
 
+                // ========================================
+                // UPDATE CHECKOUT SESSION ← ADD THIS
+                // ========================================
+                CheckoutSessionEntity session = checkoutSessionRepo
+                        .findById(checkoutSessionId)
+                        .orElse(null);
+
+                if (session != null) {
+                    session.addCreatedOrderId(orderId);
+                    session.setStatus(CheckoutSessionStatus.COMPLETED);
+                    checkoutSessionRepo.save(session);
+                    log.info("✓ Checkout session updated with order ID");
+                }
+
                 return true;
 
             } catch (Exception e) {
@@ -143,7 +157,6 @@ public class InstallmentImmediateOrderListener {
 
                 if (attempt < maxAttempts) {
                     long waitTime = (long) Math.pow(2, attempt) * 1000;
-
                     try {
                         Thread.sleep(waitTime);
                     } catch (InterruptedException ie) {

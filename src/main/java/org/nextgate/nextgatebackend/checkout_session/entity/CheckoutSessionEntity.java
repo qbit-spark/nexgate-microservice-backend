@@ -107,7 +107,7 @@ public class CheckoutSessionEntity {
 
     @Column(name = "created_order_ids", columnDefinition = "jsonb")
     @Convert(converter = OrderIdsJsonConverter.class)
-    private List<UUID> createdOrderIds;
+    private List<UUID> createdOrderIds = new ArrayList<>();
 
     private UUID groupIdToBeJoined; // For GROUP_PURCHASE type
 

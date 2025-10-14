@@ -1286,7 +1286,7 @@ public class OrderServiceImpl implements OrderService {
         // ========================================
         // 4. LINK TO AGREEMENT
         // ========================================
-        OrderItemEntity firstItem = order.getItems().get(0);
+        OrderItemEntity firstItem = order.getItems().getFirst();
         firstItem.setInstallmentAgreementId(agreement.getAgreementId());
         firstItem.setFulfillmentTiming(agreement.getFulfillmentTiming());
 
@@ -1424,7 +1424,7 @@ public class OrderServiceImpl implements OrderService {
     private OrderEntity buildOrderFromCheckoutSession(CheckoutSessionEntity session, OrderSource orderSource) throws ItemNotFoundException {
 
         // Get shop from first item
-        CheckoutSessionEntity.CheckoutItem firstItem = session.getItems().get(0);
+        CheckoutSessionEntity.CheckoutItem firstItem = session.getItems().getFirst();
         ShopEntity shop = shopRepo.findById(firstItem.getShopId())
                 .orElseThrow(() -> new ItemNotFoundException("Shop not found"));
 

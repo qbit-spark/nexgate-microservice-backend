@@ -6,6 +6,8 @@ import org.apache.coyote.BadRequestException;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.authentication_service.repo.AccountRepo;
 import org.nextgate.nextgatebackend.checkout_session.entity.CheckoutSessionEntity;
+import org.nextgate.nextgatebackend.checkout_session.enums.CheckoutSessionStatus;
+import org.nextgate.nextgatebackend.checkout_session.repo.CheckoutSessionRepo;
 import org.nextgate.nextgatebackend.financial_system.ledger.entity.LedgerAccountEntity;
 import org.nextgate.nextgatebackend.financial_system.ledger.entity.LedgerEntryEntity;
 import org.nextgate.nextgatebackend.financial_system.ledger.enums.LedgerEntryType;
@@ -63,6 +65,9 @@ public class InstallmentServiceImpl implements InstallmentService {
     private final LedgerService ledgerService;
     private final TransactionHistoryService transactionHistoryService;
     private final ApplicationEventPublisher eventPublisher;
+    private final CheckoutSessionRepo checkoutSessionRepo;
+
+
     // private final OrderService orderService;
 
     // ========================================
@@ -242,6 +247,15 @@ public class InstallmentServiceImpl implements InstallmentService {
         paymentRepo.saveAll(payments);
 
         log.info("✓ Agreement {} is now ACTIVE", savedAgreement.getAgreementNumber());
+
+        // ========================================
+        // ✅ UPDATE CHECKOUT SESSION STATUS ← ADD THIS
+        // ========================================
+        checkoutSession.setStatus(CheckoutSessionStatus.PAYMENT_COMPLETED);
+        checkoutSession.setCompletedAt(LocalDateTime.now());
+        checkoutSessionRepo.save(checkoutSession);
+
+        log.info("✓ Checkout session status updated to PAYMENT_COMPLETED");
 
         // ========================================
         // 10. PUBLISH EVENT FOR ASYNC ORDER CREATION
