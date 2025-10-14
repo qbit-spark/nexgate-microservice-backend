@@ -255,21 +255,6 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
     }
 
 
-    // ========================================
-    // HELPER METHOD: FETCH ORDER NUMBER
-    // ========================================
-
-    private String fetchOrderNumber(UUID orderId) {
-        try {
-            return orderRepo.findById(orderId)
-                    .map(OrderEntity::getOrderNumber)
-                    .orElse("ORD-" + orderId.toString().substring(0, 8));
-        } catch (Exception e) {
-            log.warn("Failed to fetch order number: {}", e.getMessage());
-            return "ORD-" + orderId.toString().substring(0, 8);
-        }
-    }
-
     // Handles pending payment (for external payments)
     private PaymentResponse handlePendingPayment(
             CheckoutSessionEntity checkoutSession,

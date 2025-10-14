@@ -53,13 +53,28 @@ public class PaymentCompletedOrderCreationListener {
         try {
             CheckoutSessionEntity session = event.getSession();
 
+            // ========================================
+            // ✅ SKIP INSTALLMENT - HANDLED IN CALLBACK
+            // ========================================
+            if (session.getSessionType() == CheckoutSessionType.INSTALLMENT) {
+                log.info("╔════════════════════════════════════════════════════════╗");
+                log.info("║   INSTALLMENT TYPE - SKIPPING ORDER CREATION          ║");
+                log.info("╚════════════════════════════════════════════════════════╝");
+                log.info("ℹ️  Order creation handled by InstallmentService");
+                log.info("   → Agreement created in PaymentCallback");
+                log.info("   → Order created based on fulfillment timing");
+                log.info("   → IMMEDIATE: Order already created");
+                log.info("   → AFTER_PAYMENT: Order created after final payment");
+                return; // ← EXIT EARLY!
+            }
+
             // CHECK IF ORDER ALREADY EXISTS
-            if (session.getCreatedOrderIds() != null && !session.getCreatedOrderIds().isEmpty()) {
+            if (session.getCreatedOrderIds() != null &&
+                    !session.getCreatedOrderIds().isEmpty()) {
                 log.warn("Orders already exist: {}", session.getCreatedOrderIds());
                 log.warn("Skipping order creation");
                 return;
             }
-
 
             // DETERMINE IF ORDER SHOULD BE CREATED NOW
             boolean shouldCreateOrder = shouldCreateOrderNow(session);
@@ -69,10 +84,10 @@ public class PaymentCompletedOrderCreationListener {
                         session.getSessionType());
 
                 // ========================================
-                // ✅ FOR GROUP_PURCHASE: CHECK COMPLETION AFTER TRANSACTION
+                // FOR GROUP_PURCHASE: CHECK COMPLETION
                 // ========================================
                 if (session.getSessionType() == CheckoutSessionType.GROUP_PURCHASE) {
-                    log.info("  → Group reaches full capacity");
+                    log.info("  → Group purchase - checking completion");
 
                     UUID groupInstanceId = session.getGroupIdToBeJoined();
 
@@ -80,22 +95,16 @@ public class PaymentCompletedOrderCreationListener {
                         log.info("Checking if group is complete: {}", groupInstanceId);
 
                         try {
-                            // Check completion AFTER transaction committed
                             groupPurchaseService.checkAndPublishGroupCompletion(groupInstanceId);
-
                         } catch (Exception e) {
                             log.error("Error checking group completion", e);
                         }
-
                     } else {
-                        log.warn("⚠️  No group instance ID found - cannot check completion");
+                        log.warn("⚠️  No group instance ID found");
                     }
-
-                } else if (session.getSessionType() == CheckoutSessionType.INSTALLMENT) {
-                    log.info("  → All installment payments completed");
                 }
 
-                return;
+                return; // ← EXIT for deferred orders
             }
 
             log.info("Order should be created now - proceeding...");
@@ -122,7 +131,6 @@ public class PaymentCompletedOrderCreationListener {
                         log.info("✓ Session status updated to COMPLETED");
                     }
 
-                    // ✅ NEW: Log all created order IDs
                     log.info("✓ Order IDs: {}", updatedSession.getCreatedOrderIds());
                 }
 
@@ -145,7 +153,6 @@ public class PaymentCompletedOrderCreationListener {
     // ========================================
     // HELPER: DETERMINE IF ORDER SHOULD BE CREATED NOW
     // ========================================
-
     private boolean shouldCreateOrderNow(CheckoutSessionEntity session) {
 
         return switch (session.getSessionType()) {
@@ -155,25 +162,14 @@ public class PaymentCompletedOrderCreationListener {
                 yield true;
             }
 
-            case INSTALLMENT -> {
-                CheckoutSessionEntity.InstallmentConfiguration config =
-                        session.getInstallmentConfig();
-
-                if (config == null) {
-                    log.warn("Installment session missing config");
-                    yield false;
-                }
-
-                boolean isImmediate = "IMMEDIATE".equals(config.getFulfillmentTiming());
-
-                log.debug("Installment - fulfillment: {} - create order: {}",
-                        config.getFulfillmentTiming(), isImmediate);
-
-                yield isImmediate;
-            }
-
             case GROUP_PURCHASE -> {
                 log.debug("Group purchase - defer order creation until group completes");
+                yield false;
+            }
+
+            // ❌ THIS SHOULD NEVER BE REACHED (handled above)
+            case INSTALLMENT -> {
+                log.warn("⚠️ INSTALLMENT in shouldCreateOrderNow - this shouldn't happen!");
                 yield false;
             }
         };
