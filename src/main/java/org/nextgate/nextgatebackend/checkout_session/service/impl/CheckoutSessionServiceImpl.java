@@ -598,21 +598,6 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         throw new ItemNotFoundException("User not authenticated");
     }
 
-    private boolean validateSystemRolesOrOwner(List<String> customRoles, AccountEntity account, CheckoutSessionEntity checkoutSession) {
-        boolean hasCustomRole = account.getRoles().stream()
-                .anyMatch(role -> customRoles.contains(role.getRoleName()));
-
-        boolean isOwner = checkoutSession.getCustomer().getAccountId().equals(account.getAccountId());
-
-        return hasCustomRole || isOwner;
-    }
-
-    private boolean validateSystemRolesOrOwner(List<String> customRoles, AccountEntity account) {
-
-        return account.getRoles().stream()
-                .anyMatch(role -> customRoles.contains(role.getRoleName()));
-    }
-
 
     // ========================================
     // REGULAR_DIRECTLY CHECKOUT HANDLER
