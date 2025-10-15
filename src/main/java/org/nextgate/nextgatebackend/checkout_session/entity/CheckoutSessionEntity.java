@@ -107,7 +107,8 @@ public class CheckoutSessionEntity {
 
     @Column(name = "created_order_ids", columnDefinition = "jsonb")
     @Convert(converter = OrderIdsJsonConverter.class)
-    private List<UUID> createdOrderIds = new ArrayList<>();
+    private List<UUID> createdOrderIds = new ArrayList<>(); // ✅ Mutable
+
 
     private UUID groupIdToBeJoined; // For GROUP_PURCHASE type
 
@@ -175,8 +176,17 @@ public class CheckoutSessionEntity {
     }
 
     public void setCreatedOrderIds(List<UUID> orderIds) {
-        this.createdOrderIds = (orderIds != null) ? orderIds : new ArrayList<>();
+        this.createdOrderIds = (orderIds != null) ? new ArrayList<>(orderIds) : new ArrayList<>();
     }
+
+    public List<UUID> getCreatedOrderIds() {
+        if (this.createdOrderIds == null) {
+            this.createdOrderIds = new ArrayList<>();
+        }
+        return this.createdOrderIds;
+    }
+
+
 
     // ========================================
     // NESTED CLASSES FOR JSON STORAGE
