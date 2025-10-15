@@ -132,6 +132,8 @@ public class OrderServiceImpl implements OrderService {
     public OrderEntity getOrderById(UUID orderId, AccountEntity requester)
             throws ItemNotFoundException, BadRequestException {
 
+        //Todo: Check if requester is admin or staff or owner, allow access to order by id if so.
+
         log.info("Fetching order by ID: {} for user: {}",
                 orderId, requester.getUserName());
 
