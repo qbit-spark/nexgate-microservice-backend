@@ -15,7 +15,6 @@ import java.util.UUID;
 @Converter
 @Slf4j
 public class OrderIdsJsonConverter implements AttributeConverter<List<UUID>, String> {
-
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
@@ -37,7 +36,8 @@ public class OrderIdsJsonConverter implements AttributeConverter<List<UUID>, Str
             return new ArrayList<>();
         }
         try {
-            return objectMapper.readValue(dbData, new TypeReference<List<UUID>>() {});
+            // Explicitly return ArrayList to ensure mutability
+            return new ArrayList<>(objectMapper.readValue(dbData, new TypeReference<List<UUID>>() {}));
         } catch (JsonProcessingException e) {
             log.error("Error converting JSON to order IDs", e);
             return new ArrayList<>();

@@ -132,6 +132,8 @@ public class OrderServiceImpl implements OrderService {
     public OrderEntity getOrderById(UUID orderId, AccountEntity requester)
             throws ItemNotFoundException, BadRequestException {
 
+        //Todo: Check if requester is admin or staff or owner, allow access to order by id if so.
+
         log.info("Fetching order by ID: {} for user: {}",
                 orderId, requester.getUserName());
 
@@ -1286,7 +1288,7 @@ public class OrderServiceImpl implements OrderService {
         // ========================================
         // 4. LINK TO AGREEMENT
         // ========================================
-        OrderItemEntity firstItem = order.getItems().get(0);
+        OrderItemEntity firstItem = order.getItems().getFirst();
         firstItem.setInstallmentAgreementId(agreement.getAgreementId());
         firstItem.setFulfillmentTiming(agreement.getFulfillmentTiming());
 
@@ -1424,7 +1426,7 @@ public class OrderServiceImpl implements OrderService {
     private OrderEntity buildOrderFromCheckoutSession(CheckoutSessionEntity session, OrderSource orderSource) throws ItemNotFoundException {
 
         // Get shop from first item
-        CheckoutSessionEntity.CheckoutItem firstItem = session.getItems().get(0);
+        CheckoutSessionEntity.CheckoutItem firstItem = session.getItems().getFirst();
         ShopEntity shop = shopRepo.findById(firstItem.getShopId())
                 .orElseThrow(() -> new ItemNotFoundException("Shop not found"));
 

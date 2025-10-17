@@ -1,6 +1,8 @@
 package org.nextgate.nextgatebackend.globesecurity.configuration;
+
 import lombok.RequiredArgsConstructor;
 import org.nextgate.nextgatebackend.globesecurity.JWTAuthFilter;
+import org.nextgate.nextgatebackend.globesecurity.ServiceAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
@@ -24,10 +26,11 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
 @EnableMethodSecurity
 public class SecurityConfiguration {
 
-    //Bro, dont touch here....
     @Autowired
     @Qualifier("handlerExceptionResolver")
     private HandlerExceptionResolver exceptionResolver;
+
+    private final ServiceAuthenticationFilter serviceAuthenticationFilter;
 
     @Bean
     public JWTAuthFilter jwtAuthenticationFilter() {
@@ -51,7 +54,10 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/**").permitAll()
 
-                        // All public endpoints
+                        // Service endpoint - validated by ServiceAuthenticationFilter
+                        .requestMatchers(HttpMethod.POST, "/api/v1/notifications/in-app").permitAll()
+
+                        // Public endpoints
                         .requestMatchers(HttpMethod.GET,"/api/v1/shops/categories/all").permitAll()
                         .requestMatchers(HttpMethod.GET,"/api/v1/shops/categories/all-paged").permitAll()
                         .requestMatchers(HttpMethod.GET,"/api/v1/shops/all-paged").permitAll()
@@ -63,7 +69,6 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.GET,"/api/v1/shops/category/{categoryId}/paged").permitAll()
                         .requestMatchers(HttpMethod.GET,"/api/v1/shops/category/{categoryId}").permitAll()
                         .requestMatchers(HttpMethod.GET,"/api/v1/shops/reviews/{shopId}/active-reviews-by-shop").permitAll()
-
                         .requestMatchers(HttpMethod.GET,"/api/v1/products/categories/all").permitAll()
                         .requestMatchers(HttpMethod.GET,"/api/v1/products/categories/all-paged").permitAll()
                         .requestMatchers(HttpMethod.GET,"/api/v1/products/categories/parent-categories").permitAll()
@@ -81,6 +86,8 @@ public class SecurityConfiguration {
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
+        // Add filters: ServiceAuth BEFORE JWT
+        httpSecurity.addFilterBefore(serviceAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         httpSecurity.addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return httpSecurity.build();

@@ -6,6 +6,8 @@ import org.nextgate.nextgatebackend.installment_purchase.events.InstallmentAgree
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
  * Listens for InstallmentAgreementCompletedEvent and sends notifications.
@@ -17,7 +19,7 @@ public class InstallmentNotificationListener {
 
     // private final NotificationService notificationService;
 
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT) // ← ADD THIS
     @Async
     public void onAgreementCompleted(InstallmentAgreementCompletedEvent event) {
 
