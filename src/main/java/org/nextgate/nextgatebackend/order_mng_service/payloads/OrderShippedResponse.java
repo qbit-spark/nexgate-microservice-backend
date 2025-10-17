@@ -17,13 +17,12 @@ public class OrderShippedResponse {
     private UUID orderId;
     private String orderNumber;
     private String trackingNumber;
-    private String carrier;
+    //private String carrier;
     private LocalDateTime shippedAt;
     private String message;
 
     // Confirmation code info (DO NOT include actual code!)
     private Boolean confirmationCodeSent;
-    private String confirmationCodeDestination; // "email" or "sms" or "both"
     private LocalDateTime codeExpiresAt;
     private Integer maxVerificationAttempts;
 }
