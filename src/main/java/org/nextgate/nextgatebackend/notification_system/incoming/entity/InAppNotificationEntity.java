@@ -1,4 +1,4 @@
-package org.nextgate.nextgatebackend.notification_system.inapp.entity;
+package org.nextgate.nextgatebackend.notification_system.incoming.entity;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;

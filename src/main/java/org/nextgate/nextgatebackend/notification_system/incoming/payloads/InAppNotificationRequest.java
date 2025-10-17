@@ -1,4 +1,4 @@
-package org.nextgate.nextgatebackend.notification_system.inapp.payloads;
+package org.nextgate.nextgatebackend.notification_system.incoming.payloads;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotBlank;

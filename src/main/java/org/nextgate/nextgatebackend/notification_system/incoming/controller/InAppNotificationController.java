@@ -1,11 +1,11 @@
-package org.nextgate.nextgatebackend.notification_system.inapp.controller;
+package org.nextgate.nextgatebackend.notification_system.incoming.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.nextgate.nextgatebackend.globeresponsebody.GlobeSuccessResponseBuilder;
-import org.nextgate.nextgatebackend.notification_system.inapp.payloads.InAppNotificationRequest;
-import org.nextgate.nextgatebackend.notification_system.inapp.service.InAppNotificationService;
+import org.nextgate.nextgatebackend.notification_system.incoming.payloads.InAppNotificationRequest;
+import org.nextgate.nextgatebackend.notification_system.incoming.service.InAppNotificationService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;

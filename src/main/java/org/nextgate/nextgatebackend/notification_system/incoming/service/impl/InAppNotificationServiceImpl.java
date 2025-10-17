@@ -1,11 +1,11 @@
-package org.nextgate.nextgatebackend.notification_system.inapp.service.impl;
+package org.nextgate.nextgatebackend.notification_system.incoming.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.nextgate.nextgatebackend.notification_system.inapp.entity.InAppNotificationEntity;
-import org.nextgate.nextgatebackend.notification_system.inapp.payloads.InAppNotificationRequest;
-import org.nextgate.nextgatebackend.notification_system.inapp.repo.InAppNotificationRepository;
-import org.nextgate.nextgatebackend.notification_system.inapp.service.InAppNotificationService;
+import org.nextgate.nextgatebackend.notification_system.incoming.entity.InAppNotificationEntity;
+import org.nextgate.nextgatebackend.notification_system.incoming.payloads.InAppNotificationRequest;
+import org.nextgate.nextgatebackend.notification_system.incoming.repo.InAppNotificationRepository;
+import org.nextgate.nextgatebackend.notification_system.incoming.service.InAppNotificationService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
