@@ -16,6 +16,13 @@ import org.nextgate.nextgatebackend.group_purchase_mng.repo.GroupPurchaseInstanc
 import org.nextgate.nextgatebackend.installment_purchase.entity.InstallmentAgreementEntity;
 import org.nextgate.nextgatebackend.installment_purchase.enums.FulfillmentTiming;
 import org.nextgate.nextgatebackend.installment_purchase.repo.InstallmentAgreementRepo;
+import org.nextgate.nextgatebackend.notification_system.publisher.NotificationPublisher;
+import org.nextgate.nextgatebackend.notification_system.publisher.dto.NotificationEvent;
+import org.nextgate.nextgatebackend.notification_system.publisher.dto.Recipient;
+import org.nextgate.nextgatebackend.notification_system.publisher.enums.NotificationChannel;
+import org.nextgate.nextgatebackend.notification_system.publisher.enums.NotificationPriority;
+import org.nextgate.nextgatebackend.notification_system.publisher.enums.NotificationType;
+import org.nextgate.nextgatebackend.notification_system.publisher.mapper.OrderNotificationMapper;
 import org.nextgate.nextgatebackend.order_mng_service.entity.OrderEntity;
 import org.nextgate.nextgatebackend.order_mng_service.entity.OrderItemEntity;
 import org.nextgate.nextgatebackend.order_mng_service.enums.DeliveryStatus;
@@ -53,6 +60,7 @@ public class OrderServiceImpl implements OrderService {
     private final ShopRepo shopRepo;
     private final DeliveryConfirmationService deliveryConfirmationService;
     private final EscrowService escrowService;
+    private final NotificationPublisher notificationPublisher;
 
     // ========================================
     // UNIVERSAL ORDER CREATION
@@ -458,6 +466,9 @@ public class OrderServiceImpl implements OrderService {
         session.setCompletedAt(LocalDateTime.now());
         checkoutSessionRepo.save(session);
 
+        sendOrderConfirmationToBuyer(savedOrder);
+        sendNewOrderNotificationToSeller(savedOrder);
+
         log.info("✓ Checkout session completed");
 
         return List.of(savedOrder.getOrderId());
@@ -534,6 +545,9 @@ public class OrderServiceImpl implements OrderService {
 
             log.info("✓ Order created: {}", savedOrder.getOrderNumber());
             log.info("  Total: {} {}", savedOrder.getTotalAmount(), savedOrder.getCurrency());
+
+            sendOrderConfirmationToBuyer(savedOrder);
+            sendNewOrderNotificationToSeller(savedOrder);
 
             orderNumber++;
         }
@@ -644,6 +658,9 @@ public class OrderServiceImpl implements OrderService {
         log.info("✓ Installment order created: {}", savedOrder.getOrderNumber());
         log.info("  Order ID: {}", savedOrder.getOrderId());
 
+        sendOrderConfirmationToBuyer(savedOrder);
+        sendNewOrderNotificationToSeller(savedOrder);
+
         return List.of(savedOrder.getOrderId());
     }
 
@@ -732,6 +749,9 @@ public class OrderServiceImpl implements OrderService {
         log.info("✓ Group order created: {}", savedOrder.getOrderNumber());
         log.info("  Order ID: {}", savedOrder.getOrderId());
         log.info("  Customer: {}", session.getCustomer().getUserName());
+
+        sendOrderConfirmationToBuyer(savedOrder);
+        sendNewOrderNotificationToSeller(savedOrder);
 
         return List.of(savedOrder.getOrderId());
     }
@@ -1215,4 +1235,107 @@ public class OrderServiceImpl implements OrderService {
 
         return order;
     }
+
+    /**
+     * Send order confirmation to BUYER
+     * Called after order is created
+     */
+    private void sendOrderConfirmationToBuyer(OrderEntity order) {
+        try {
+            log.info("📧 Sending order confirmation to buyer: {}", order.getBuyer().getUserName());
+
+            // 1. Prepare notification data using mapper
+            Map<String, Object> data = OrderNotificationMapper.mapOrderConfirmationForBuyer(order);
+ 
+            // 2. Build recipient (BUYER)
+            Recipient recipient = Recipient.builder()
+                    .userId(order.getBuyer().getId().toString())
+                    .email(order.getBuyer().getEmail())
+                    .phone(order.getBuyer().getPhoneNumber())
+                    .name(order.getBuyer().getFirstName())
+                    .language("en")
+                    .build();
+
+            // 3. Create notification event
+            NotificationEvent event = NotificationEvent.builder()
+                    .type(NotificationType.ORDER_CONFIRMATION)
+                    .recipients(List.of(recipient))
+                    .channels(List.of(
+                            NotificationChannel.EMAIL,
+                            NotificationChannel.SMS,
+                            NotificationChannel.PUSH,
+                            NotificationChannel.IN_APP
+                    ))
+                    .priority(NotificationPriority.HIGH)
+                    .data(data)
+                    .build();
+
+            // 4. Publish notification
+            notificationPublisher.publish(event);
+
+            log.info("✅ Order confirmation sent to buyer: order={}, buyer={}",
+                    order.getOrderNumber(), order.getBuyer().getUserName());
+
+        } catch (Exception e) {
+            log.error("❌ Failed to send order confirmation to buyer: order={}, error={}",
+                    order.getOrderNumber(), e.getMessage(), e);
+            // Don't throw - order creation should not fail if notification fails
+        }
+    }
+
+    /**
+     * Send new order notification to SELLER
+     * Called after order is created
+     */
+    private void sendNewOrderNotificationToSeller(OrderEntity order) {
+        try {
+            log.info("📧 Sending new order notification to seller: {}", order.getSeller().getShopName());
+
+            // Get shop owner account
+            AccountEntity shopOwner = order.getSeller().getOwner();
+
+            if (shopOwner == null) {
+                log.warn("⚠️ Cannot send notification - shop has no owner: {}", order.getSeller().getShopId());
+                return;
+            }
+
+            // 1. Prepare notification data using mapper
+            Map<String, Object> data = OrderNotificationMapper.mapNewOrderForSeller(order);
+
+            // 2. Build recipient (SELLER/Shop Owner)
+            Recipient recipient = Recipient.builder()
+                    .userId(shopOwner.getId().toString())
+                    .email(shopOwner.getEmail())
+                    .phone(shopOwner.getPhoneNumber())
+                    .name(shopOwner.getFirstName())
+                    .language("en")
+                    .build();
+
+            // 3. Create notification event
+            NotificationEvent event = NotificationEvent.builder()
+                    .type(NotificationType.SHOP_NEW_ORDER)
+                    .recipients(List.of(recipient))
+                    .channels(List.of(
+                            NotificationChannel.EMAIL,
+                            NotificationChannel.SMS,
+                            NotificationChannel.PUSH,
+                            NotificationChannel.IN_APP
+                    ))
+                    .priority(NotificationPriority.HIGH)
+                    .data(data)
+                    .build();
+
+            // 4. Publish notification
+            notificationPublisher.publish(event);
+
+            log.info("✅ New order notification sent to seller: order={}, shop={}, seller={}",
+                    order.getOrderNumber(), order.getSeller().getShopName(), shopOwner.getUserName());
+
+        } catch (Exception e) {
+            log.error("❌ Failed to send new order notification to seller: order={}, error={}",
+                    order.getOrderNumber(), e.getMessage(), e);
+            // Don't throw - order creation should not fail if notification fails
+        }
+    }
+
 }
