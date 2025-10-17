@@ -18,6 +18,9 @@ import org.nextgate.nextgatebackend.order_mng_service.repo.DeliveryConfirmationR
 import org.nextgate.nextgatebackend.order_mng_service.service.DeliveryConfirmationService;
 import org.nextgate.nextgatebackend.order_mng_service.service.OrderService;
 import org.nextgate.nextgatebackend.order_mng_service.utils.OrderMapper;
+import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.entity.ShopEntity;
+import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.repo.ShopRepo;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -38,6 +41,7 @@ public class OrderController {
     private final AccountService accountService;
     private final OrderMapper orderMapper;
     private final AccountRepo accountRepo;
+    private final ShopRepo shopRepo;
 
     // ========================================
     // QUERY ENDPOINTS
@@ -274,6 +278,125 @@ public class OrderController {
     }
 
 
+    /**
+     * Get my orders with pagination
+     */
+    @GetMapping("/my-orders/paged")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getMyOrdersPaged(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) throws ItemNotFoundException {
+
+        AccountEntity customer = getAuthenticatedAccount();
+
+        Page<OrderEntity> orderPage = orderService.getMyOrdersPaged(customer, page, size);
+
+        return ResponseEntity.ok(orderMapper.toOrderPageResponse(orderPage));
+    }
+
+
+    /**
+     * Get my orders by status with pagination
+     */
+    @GetMapping("/my-orders/status/{status}/paged")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getMyOrdersByStatusPaged(
+            @PathVariable OrderStatus status,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) throws ItemNotFoundException {
+
+        AccountEntity customer = getAuthenticatedAccount();
+
+        Page<OrderEntity> orderPage = orderService.getMyOrdersByStatusPaged(
+                customer, status, page, size);
+
+        return ResponseEntity.ok(orderMapper.toOrderPageResponse(orderPage));
+    }
+
+    // ADD these endpoints to OrderController.java
+
+    /**
+     * Get shop orders with pagination (Shop Owner only)
+     */
+    @GetMapping("/shop/{shopId}/orders/paged")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getShopOrdersPaged(
+            @PathVariable UUID shopId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) throws ItemNotFoundException, BadRequestException {
+
+        AccountEntity authenticatedUser = getAuthenticatedAccount();
+
+        // Get shop and verify ownership
+        ShopEntity shop = validateShopOwnership(shopId, authenticatedUser);
+
+        Page<OrderEntity> orderPage = orderService.getShopOrdersPaged(shop, page, size);
+
+        return ResponseEntity.ok(orderMapper.toOrderPageResponse(orderPage));
+    }
+
+
+    /**
+     * Get shop orders by status with pagination (Shop Owner only)
+     */
+    @GetMapping("/shop/{shopId}/orders/status/{status}/paged")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getShopOrdersByStatusPaged(
+            @PathVariable UUID shopId,
+            @PathVariable OrderStatus status,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) throws ItemNotFoundException, BadRequestException {
+
+        AccountEntity authenticatedUser = getAuthenticatedAccount();
+
+        // Get shop and verify ownership
+        ShopEntity shop = validateShopOwnership(shopId, authenticatedUser);
+
+        Page<OrderEntity> orderPage = orderService.getShopOrdersByStatusPaged(
+                shop, status, page, size);
+
+        return ResponseEntity.ok(orderMapper.toOrderPageResponse(orderPage));
+    }
+
+
+    /**
+     * Get all non-paginated shop orders (Shop Owner only)
+     */
+    @GetMapping("/shop/{shopId}/orders")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getShopOrders(
+            @PathVariable UUID shopId
+    ) throws ItemNotFoundException, BadRequestException {
+
+        AccountEntity authenticatedUser = getAuthenticatedAccount();
+
+        // Get shop and verify ownership
+        ShopEntity shop = validateShopOwnership(shopId, authenticatedUser);
+
+        List<OrderEntity> orders = orderService.getShopOrders(shop);
+
+        return ResponseEntity.ok(orderMapper.toOrderResponseList(orders));
+    }
+
+
+    /**
+     * Get shop orders by status non-paginated (Shop Owner only)
+     */
+    @GetMapping("/shop/{shopId}/orders/status/{status}")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getShopOrdersByStatus(
+            @PathVariable UUID shopId,
+            @PathVariable OrderStatus status
+    ) throws ItemNotFoundException, BadRequestException {
+
+        AccountEntity authenticatedUser = getAuthenticatedAccount();
+
+        // Get shop and verify ownership
+        ShopEntity shop = validateShopOwnership(shopId, authenticatedUser);
+
+        List<OrderEntity> orders = orderService.getShopOrdersByStatus(shop, status);
+
+        return ResponseEntity.ok(orderMapper.toOrderResponseList(orders));
+    }
+
 
     // ========================================
     // HELPER METHODS
@@ -305,5 +428,39 @@ public class OrderController {
                     .orElseThrow(() -> new ItemNotFoundException("User not found"));
         }
         throw new ItemNotFoundException("User not authenticated");
+    }
+
+    private ShopEntity validateShopOwnership(UUID shopId, AccountEntity user)
+            throws ItemNotFoundException, BadRequestException {
+
+        log.info("Validating shop ownership for shop: {} by user: {}",
+                shopId, user.getUserName());
+
+        // Fetch shop
+        ShopEntity shop = shopRepo.findById(shopId)
+                .orElseThrow(() -> new ItemNotFoundException("Shop not found: " + shopId));
+
+        // Check if shop is deleted
+        if (shop.getIsDeleted() != null && shop.getIsDeleted()) {
+            throw new ItemNotFoundException("Shop not found: " + shopId);
+        }
+
+        // Verify ownership
+        if (shop.getOwner() == null) {
+            log.error("Shop has no owner: {}", shopId);
+            throw new BadRequestException("Shop has no owner assigned");
+        }
+
+        if (!shop.getOwner().getAccountId().equals(user.getAccountId())) {
+            log.warn("Access denied: User {} attempted to access shop {} owned by {}",
+                    user.getUserName(), shopId, shop.getOwner().getUserName());
+            throw new BadRequestException(
+                    "Access denied. You are not the owner of this shop");
+        }
+
+        log.info("✓ Shop ownership validated: {} is owner of {}",
+                user.getUserName(), shop.getShopName());
+
+        return shop;
     }
 }

@@ -26,6 +26,9 @@ import org.nextgate.nextgatebackend.products_mng_service.products.entity.Product
 import org.nextgate.nextgatebackend.products_mng_service.products.repo.ProductRepo;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.entity.ShopEntity;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.repo.ShopRepo;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -973,6 +976,99 @@ public class OrderServiceImpl implements OrderService {
         log.info("╔════════════════════════════════════════════════════════╗");
         log.info("║         ORDER CANCELLED SUCCESSFULLY                  ║");
         log.info("╚════════════════════════════════════════════════════════╝");
+    }
+
+
+
+
+    // ========================================
+// PAGINATED QUERY METHODS - CUSTOMER ORDERS
+// ========================================
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<OrderEntity> getMyOrdersPaged(
+            AccountEntity customer,
+            int page,
+            int size) {
+
+        // Default page to 1 if less than 1
+        if (page < 1) page = 1;
+        // Default size to 10 if invalid
+        if (size <= 0) size = 10;
+
+        log.info("Fetching orders for customer: {} (page {}, size {})",
+                customer.getUserName(), page, size);
+
+        // Spring Data uses 0-based index, so subtract 1
+        Pageable pageable = PageRequest.of(page - 1, size);
+
+        return orderRepo.findByBuyerOrderByOrderedAtDesc(customer, pageable);
+    }
+
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<OrderEntity> getMyOrdersByStatusPaged(
+            AccountEntity customer,
+            OrderStatus status,
+            int page,
+            int size) {
+
+        if (page < 1) page = 1;
+        if (size <= 0) size = 10;
+
+        log.info("Fetching orders for customer: {} with status: {} (page {}, size {})",
+                customer.getUserName(), status, page, size);
+
+        Pageable pageable = PageRequest.of(page - 1, size);
+
+        return orderRepo.findByBuyerAndOrderStatusOrderByOrderedAtDesc(
+                customer, status, pageable);
+    }
+
+
+// ========================================
+// PAGINATED QUERY METHODS - SHOP ORDERS
+// ========================================
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<OrderEntity> getShopOrdersPaged(
+            ShopEntity shop,
+            int page,
+            int size) {
+
+        if (page < 1) page = 1;
+        if (size <= 0) size = 10;
+
+        log.info("Fetching orders for shop: {} (page {}, size {})",
+                shop.getShopName(), page, size);
+
+        Pageable pageable = PageRequest.of(page - 1, size);
+
+        return orderRepo.findBySellerOrderByOrderedAtDesc(shop, pageable);
+    }
+
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<OrderEntity> getShopOrdersByStatusPaged(
+            ShopEntity shop,
+            OrderStatus status,
+            int page,
+            int size) {
+
+        if (page < 1) page = 1;
+        if (size <= 0) size = 10;
+
+        log.info("Fetching orders for shop: {} with status: {} (page {}, size {})",
+                shop.getShopName(), status, page, size);
+
+        Pageable pageable = PageRequest.of(page - 1, size);
+
+        return orderRepo.findBySellerAndOrderStatusOrderByOrderedAtDesc(
+                shop, status, pageable);
     }
 
 

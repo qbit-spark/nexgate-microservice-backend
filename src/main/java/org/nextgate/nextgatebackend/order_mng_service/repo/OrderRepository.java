@@ -4,6 +4,8 @@ import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.order_mng_service.entity.OrderEntity;
 import org.nextgate.nextgatebackend.order_mng_service.enums.OrderStatus;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.entity.ShopEntity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -41,4 +43,16 @@ public interface OrderRepository extends JpaRepository<OrderEntity, UUID> {
     long countBySellerAndOrderStatus(ShopEntity seller, OrderStatus status);
 
     Optional<OrderEntity> findByItems_InstallmentAgreementId(UUID installmentAgreementId);
+
+    // ADD these paginated methods to OrderRepository.java
+
+    Page<OrderEntity> findByBuyerOrderByOrderedAtDesc(AccountEntity buyer, Pageable pageable);
+
+    Page<OrderEntity> findByBuyerAndOrderStatusOrderByOrderedAtDesc(
+            AccountEntity buyer, OrderStatus status, Pageable pageable);
+
+    Page<OrderEntity> findBySellerOrderByOrderedAtDesc(ShopEntity seller, Pageable pageable);
+
+    Page<OrderEntity> findBySellerAndOrderStatusOrderByOrderedAtDesc(
+            ShopEntity seller, OrderStatus status, Pageable pageable);
 }
