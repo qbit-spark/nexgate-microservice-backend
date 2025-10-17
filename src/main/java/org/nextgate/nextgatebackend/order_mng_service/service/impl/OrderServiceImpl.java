@@ -173,9 +173,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<OrderEntity> getMyOrdersByStatus(
-            AccountEntity customer,
-            OrderStatus status) {
+    public List<OrderEntity> getMyOrdersByStatus(AccountEntity customer, OrderStatus status) {
 
 
         return orderRepo.findByBuyerAndOrderStatusOrderByOrderedAtDesc(
@@ -197,9 +195,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<OrderEntity> getShopOrdersByStatus(
-            ShopEntity shop,
-            OrderStatus status) {
+    public List<OrderEntity> getShopOrdersByStatus(ShopEntity shop, OrderStatus status) {
 
         return orderRepo.findBySellerAndOrderStatusOrderByOrderedAtDesc(
                 shop, status);
