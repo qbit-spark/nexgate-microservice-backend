@@ -6,6 +6,7 @@ import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException
 import org.nextgate.nextgatebackend.order_mng_service.entity.OrderEntity;
 import org.nextgate.nextgatebackend.order_mng_service.enums.OrderStatus;
 import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.entity.ShopEntity;
+import org.springframework.data.domain.Page;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -81,6 +82,35 @@ public interface OrderService {
             UUID orderId,
             AccountEntity seller
     ) throws ItemNotFoundException, BadRequestException;
+
+
+    /**
+     * Get customer orders with pagination.
+     */
+    Page<OrderEntity> getMyOrdersPaged(AccountEntity customer, int page, int size);
+
+    /**
+     * Get customer orders by status with pagination.
+     */
+    Page<OrderEntity> getMyOrdersByStatusPaged(
+            AccountEntity customer, OrderStatus status, int page, int size);
+
+// ========================================
+// PAGINATED QUERY METHODS - SHOP ORDERS
+// ========================================
+
+    /**
+     * Get shop orders with pagination.
+     */
+    Page<OrderEntity> getShopOrdersPaged(ShopEntity shop, int page, int size);
+
+    /**
+     * Get shop orders by status with pagination.
+     */
+    Page<OrderEntity> getShopOrdersByStatusPaged(
+            ShopEntity shop, OrderStatus status, int page, int size);
+
+
 
     /**
      * Mark order as delivered by seller.

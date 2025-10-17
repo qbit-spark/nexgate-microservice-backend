@@ -5,6 +5,7 @@ import org.nextgate.nextgatebackend.order_mng_service.entity.OrderEntity;
 import org.nextgate.nextgatebackend.order_mng_service.entity.OrderItemEntity;
 import org.nextgate.nextgatebackend.order_mng_service.payloads.OrderItemResponse;
 import org.nextgate.nextgatebackend.order_mng_service.payloads.OrderResponse;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -181,6 +182,33 @@ public class OrderMapper {
                 .subtotal(item.getSubtotal())
                 .tax(item.getTax())
                 .total(item.getTotal())
+                .build();
+    }
+
+
+    public GlobeSuccessResponseBuilder toOrderPageResponse(Page<OrderEntity> orderPage) {
+
+        List<OrderResponse> orderResponses = orderPage.getContent().stream()
+                .map(this::mapToOrderResponse)
+                .collect(Collectors.toList());
+
+        var responseData = new Object() {
+            public final List<OrderResponse> orders = orderResponses;
+            public final int currentPage = orderPage.getNumber() + 1; // Convert back to 1-based
+            public final int pageSize = orderPage.getSize();
+            public final long totalElements = orderPage.getTotalElements();
+            public final int totalPages = orderPage.getTotalPages();
+            public final boolean hasNext = orderPage.hasNext();
+            public final boolean hasPrevious = orderPage.hasPrevious();
+            public final boolean isFirst = orderPage.isFirst();
+            public final boolean isLast = orderPage.isLast();
+        };
+
+        return GlobeSuccessResponseBuilder.builder()
+                .message(orderResponses.isEmpty()
+                        ? "No orders found"
+                        : "Orders retrieved successfully")
+                .data(responseData)
                 .build();
     }
 }
