@@ -9,6 +9,7 @@ import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.authentication_service.repo.AccountRepo;
 import org.nextgate.nextgatebackend.authentication_service.service.AccountService;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
+import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
 import org.nextgate.nextgatebackend.globeresponsebody.GlobeSuccessResponseBuilder;
 import org.nextgate.nextgatebackend.order_mng_service.entity.DeliveryConfirmationEntity;
 import org.nextgate.nextgatebackend.order_mng_service.entity.OrderEntity;
@@ -43,13 +44,7 @@ public class OrderController {
     private final AccountRepo accountRepo;
     private final ShopRepo shopRepo;
 
-    // ========================================
-    // QUERY ENDPOINTS
-    // ========================================
 
-    /**
-     * Get order by ID
-     */
     @GetMapping("/{orderId}")
     public ResponseEntity<GlobeSuccessResponseBuilder> getOrderById(
             @PathVariable UUID orderId,
@@ -65,9 +60,7 @@ public class OrderController {
     }
 
 
-    /**
-     * Get order by order number
-     */
+
     @GetMapping("/number/{orderNumber}")
     public ResponseEntity<GlobeSuccessResponseBuilder> getOrderByNumber(
             @PathVariable String orderNumber,
@@ -83,9 +76,7 @@ public class OrderController {
     }
 
 
-    /**
-     * Get my orders (customer)
-     */
+
     @GetMapping("/my-orders")
     public ResponseEntity<GlobeSuccessResponseBuilder> getMyOrders()
             throws ItemNotFoundException {
@@ -125,31 +116,24 @@ public class OrderController {
 
         AccountEntity seller = getAuthenticatedAccount();
 
-        orderService.markOrderAsShipped(
-                orderId,
-                seller
-        );
+        orderService.markOrderAsShipped(orderId, seller);
 
         // Get active confirmation to include in response
-        DeliveryConfirmationEntity confirmation =
-                deliveryConfirmationService.getActiveConfirmation(orderId);
+        DeliveryConfirmationEntity confirmation = deliveryConfirmationService.getActiveConfirmation(orderId);
 
         OrderShippedResponse response = OrderShippedResponse.builder()
                 .orderId(orderId)
                 .orderNumber(confirmation.getOrder().getOrderNumber())
-                //.trackingNumber(confirmation.getTrackingNumber())
-                //.carrier(request.getCarrier())
                 .shippedAt(confirmation.getOrder().getShippedAt())
                 .message("Order marked as shipped. Confirmation code sent to customer.")
                 .confirmationCodeSent(true)
-                .confirmationCodeDestination("email")
                 .codeExpiresAt(confirmation.getExpiresAt())
                 .maxVerificationAttempts(confirmation.getMaxAttempts())
                 .build();
 
         return ResponseEntity.ok(
                 GlobeSuccessResponseBuilder.builder()
-                        .message("Order shipped successfully")
+                        .message("Order marked as shipped")
                         .data(response)
                         .build()
         );
@@ -169,7 +153,7 @@ public class OrderController {
             @Valid @RequestBody ConfirmDeliveryRequest request,
             Authentication authentication,
             HttpServletRequest httpRequest
-    ) throws ItemNotFoundException, BadRequestException {
+    ) throws ItemNotFoundException, BadRequestException, RandomExceptions {
 
 
         AccountEntity customer = getAuthenticatedAccount();
@@ -216,12 +200,14 @@ public class OrderController {
 
         AccountEntity customer = getAuthenticatedAccount();
 
-        String newCode = orderService.regenerateDeliveryConfirmationCode(orderId, customer);
+        // Service handles everything
+        orderService.regenerateDeliveryConfirmationCode(orderId, customer);
 
-        // Get new confirmation
+        // Get confirmation details for response
         DeliveryConfirmationEntity confirmation =
                 deliveryConfirmationService.getActiveConfirmation(orderId);
 
+        // Build response
         ConfirmationCodeRegeneratedResponse response =
                 ConfirmationCodeRegeneratedResponse.builder()
                         .orderId(orderId)
@@ -236,42 +222,6 @@ public class OrderController {
         return ResponseEntity.ok(
                 GlobeSuccessResponseBuilder.builder()
                         .message("Confirmation code regenerated successfully")
-                        .data(response)
-                        .build()
-        );
-    }
-
-
-    /**
-     * Cancel order
-     */
-    @PostMapping("/{orderId}/cancel")
-    public ResponseEntity<GlobeSuccessResponseBuilder> cancelOrder(
-            @PathVariable UUID orderId,
-            @Valid @RequestBody CancelOrderRequest request
-    ) throws ItemNotFoundException, BadRequestException {
-
-        AccountEntity actor = getAuthenticatedAccount();
-
-        orderService.cancelOrder(orderId, request.getReason(), actor);
-
-        // Get order to build response
-        OrderEntity order = orderService.getOrderById(orderId, actor);
-
-        OrderCancelledResponse response = OrderCancelledResponse.builder()
-                .orderId(orderId)
-                .orderNumber(order.getOrderNumber())
-                .cancelledAt(order.getCancelledAt())
-                .reason(request.getReason())
-                .refundProcessed(true) // TODO: Get actual status from refund service
-                .refundAmount(order.getAmountPaid())
-                .currency(order.getCurrency())
-                .message("Order cancelled successfully. Refund will be processed within 3-5 business days.")
-                .build();
-
-        return ResponseEntity.ok(
-                GlobeSuccessResponseBuilder.builder()
-                        .message("Order cancelled successfully")
                         .data(response)
                         .build()
         );
@@ -313,7 +263,6 @@ public class OrderController {
         return ResponseEntity.ok(orderMapper.toOrderPageResponse(orderPage));
     }
 
-    // ADD these endpoints to OrderController.java
 
     /**
      * Get shop orders with pagination (Shop Owner only)
