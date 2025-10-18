@@ -23,7 +23,7 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class EmailsHelperMethodsIMPL {
+public class EmailsHelperMethodsImpl {
 
     private final JavaMailSender mailSender;
     private final TemplateEngine templateEngine;
