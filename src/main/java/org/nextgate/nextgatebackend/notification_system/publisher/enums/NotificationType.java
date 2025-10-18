@@ -33,5 +33,9 @@ public enum NotificationType {
     WELCOME_EMAIL,
 
     // Promotional notifications
-    PROMOTIONAL_OFFER
+    PROMOTIONAL_OFFER,
+
+    GROUP_PURCHASE_CREATED,
+    GROUP_MEMBER_JOINED,
+    GROUP_SEATS_TRANSFERRED
 }

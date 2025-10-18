@@ -17,6 +17,13 @@ import org.nextgate.nextgatebackend.group_purchase_mng.repo.GroupParticipantRepo
 import org.nextgate.nextgatebackend.group_purchase_mng.repo.GroupPurchaseInstanceRepo;
 import org.nextgate.nextgatebackend.group_purchase_mng.service.GroupPurchaseService;
 import org.nextgate.nextgatebackend.group_purchase_mng.utils.GroupPurchaseValidator;
+import org.nextgate.nextgatebackend.notification_system.publisher.NotificationPublisher;
+import org.nextgate.nextgatebackend.notification_system.publisher.dto.NotificationEvent;
+import org.nextgate.nextgatebackend.notification_system.publisher.dto.Recipient;
+import org.nextgate.nextgatebackend.notification_system.publisher.enums.NotificationChannel;
+import org.nextgate.nextgatebackend.notification_system.publisher.enums.NotificationPriority;
+import org.nextgate.nextgatebackend.notification_system.publisher.enums.NotificationType;
+import org.nextgate.nextgatebackend.notification_system.publisher.mapper.GroupNotificationMapper;
 import org.nextgate.nextgatebackend.products_mng_service.products.entity.ProductEntity;
 import org.nextgate.nextgatebackend.products_mng_service.products.repo.ProductRepo;
 import org.springframework.context.ApplicationEventPublisher;
@@ -28,10 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -45,6 +49,7 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
     private final GroupPurchaseValidator validator;
     private final ApplicationEventPublisher eventPublisher;
     private final CheckoutSessionRepo checkoutSessionRepo;
+    private final NotificationPublisher notificationPublisher;
     
     @Override
     @Transactional
@@ -156,6 +161,8 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
                 isGroupFull,
                 savedGroup.getSeatsOccupied(),
                 savedGroup.getTotalSeats());
+
+        sendGroupCreatedNotification(savedGroup, customer, quantity);
 
         return savedGroup;  // Transaction commits here
     }
@@ -280,6 +287,7 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
             // Increment total participants count (only for new participants)
             group.setTotalParticipants(group.getTotalParticipants() + 1);
 
+
             log.info("New participant created for user: {} in group: {}",
                     customer.getAccountId(), checkoutSession.getGroupIdToBeJoined());
         }
@@ -305,6 +313,8 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
                 savedGroup.getSeatsOccupied(),
                 savedGroup.getTotalSeats());
 
+        sendMemberJoinedNotifications(savedGroup, customer, quantity);
+
         return savedGroup;  // Transaction commits here
     }
 
@@ -314,8 +324,7 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
     public GroupParticipantEntity transferToGroup(
             UUID sourceGroupId,
             UUID targetGroupId,
-            Integer quantity
-    ) throws ItemNotFoundException, BadRequestException {
+            Integer quantity) throws ItemNotFoundException, BadRequestException {
 
         log.info("Transferring {} seats from group {} to group {}",
                 quantity, sourceGroupId, targetGroupId);
@@ -516,6 +525,8 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
                 isGroupFull,
                 targetGroup.getSeatsOccupied(),
                 targetGroup.getTotalSeats());
+
+        sendSeatsTransferredNotification(sourceGroup, targetGroup, authenticatedUser, quantity);
 
         return targetParticipant;  // Transaction commits here
 
@@ -892,4 +903,240 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
         checkAndCompleteGroup(group);
     }
 
+
+    /**
+     * Send notification to shop owner when new group is created
+     */
+    private void sendGroupCreatedNotification(
+            GroupPurchaseInstanceEntity group,
+            AccountEntity creator,
+            Integer initialSeats) {
+
+        log.info("📧 Sending group creation notification to shop owner");
+
+        AccountEntity shopOwner = group.getShop().getOwner();
+
+        if (shopOwner == null) {
+            log.warn("⚠️ Cannot send notification - shop has no owner");
+            return;
+        }
+
+        // 1. Prepare notification data using mapper
+        Map<String, Object> data = GroupNotificationMapper.mapNewGroupCreated(
+                group, creator, initialSeats);
+
+        // 2. Build recipient (shop owner)
+        Recipient recipient = Recipient.builder()
+                .userId(shopOwner.getId().toString())
+                .email(shopOwner.getEmail())
+                .phone(shopOwner.getPhoneNumber())
+                .name(shopOwner.getFirstName())
+                .language("en")
+                .build();
+
+        // 3. Create notification event
+        NotificationEvent event = NotificationEvent.builder()
+                .type(NotificationType.GROUP_PURCHASE_CREATED)
+                .recipients(List.of(recipient))
+                .channels(List.of(
+                        NotificationChannel.EMAIL,
+                        NotificationChannel.SMS,
+                        NotificationChannel.IN_APP
+                ))
+                .priority(NotificationPriority.NORMAL)
+                .data(data)
+                .build();
+
+        // 4. Publish notification
+        notificationPublisher.publish(event);
+
+        log.info("✅ Group creation notification sent to shop owner: {}", shopOwner.getUserName());
+    }
+
+    /**
+     * Send notifications when member joins group
+     * Notifies: 1) Shop owner, 2) Existing group members
+     */
+    private void sendMemberJoinedNotifications(
+            GroupPurchaseInstanceEntity group,
+            AccountEntity newMember,
+            Integer quantity) {
+
+        log.info("📧 Sending member joined notifications for group: {}", group.getGroupCode());
+
+        // 1. Notify shop owner
+        sendMemberJoinedToShopOwner(group, newMember, quantity);
+
+        // 2. Notify existing members
+        sendMemberJoinedToExistingMembers(group, newMember, quantity);
+    }
+
+    /**
+     * Notify shop owner about new member
+     */
+    private void sendMemberJoinedToShopOwner(
+            GroupPurchaseInstanceEntity group,
+            AccountEntity newMember,
+            Integer quantity) {
+
+        try {
+            AccountEntity shopOwner = group.getShop().getOwner();
+
+            if (shopOwner == null) {
+                log.warn("⚠️ Cannot notify shop owner - shop has no owner");
+                return;
+            }
+
+            // Prepare data
+            Map<String, Object> data = GroupNotificationMapper.mapMemberJoinedForShopOwner(
+                    group, newMember, quantity);
+
+            // Build recipient
+            Recipient recipient = Recipient.builder()
+                    .userId(shopOwner.getId().toString())
+                    .email(shopOwner.getEmail())
+                    .phone(shopOwner.getPhoneNumber())
+                    .name(shopOwner.getFirstName())
+                    .language("en")
+                    .build();
+
+            // Create event
+            NotificationEvent event = NotificationEvent.builder()
+                    .type(NotificationType.GROUP_MEMBER_JOINED)
+                    .recipients(List.of(recipient))
+                    .channels(List.of(
+                            NotificationChannel.EMAIL,
+                            NotificationChannel.IN_APP
+                    ))
+                    .priority(NotificationPriority.NORMAL)
+                    .data(data)
+                    .build();
+
+            // Publish
+            notificationPublisher.publish(event);
+
+            log.info("✅ Shop owner notified about new member: {}", newMember.getUserName());
+
+        } catch (Exception e) {
+            log.error("Failed to notify shop owner about new member", e);
+        }
+    }
+
+    /**
+     * Notify existing members about new member joining
+     */
+    private void sendMemberJoinedToExistingMembers(
+            GroupPurchaseInstanceEntity group,
+            AccountEntity newMember,
+            Integer quantity) {
+
+            // Get all active participants except the new member
+            List<GroupParticipantEntity> existingParticipants =
+                    groupParticipantRepo.findByGroupInstanceOrderByJoinedAtAsc(group)
+                            .stream()
+                            .filter(p -> p.getStatus() == ParticipantStatus.ACTIVE)
+                            .filter(p -> !p.getUser().getAccountId().equals(newMember.getAccountId()))
+                            .toList();
+
+            if (existingParticipants.isEmpty()) {
+                log.info("No existing members to notify (first member in group)");
+                return;
+            }
+
+            log.info("Notifying {} existing members about new join", existingParticipants.size());
+
+            // Send notification to each existing member
+            for (GroupParticipantEntity participant : existingParticipants) {
+                try {
+                    sendMemberJoinedToExistingMember(group, participant.getUser(), newMember, quantity);
+                } catch (Exception e) {
+                    log.error("Failed to notify existing member: {}",
+                            participant.getUser().getUserName(), e);
+                }
+            }
+
+            log.info("✅ Existing members notified about new join");
+
+    }
+
+    /**
+     * Send notification to a single existing member
+     */
+    private void sendMemberJoinedToExistingMember(
+            GroupPurchaseInstanceEntity group,
+            AccountEntity existingMember,
+            AccountEntity newMember,
+            Integer quantity) {
+
+        // Prepare data
+        Map<String, Object> data = GroupNotificationMapper.mapMemberJoinedForExistingMembers(
+                group, existingMember, newMember, quantity);
+
+        // Build recipient
+        Recipient recipient = Recipient.builder()
+                .userId(existingMember.getId().toString())
+                .email(existingMember.getEmail())
+                .phone(existingMember.getPhoneNumber())
+                .name(existingMember.getFirstName())
+                .language("en")
+                .build();
+
+        // Create event
+        NotificationEvent event = NotificationEvent.builder()
+                .type(NotificationType.GROUP_MEMBER_JOINED)
+                .recipients(List.of(recipient))
+                .channels(List.of(
+                        NotificationChannel.PUSH,
+                        NotificationChannel.IN_APP
+                ))
+                .priority(NotificationPriority.LOW)
+                .data(data)
+                .build();
+
+        // Publish
+        notificationPublisher.publish(event);
+    }
+
+    /**
+     * Send notification when seats are transferred between groups
+     */
+    private void sendSeatsTransferredNotification(
+            GroupPurchaseInstanceEntity sourceGroup,
+            GroupPurchaseInstanceEntity targetGroup,
+            AccountEntity user,
+            Integer quantity) {
+
+        log.info("📧 Sending seats transferred notification to user: {}", user.getUserName());
+
+        // 1. Prepare notification data using mapper
+        Map<String, Object> data = GroupNotificationMapper.mapSeatsTransferred(
+                sourceGroup, targetGroup, user, quantity);
+
+        // 2. Build recipient (the user who transferred)
+        Recipient recipient = Recipient.builder()
+                .userId(user.getId().toString())
+                .email(user.getEmail())
+                .phone(user.getPhoneNumber())
+                .name(user.getFirstName())
+                .language("en")
+                .build();
+
+        // 3. Create notification event
+        NotificationEvent event = NotificationEvent.builder()
+                .type(NotificationType.GROUP_SEATS_TRANSFERRED)
+                .recipients(List.of(recipient))
+                .channels(List.of(
+                        NotificationChannel.EMAIL,
+                        NotificationChannel.PUSH,
+                        NotificationChannel.IN_APP
+                ))
+                .priority(NotificationPriority.NORMAL)
+                .data(data)
+                .build();
+
+        // 4. Publish notification
+        notificationPublisher.publish(event);
+
+        log.info("✅ Seats transferred notification sent to: {}", user.getUserName());
+    }
 }

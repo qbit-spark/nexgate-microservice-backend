@@ -45,11 +45,15 @@ public enum NotificationDomain {
 
     // Group Purchase domain
     GROUP_PURCHASE("notification.group_purchase",
-            NotificationType.GROUP_PURCHASE_COMPLETE),
+            NotificationType.GROUP_PURCHASE_COMPLETE,
+            NotificationType.GROUP_PURCHASE_CREATED,
+            NotificationType.GROUP_MEMBER_JOINED,
+            NotificationType.GROUP_SEATS_TRANSFERRED),
 
     // User domain
     USER("notification.user",
             NotificationType.WELCOME_EMAIL),
+
 
     // Promotional domain
     PROMOTIONAL("notification.promotional",
