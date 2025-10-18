@@ -9,26 +9,17 @@ import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException
 import org.nextgate.nextgatebackend.group_purchase_mng.enums.GroupStatus;
 import org.nextgate.nextgatebackend.products_mng_service.products.entity.ProductEntity;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
 public interface GroupPurchaseService {
 
     // Core Operations
-    GroupPurchaseInstanceEntity createGroupInstance(
-            CheckoutSessionEntity checkoutSession
-    ) throws ItemNotFoundException, BadRequestException;
+    void createGroupInstance(CheckoutSessionEntity checkoutSession) throws ItemNotFoundException, BadRequestException;
 
-    GroupPurchaseInstanceEntity joinGroup(
-            CheckoutSessionEntity checkoutSession
-    ) throws ItemNotFoundException, BadRequestException;
+    void joinGroup(CheckoutSessionEntity checkoutSession) throws ItemNotFoundException, BadRequestException;
 
-     GroupParticipantEntity transferToGroup(
-            UUID sourceGroupId,
-            UUID targetGroupId,
-            Integer quantity
-    ) throws ItemNotFoundException, BadRequestException;
+     GroupParticipantEntity transferToGroup(UUID sourceGroupId, UUID targetGroupId, Integer quantity) throws ItemNotFoundException, BadRequestException;
 
 
    // Query Operations - Groups
