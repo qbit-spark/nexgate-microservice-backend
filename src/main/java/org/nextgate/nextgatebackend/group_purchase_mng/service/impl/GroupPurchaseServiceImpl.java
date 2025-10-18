@@ -53,7 +53,7 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
     
     @Override
     @Transactional
-    public GroupPurchaseInstanceEntity createGroupInstance(
+    public void createGroupInstance(
             CheckoutSessionEntity checkoutSession) throws ItemNotFoundException, BadRequestException {
 
         log.info("Creating group instance from checkout session: {}",
@@ -164,12 +164,11 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
 
         sendGroupCreatedNotification(savedGroup, customer, quantity);
 
-        return savedGroup;  // Transaction commits here
     }
 
     @Override
     @Transactional
-    public GroupPurchaseInstanceEntity joinGroup(
+    public void joinGroup(
             CheckoutSessionEntity checkoutSession) throws ItemNotFoundException, BadRequestException {
 
         log.info("User joining group: {} from checkout session: {}",
@@ -315,7 +314,6 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
 
         sendMemberJoinedNotifications(savedGroup, customer, quantity);
 
-        return savedGroup;  // Transaction commits here
     }
 
 
