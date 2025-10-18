@@ -1028,13 +1028,25 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
             AccountEntity newMember,
             Integer quantity) {
 
+        try {
+            UUID newMemberId = newMember.getId(); // Get ID once
+
             // Get all active participants except the new member
             List<GroupParticipantEntity> existingParticipants =
                     groupParticipantRepo.findByGroupInstanceOrderByJoinedAtAsc(group)
                             .stream()
                             .filter(p -> p.getStatus() == ParticipantStatus.ACTIVE)
-                            .filter(p -> !p.getUser().getAccountId().equals(newMember.getAccountId()))
+                            .filter(p -> {
+                                UUID participantUserId = p.getUser().getId();
+                                boolean isNewMember = participantUserId.equals(newMemberId);
+                                if (isNewMember) {
+                                    log.debug("Excluding new member from notification: {}", p.getUser().getUserName());
+                                }
+                                return !isNewMember; // Exclude if it's the new member
+                            })
                             .toList();
+
+            log.info("Found {} existing members (excluding new member)", existingParticipants.size());
 
             if (existingParticipants.isEmpty()) {
                 log.info("No existing members to notify (first member in group)");
@@ -1046,6 +1058,7 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
             // Send notification to each existing member
             for (GroupParticipantEntity participant : existingParticipants) {
                 try {
+                    log.info("Notifying existing member: {}", participant.getUser().getUserName());
                     sendMemberJoinedToExistingMember(group, participant.getUser(), newMember, quantity);
                 } catch (Exception e) {
                     log.error("Failed to notify existing member: {}",
@@ -1055,6 +1068,9 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
 
             log.info("✅ Existing members notified about new join");
 
+        } catch (Exception e) {
+            log.error("Failed to notify existing members", e);
+        }
     }
 
     /**
