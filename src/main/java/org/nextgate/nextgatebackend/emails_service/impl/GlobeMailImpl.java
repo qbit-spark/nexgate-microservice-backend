@@ -14,9 +14,9 @@ import java.util.Map;
 @RequiredArgsConstructor
 @Service
 @Slf4j
-public class GlobeMailIMPL implements GlobeMailService {
+public class GlobeMailImpl implements GlobeMailService {
 
-    private final EmailsHelperMethodsIMPL emailsHelperMethodsIMPL;
+    private final EmailsHelperMethodsImpl emailsHelperMethodsIMPL;
     private final SecurityInfoUtils securityInfoUtils;
 
     @Override
