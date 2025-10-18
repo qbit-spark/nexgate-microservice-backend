@@ -119,6 +119,10 @@ public class CheckoutSessionEntity {
     @Convert(converter = InstallmentConfigJsonConverter.class)
     private InstallmentConfiguration installmentConfig;
 
+    // Escrow reference can be null till payment is completed
+    @Column(name = "escrow_id")
+    private UUID escrowId;
+
 
     // Cart reference (for REGULAR_CART type)
     @Column(name = "cart_id")

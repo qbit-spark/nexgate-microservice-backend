@@ -168,7 +168,7 @@ public class EscrowServiceImpl implements EscrowService {
         LedgerAccountEntity escrowLedgerAccount = ledgerService.getAccountById(escrow.getLedgerAccountId());
 
         // Get seller's wallet ledger account (destination 1)
-        WalletEntity sellerWallet = walletService.getWalletByAccountId(escrow.getSeller().getAccountId());
+        WalletEntity sellerWallet = walletService.getWalletByAccountIdInternalUse(escrow.getSeller().getAccountId());
         LedgerAccountEntity sellerLedgerAccount = ledgerService.getOrCreateWalletAccount(sellerWallet);
 
         // Get platform revenue account (destination 2)
@@ -178,6 +178,7 @@ public class EscrowServiceImpl implements EscrowService {
         Map<LedgerAccountEntity, BigDecimal> creditAccounts = new HashMap<>();
         creditAccounts.put(sellerLedgerAccount, escrow.getSellerAmount());
         creditAccounts.put(platformRevenueAccount, escrow.getPlatformFeeAmount());
+
 
         // Execute split: one debit (escrow), two credits (seller + platform)
         List<LedgerEntryEntity> ledgerEntries = ledgerService.createSplitEntry(

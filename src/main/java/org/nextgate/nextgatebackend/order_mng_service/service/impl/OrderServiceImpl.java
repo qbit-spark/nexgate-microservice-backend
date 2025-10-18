@@ -251,7 +251,7 @@ public class OrderServiceImpl implements OrderService {
         log.info("Order {} marked as SHIPPED", order.getOrderNumber());
 
         //Todo: Step 4: Placeholder for notification
-        //logShippingNotification(order, confirmationCode, trackingNumber, carrier);
+        sendOrderShippedNotification(order, confirmationCode);
 
         log.info("Order shipped successfully - Order: {}", order.getOrderNumber());
     }
@@ -270,6 +270,11 @@ public class OrderServiceImpl implements OrderService {
         // Step 3: Update order to DELIVERED and COMPLETED
         LocalDateTime now = LocalDateTime.now();
 
+
+        // Step 4: Release escrow to seller
+        releaseEscrow(order);
+
+
         order.setIsDeliveryConfirmed(true);
         order.setDeliveryConfirmedAt(now);
         order.setDeliveredAt(now);
@@ -280,12 +285,12 @@ public class OrderServiceImpl implements OrderService {
 
         orderRepo.save(order);
 
-        // Step 4: Release escrow to seller
-        releaseEscrow(order);
-
         //Todo: Step 5: Placeholder for notifications
-        //logCompletionNotifications(order);
+        // 1. Buyer: Order delivered
+        sendOrderDeliveredNotificationToBuyer(order);
 
+        // 2. Seller: Order delivered successfully
+        sendOrderDeliveredNotificationToSeller(order);
     }
 
 
@@ -1046,6 +1051,8 @@ public class OrderServiceImpl implements OrderService {
                 // Confirmation
                 .isDeliveryConfirmed(false)
 
+                .escrowId(session.getEscrowId())
+
                 // Timestamps
                 .orderedAt(LocalDateTime.now())
 
@@ -1337,5 +1344,156 @@ public class OrderServiceImpl implements OrderService {
             // Don't throw - order creation should not fail if notification fails
         }
     }
+
+
+    /**
+     * Send order shipped notification to BUYER
+     * Called after seller marks order as shipped
+     * INCLUDES CONFIRMATION CODE for delivery verification
+     */
+    private void sendOrderShippedNotification(OrderEntity order, String confirmationCode) {
+        try {
+            log.info("📧 Sending order shipped notification to buyer: {}", order.getBuyer().getUserName());
+
+            // 1. Prepare notification data using mapper
+            Map<String, Object> data = OrderNotificationMapper.mapOrderShippedForBuyer(
+                    order,
+                    confirmationCode
+            );
+
+            // 2. Build recipient (BUYER)
+            Recipient recipient = Recipient.builder()
+                    .userId(order.getBuyer().getId().toString())
+                    .email(order.getBuyer().getEmail())
+                    .phone(order.getBuyer().getPhoneNumber())
+                    .name(order.getBuyer().getFirstName())
+                    .language("en")
+                    .build();
+
+            // 3. Create notification event
+            NotificationEvent event = NotificationEvent.builder()
+                    .type(NotificationType.ORDER_SHIPPED)
+                    .recipients(List.of(recipient))
+                    .channels(List.of(
+                            NotificationChannel.EMAIL,
+                            NotificationChannel.SMS,
+                            NotificationChannel.PUSH,
+                            NotificationChannel.IN_APP
+                    ))
+                    .priority(NotificationPriority.NORMAL)
+                    .data(data)
+                    .build();
+
+            // 4. Publish notification
+            notificationPublisher.publish(event);
+
+            log.info("✅ Order shipped notification sent: order={}, confirmationCode={}",
+                    order.getOrderNumber(), confirmationCode);
+
+        } catch (Exception e) {
+            log.error("❌ Failed to send order shipped notification: order={}, error={}",
+                    order.getOrderNumber(), e.getMessage(), e);
+        }
+    }
+
+
+    /**
+     * Send order delivered notification to SELLER
+     * Tells seller that customer confirmed delivery
+     */
+    private void sendOrderDeliveredNotificationToSeller(OrderEntity order) {
+        try {
+            log.info("📧 Sending order delivered notification to seller: {}", order.getSeller().getShopName());
+
+            AccountEntity shopOwner = order.getSeller().getOwner();
+
+            if (shopOwner == null) {
+                log.warn("⚠️ Cannot send notification - shop has no owner");
+                return;
+            }
+
+            // 1. Prepare notification data
+            Map<String, Object> data = OrderNotificationMapper.mapOrderDeliveredForSeller(order);
+
+            // 2. Build recipient (SELLER)
+            Recipient recipient = Recipient.builder()
+                    .userId(shopOwner.getId().toString())
+                    .email(shopOwner.getEmail())
+                    .phone(shopOwner.getPhoneNumber())
+                    .name(shopOwner.getFirstName())
+                    .language("en")
+                    .build();
+
+            // 3. Create notification event
+            NotificationEvent event = NotificationEvent.builder()
+                    .type(NotificationType.ORDER_DELIVERED)
+                    .recipients(List.of(recipient))
+                    .channels(List.of(
+                            NotificationChannel.EMAIL,
+                            NotificationChannel.SMS,
+                            NotificationChannel.PUSH,
+                            NotificationChannel.IN_APP
+                    ))
+                    .priority(NotificationPriority.NORMAL)
+                    .data(data)
+                    .build();
+
+            // 4. Publish notification
+            notificationPublisher.publish(event);
+
+            log.info("✅ Order delivered notification sent to seller: order={}",
+                    order.getOrderNumber());
+
+        } catch (Exception e) {
+            log.error("❌ Failed to send order delivered notification to seller: {}", e.getMessage(), e);
+        }
+    }
+
+
+    /**
+     * Send order delivered notification to BUYER
+     * Called after buyer confirms delivery
+     */
+    private void sendOrderDeliveredNotificationToBuyer(OrderEntity order) {
+        try {
+            log.info("📧 Sending order delivered notification to buyer: {}", order.getBuyer().getUserName());
+
+            // 1. Prepare notification data using mapper
+            Map<String, Object> data = OrderNotificationMapper.mapOrderDeliveredForBuyer(order);
+
+            // 2. Build recipient (BUYER)
+            Recipient recipient = Recipient.builder()
+                    .userId(order.getBuyer().getId().toString())
+                    .email(order.getBuyer().getEmail())
+                    .phone(order.getBuyer().getPhoneNumber())
+                    .name(order.getBuyer().getFirstName())
+                    .language("en")
+                    .build();
+
+            // 3. Create notification event
+            NotificationEvent event = NotificationEvent.builder()
+                    .type(NotificationType.ORDER_DELIVERED)
+                    .recipients(List.of(recipient))
+                    .channels(List.of(
+                            NotificationChannel.EMAIL,
+                            NotificationChannel.PUSH,
+                            NotificationChannel.IN_APP
+                    ))
+                    .priority(NotificationPriority.NORMAL)
+                    .data(data)
+                    .build();
+
+            // 4. Publish notification
+            notificationPublisher.publish(event);
+
+            log.info("✅ Order delivered notification sent: order={}",
+                    order.getOrderNumber());
+
+        } catch (Exception e) {
+            log.error("❌ Failed to send order delivered notification: order={}, error={}",
+                    order.getOrderNumber(), e.getMessage(), e);
+        }
+    }
+
 
 }

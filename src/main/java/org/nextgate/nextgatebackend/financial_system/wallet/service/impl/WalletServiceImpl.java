@@ -86,6 +86,18 @@ public class WalletServiceImpl implements WalletService {
         return wallet;
     }
 
+
+    @Override
+    @Transactional
+    public WalletEntity getWalletByAccountIdInternalUse(UUID accountId) throws ItemNotFoundException {
+        AccountEntity account = accountRepo.findById(accountId)
+                .orElseThrow(() -> new ItemNotFoundException("Account not found"));
+
+        return initializeWallet(account);
+    }
+
+
+
     @Override
     public BigDecimal getMyWalletBalance() throws ItemNotFoundException {
         AccountEntity account = getAuthenticatedAccount();

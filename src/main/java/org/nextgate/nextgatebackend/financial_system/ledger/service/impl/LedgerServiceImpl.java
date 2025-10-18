@@ -49,9 +49,12 @@ public class LedgerServiceImpl implements LedgerService {
             String description,
             AccountEntity createdBy) {
 
+
         validateEntry(debitAccount, creditAccount, amount);
 
-        if (!debitAccount.isExternalAccount() && !debitAccount.canDebit(amount)) {
+        if (!debitAccount.isExternalAccount()
+                && amount.compareTo(BigDecimal.ZERO) > 0
+                && !debitAccount.canDebit(amount)) {
             throw new InsufficientBalanceException(
                     debitAccount.getAccountNumber(),
                     amount,
@@ -160,6 +163,7 @@ public class LedgerServiceImpl implements LedgerService {
         for (Map.Entry<LedgerAccountEntity, BigDecimal> credit : creditAccounts.entrySet()) {
             LedgerAccountEntity creditAccount = credit.getKey();
             BigDecimal amount = credit.getValue();
+
 
             LedgerEntryEntity entry = createEntry(
                     debitAccount,
@@ -406,8 +410,8 @@ public class LedgerServiceImpl implements LedgerService {
             throw new LedgerException("Debit and credit accounts must be different");
         }
 
-        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new LedgerException("Amount must be positive");
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) < 0) {
+            throw new LedgerException("Amount must be greater than or equal to zero");
         }
 
         if (!debitAccount.getCurrency().equals(creditAccount.getCurrency())) {
