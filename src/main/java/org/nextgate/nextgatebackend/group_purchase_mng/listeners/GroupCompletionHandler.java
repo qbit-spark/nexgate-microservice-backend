@@ -9,12 +9,24 @@ import org.nextgate.nextgatebackend.group_purchase_mng.enums.ParticipantStatus;
 import org.nextgate.nextgatebackend.group_purchase_mng.events.GroupCompletedEvent;
 import org.nextgate.nextgatebackend.group_purchase_mng.repo.GroupParticipantRepo;
 import org.nextgate.nextgatebackend.group_purchase_mng.repo.GroupPurchaseInstanceRepo;
+import org.nextgate.nextgatebackend.notification_system.publisher.NotificationPublisher;
 import org.nextgate.nextgatebackend.order_mng_service.service.OrderService;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
+import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
+import org.nextgate.nextgatebackend.notification_system.publisher.NotificationPublisher;
+import org.nextgate.nextgatebackend.notification_system.publisher.dto.NotificationEvent;
+import org.nextgate.nextgatebackend.notification_system.publisher.dto.Recipient;
+import org.nextgate.nextgatebackend.notification_system.publisher.enums.NotificationChannel;
+import org.nextgate.nextgatebackend.notification_system.publisher.enums.NotificationPriority;
+import org.nextgate.nextgatebackend.notification_system.publisher.enums.NotificationType;
+import org.nextgate.nextgatebackend.notification_system.publisher.mapper.GroupNotificationMapper;
+
+import java.util.List;
+import java.util.Map;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,11 +46,12 @@ import java.util.UUID;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class GroupOrderCreationListener {
+public class GroupCompletionHandler {
 
     private final OrderService orderService;
     private final GroupParticipantRepo participantRepo;
     private final GroupPurchaseInstanceRepo groupPurchaseInstanceRepo;
+    private final NotificationPublisher notificationPublisher;
 
     private static final int MAX_RETRY_ATTEMPTS = 3;
     private static final long INITIAL_DELAY_MS = 500;
@@ -69,10 +82,15 @@ public class GroupOrderCreationListener {
             logGroupDetails(group, activeParticipants);
 
             // Process each participant
-            OrderCreationResult result = processParticipants(activeParticipants);
+            OrderCreationResult orderResult = processParticipants(activeParticipants);
+
+
+            sendParticipantNotifications(group, activeParticipants, orderResult);
+
+            sendShopOwnerNotification(group, activeParticipants);
 
             // Log final summary
-            logFinalSummary(group, result);
+            logFinalSummary(group, orderResult);
 
         } catch (Exception e) {
             logCriticalError(event.getGroupInstanceId(), e);
@@ -311,6 +329,133 @@ public class GroupOrderCreationListener {
 
         public boolean hasFailures() {
             return failureCount > 0;
+        }
+    }
+
+    // ========================================
+// NOTIFICATION METHODS
+// ========================================
+
+    /**
+     * Send group completion notifications to all participants
+     */
+    private void sendParticipantNotifications(
+            GroupPurchaseInstanceEntity group,
+            List<GroupParticipantEntity> participants,
+            OrderCreationResult orderResult) {
+
+        log.info("📧 Sending group completion notifications to {} participants",
+                participants.size());
+
+        int successCount = 0;
+        int failureCount = 0;
+
+        for (GroupParticipantEntity participant : participants) {
+            try {
+                sendParticipantNotification(group, participant);
+                successCount++;
+            } catch (Exception e) {
+                log.error("Failed to send notification to participant: {}",
+                        participant.getUser().getUserName(), e);
+                failureCount++;
+            }
+        }
+
+        log.info("✅ Participant notifications sent: {} success, {} failed",
+                successCount, failureCount);
+    }
+
+    /**
+     * Send notification to a single participant
+     */
+    private void sendParticipantNotification(
+            GroupPurchaseInstanceEntity group,
+            GroupParticipantEntity participant) {
+
+        // 1. Prepare notification data using mapper
+        Map<String, Object> data = GroupNotificationMapper.mapGroupCompleted(
+                group, participant);
+
+        // 2. Build recipient
+        Recipient recipient = Recipient.builder()
+                .userId(participant.getUser().getId().toString())
+                .email(participant.getUser().getEmail())
+                .phone(participant.getUser().getPhoneNumber())
+                .name(participant.getUser().getFirstName())
+                .language("en")
+                .build();
+
+        // 3. Create notification event
+        NotificationEvent event = NotificationEvent.builder()
+                .type(NotificationType.GROUP_PURCHASE_COMPLETE)
+                .recipients(List.of(recipient))
+                .channels(List.of(
+                        NotificationChannel.EMAIL,
+                        NotificationChannel.SMS,
+                        NotificationChannel.PUSH,
+                        NotificationChannel.IN_APP
+                ))
+                .priority(NotificationPriority.HIGH)
+                .data(data)
+                .build();
+
+        // 4. Publish notification
+        notificationPublisher.publish(event);
+
+        log.info("✓ Notification sent to: {}", participant.getUser().getUserName());
+    }
+
+    /**
+     * Send group completion notification to shop owner
+     */
+    private void sendShopOwnerNotification(
+            GroupPurchaseInstanceEntity group,
+            List<GroupParticipantEntity> participants) {
+
+        try {
+            log.info("📧 Sending group completion notification to shop owner");
+
+            AccountEntity shopOwner = group.getShop().getOwner();
+
+            if (shopOwner == null) {
+                log.warn("⚠️ Cannot send notification - shop has no owner");
+                return;
+            }
+
+            // 1. Prepare notification data using mapper
+            Map<String, Object> data = GroupNotificationMapper.mapGroupCompletedForShopOwner(
+                    group, participants);
+
+            // 2. Build recipient
+            Recipient recipient = Recipient.builder()
+                    .userId(shopOwner.getId().toString())
+                    .email(shopOwner.getEmail())
+                    .phone(shopOwner.getPhoneNumber())
+                    .name(shopOwner.getFirstName())
+                    .language("en")
+                    .build();
+
+            // 3. Create notification event
+            NotificationEvent event = NotificationEvent.builder()
+                    .type(NotificationType.GROUP_PURCHASE_COMPLETE)
+                    .recipients(List.of(recipient))
+                    .channels(List.of(
+                            NotificationChannel.EMAIL,
+                            NotificationChannel.SMS,
+                            NotificationChannel.IN_APP
+                    ))
+                    .priority(NotificationPriority.HIGH)
+                    .data(data)
+                    .build();
+
+            // 4. Publish notification
+            notificationPublisher.publish(event);
+
+            log.info("✅ Shop owner notification sent: {}", shopOwner.getUserName());
+
+        } catch (Exception e) {
+            log.error("❌ Failed to send shop owner notification", e);
+            // Don't throw - order creation already succeeded
         }
     }
 }
