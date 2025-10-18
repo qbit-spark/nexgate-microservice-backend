@@ -45,4 +45,6 @@ public interface WalletService {
 
     // Updates last activity timestamp
     void recordActivity(WalletEntity wallet);
+
+    WalletEntity getWalletByAccountIdInternalUse(UUID accountId) throws ItemNotFoundException;
 }

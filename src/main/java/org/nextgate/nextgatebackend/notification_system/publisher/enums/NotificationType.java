@@ -1,0 +1,37 @@
+package org.nextgate.nextgatebackend.notification_system.publisher.enums;
+
+public enum NotificationType {
+    // Order notifications
+    ORDER_CONFIRMATION,
+    ORDER_SHIPPED,
+    ORDER_DELIVERED,
+
+    // Payment notifications
+    PAYMENT_RECEIVED,
+    PAYMENT_FAILURE,
+
+    // Cart notifications
+    CART_ABANDONMENT,
+
+    // Checkout notifications
+    CHECKOUT_EXPIRY,
+
+    // Wallet notifications
+    WALLET_BALANCE_UPDATE,
+
+    // Installment notifications
+    INSTALLMENT_DUE,
+
+    // Shop notifications
+    SHOP_NEW_ORDER,
+    SHOP_LOW_INVENTORY,
+
+    // Group purchase notifications
+    GROUP_PURCHASE_COMPLETE,
+
+    // User notifications
+    WELCOME_EMAIL,
+
+    // Promotional notifications
+    PROMOTIONAL_OFFER
+}

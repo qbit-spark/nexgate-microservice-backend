@@ -3,11 +3,13 @@ package org.nextgate.nextgatebackend.financial_system.payment_processing.service
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.coyote.BadRequestException;
+import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.checkout_session.entity.CheckoutSessionEntity;
 import org.nextgate.nextgatebackend.checkout_session.enums.CheckoutSessionStatus;
 import org.nextgate.nextgatebackend.checkout_session.enums.CheckoutSessionType;
 import org.nextgate.nextgatebackend.checkout_session.events.PaymentCompletedEvent;
 import org.nextgate.nextgatebackend.checkout_session.repo.CheckoutSessionRepo;
+import org.nextgate.nextgatebackend.financial_system.escrow.entity.EscrowAccountEntity;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.callbacks.PaymentCallback;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.enums.PaymentMethod;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.enums.PaymentStatus;
@@ -19,6 +21,13 @@ import org.nextgate.nextgatebackend.financial_system.payment_processing.service.
 import org.nextgate.nextgatebackend.financial_system.payment_processing.service.WalletPaymentProcessor;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
+import org.nextgate.nextgatebackend.notification_system.publisher.NotificationPublisher;
+import org.nextgate.nextgatebackend.notification_system.publisher.dto.NotificationEvent;
+import org.nextgate.nextgatebackend.notification_system.publisher.dto.Recipient;
+import org.nextgate.nextgatebackend.notification_system.publisher.enums.NotificationChannel;
+import org.nextgate.nextgatebackend.notification_system.publisher.enums.NotificationPriority;
+import org.nextgate.nextgatebackend.notification_system.publisher.enums.NotificationType;
+import org.nextgate.nextgatebackend.notification_system.publisher.mapper.PaymentNotificationMapper;
 import org.nextgate.nextgatebackend.order_mng_service.entity.OrderEntity;
 import org.nextgate.nextgatebackend.order_mng_service.repo.OrderRepository;
 import org.nextgate.nextgatebackend.order_mng_service.service.OrderService;
@@ -28,6 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.nextgate.nextgatebackend.checkout_session.enums.CheckoutSessionType.*;
@@ -44,6 +54,7 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
     private final PaymentCallback paymentCallback;
     private final OrderRepository orderRepo;
     private final ApplicationEventPublisher eventPublisher;
+    private final NotificationPublisher notificationPublisher;
 
     @Override
     @Transactional
@@ -175,9 +186,13 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
         // Update checkout session status
         checkoutSession.setStatus(CheckoutSessionStatus.PAYMENT_COMPLETED);
         checkoutSession.setCompletedAt(LocalDateTime.now());
+        checkoutSession.setEscrowId(result.getEscrow().getId());
 
         checkoutSessionRepo.save(checkoutSession);
 
+        //Todo: Publish notification event here to show payment success notification
+
+        sendPaymentSuccessNotification(checkoutSession, result.getEscrow());
 
         // ========================================
         // INVOKE SUCCESS CALLBACK
@@ -234,8 +249,6 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
     }
 
 
-
-
     // ========================================
     // HELPER METHOD: BUILD SUCCESS MESSAGE
     // ========================================
@@ -243,14 +256,11 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
     private String buildSuccessMessage(CheckoutSessionType sessionType) {
 
         return switch (sessionType) {
-            case REGULAR_DIRECTLY, REGULAR_CART ->
-                    "Payment completed successfully. Your order is being processed.";
+            case REGULAR_DIRECTLY, REGULAR_CART -> "Payment completed successfully. Your order is being processed.";
 
-            case INSTALLMENT ->
-                    "Down payment completed successfully. Order is being processed.";
+            case INSTALLMENT -> "Down payment completed successfully. Order is being processed.";
 
-            case GROUP_PURCHASE ->
-                    "Payment completed. Order will be created when group completes.";
+            case GROUP_PURCHASE -> "Payment completed. Order will be created when group completes.";
         };
     }
 
@@ -315,5 +325,57 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
                 .message(result.getMessage())
                 .checkoutSessionId(checkoutSession.getSessionId())
                 .build();
+    }
+
+    /**
+     * Send payment success notification to customer
+     */
+    private void sendPaymentSuccessNotification(
+            CheckoutSessionEntity checkoutSession,
+            EscrowAccountEntity escrow) {
+
+        AccountEntity customer = checkoutSession.getCustomer();
+
+        // 1. Prepare notification data using mapper
+        Map<String, Object> data = PaymentNotificationMapper.mapPaymentReceived(
+                customer.getFirstName(),
+                customer.getEmail(),
+                escrow.getTotalAmount(),
+                escrow.getCurrency(),
+                "WALLET",  // or checkoutSession.getPaymentMethod()
+                escrow.getId().toString(),
+                escrow.getEscrowNumber(),
+                String.valueOf(checkoutSession.getSessionId())
+        );
+
+        // 2. Build recipient
+        Recipient recipient = Recipient.builder()
+                .userId(customer.getId().toString())
+                .email(customer.getEmail())
+                .phone(customer.getPhoneNumber())
+                .name(customer.getFirstName())
+                .language("en")
+                .build();
+
+        // 3. Create notification event
+        NotificationEvent event = NotificationEvent.builder()
+                .type(NotificationType.PAYMENT_RECEIVED)
+                .recipients(List.of(recipient))
+                .channels(List.of(
+                        NotificationChannel.EMAIL,
+                        NotificationChannel.SMS,
+                        NotificationChannel.PUSH,
+                        NotificationChannel.IN_APP
+                ))
+                .priority(NotificationPriority.HIGH)
+                .data(data)
+                .build();
+
+        // 4. Publish notification
+        notificationPublisher.publish(event);
+
+        log.info("📤 Payment success notification sent: user={}, amount={}, escrow={}",
+                customer.getUserName(), escrow.getTotalAmount(), escrow.getEscrowNumber());
+
     }
 }
