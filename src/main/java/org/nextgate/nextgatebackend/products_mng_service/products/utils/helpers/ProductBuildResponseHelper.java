@@ -234,34 +234,23 @@ public class ProductBuildResponseHelper {
         if (!product.isGroupBuyingAvailable()) {
             return ProductDetailedResponse.OrderingLimitsResponse.GroupBuyingDetailedResponse.builder()
                     .isEnabled(false)
-                    .isAvailable(false)
                     .build();
         }
 
         // In a real implementation, you'd fetch current group data from database
         // For now, we'll simulate some data
-        int currentGroupSize = 7;
-        int remainingSlots = product.getGroupMaxSize() - currentGroupSize;
-        double progressPercentage = ((double) currentGroupSize / product.getGroupMaxSize()) * 100;
 
         LocalDateTime expiresAt = LocalDateTime.now().plusHours(product.getGroupTimeLimitHours());
-        long timeRemainingHours = product.getGroupTimeLimitHours() - 24;
 
         return ProductDetailedResponse.OrderingLimitsResponse.GroupBuyingDetailedResponse.builder()
                 .isEnabled(true)
-                .isAvailable(currentGroupSize < product.getGroupMaxSize())
                 .maxGroupSize(product.getGroupMaxSize())
-                .currentGroupSize(currentGroupSize)
-                .remainingSlots(remainingSlots)
-                .progressPercentage(Math.min(progressPercentage, 100.0))
                 .groupPrice(product.getGroupPrice())
                 .groupDiscount(product.getGroupDiscount())
                 .groupDiscountPercentage(product.getGroupDiscountPercentage())
                 .timeLimitHours(product.getGroupTimeLimitHours())
-                .timeRemainingHours(Math.max(timeRemainingHours, 0))
                 .expiresAt(expiresAt)
                 .status("ACTIVE")
-                .canJoinGroup(currentGroupSize < product.getGroupMaxSize())
                 .build();
     }
 
