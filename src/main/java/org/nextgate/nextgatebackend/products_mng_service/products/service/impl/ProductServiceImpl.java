@@ -123,7 +123,6 @@ public class ProductServiceImpl implements ProductService {
         // Ordering Limits
         product.setMinOrderQuantity(request.getMinOrderQuantity());
         product.setMaxOrderQuantity(request.getMaxOrderQuantity());
-        product.setRequiresApproval(request.getRequiresApproval());
 
         // Relationships
         product.setShop(shop);
@@ -149,7 +148,6 @@ public class ProductServiceImpl implements ProductService {
 
         // Installment Options
         product.setInstallmentEnabled(false); // Disabled by default, enabled when plans are added
-        product.setMaxQuantityForInstallment(request.getMaxQuantityForInstallment());
 
         //8. Set initial status based on action
         if (action == ReqAction.SAVE_PUBLISH) {

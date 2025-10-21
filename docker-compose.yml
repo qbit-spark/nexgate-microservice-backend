@@ -1,66 +1,147 @@
-version: '3.8'
-
 services:
-  nexgate_postgres:
+  # ========================
+  # Database Services
+  # ========================
+  postgres:
     image: postgres:latest
-    container_name: nexgate_postgres_db
-    restart: always
+    container_name: nexgate_postgres
+    restart: unless-stopped
     ports:
-      - "5426:5432"
+      - "5432:5432"
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-nexgate}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: nexgate
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: nexgate123
     volumes:
       - nexgate_postgres_data:/var/lib/postgresql/data
     networks:
-      - nexgate_network
+      - nexgate-local
 
-  nexgate_minio:
-    image: minio/minio:latest
-    container_name: nexgate_minio_server
-    restart: always
+  notification-postgres:
+    image: postgres:latest
+    container_name: nexgate_notification_postgres
+    restart: unless-stopped
     ports:
-      - "9005:9000"      # MinIO API port
-      - "9002:9001"      # MinIO Console port
+      - "5433:5432"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      POSTGRES_DB: nexgate_notifications
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - notification_postgres_data:/var/lib/postgresql/data
+    networks:
+      - nexgate-local
+
+  # ========================
+  # Message Queue & Cache
+  # ========================
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: nexgate_rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - notification_rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - nexgate-local
+
+  redis:
+    image: redis:latest
+    container_name: nexgate_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - notification_redis_data:/data
+    networks:
+      - nexgate-local
+
+  # ========================
+  # Storage Service
+  # ========================
+  minio:
+    image: minio/minio:latest
+    container_name: nexgate_minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: nexgate_admin
+      MINIO_ROOT_PASSWORD: nexgate_minio123
     volumes:
       - nexgate_minio_data:/data
     command: server /data --console-address ":9001"
     networks:
-      - nexgate_network
+      - nexgate-local
 
-  nexgate_vault:
-    image: hashicorp/vault:latest
-    container_name: nexgate_vault_server
-    restart: always
+  # ========================
+  # Application Services
+  # ========================
+#  backend:
+#    image: josh656/nexgate-backend:latest
+#    container_name: nexgate_backend
+#    restart: unless-stopped
+#    ports:
+#      - "8765:8765"
+#    environment:
+#      POSTGRES_HOST: postgres
+#      POSTGRES_PORT: 5432
+#      POSTGRES_DB: nexgate
+#      POSTGRES_USER: postgres
+#      POSTGRES_PASSWORD: nexgate123
+#      MINIO_HOST: minio
+#      MINIO_PORT: 9000
+#      MINIO_ACCESS_KEY: nexgate_admin
+#      MINIO_SECRET_KEY: nexgate_minio123
+#      RABBITMQ_HOST: rabbitmq
+#      RABBITMQ_PORT: 5672
+#      RABBITMQ_USER: guest
+#      RABBITMQ_PASSWORD: guest
+#    depends_on:
+#      - postgres
+#      - minio
+#      - rabbitmq
+#    networks:
+#      - nexgate-local
+
+  notification-server:
+    image: josh656/nexgate-notification-server:latest
+    container_name: nexgate_notification_server
+    restart: unless-stopped
     ports:
-      - "8200:8200"      # Vault API port
+      - "8766:8766"
     environment:
-      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_DEV_ROOT_TOKEN_ID}
-      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
-      VAULT_ADDR: http://0.0.0.0:8200
-    volumes:
-      - nexgate_vault_data:/vault/data
-      - nexgate_vault_logs:/vault/logs
-    cap_add:
-      - IPC_LOCK
-    command: ["vault", "server", "-dev"]
+      POSTGRES_HOST: notification-postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: nexgate_notifications
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: guest
+      RABBITMQ_PASSWORD: guest
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      - notification-postgres
+      - rabbitmq
+      - redis
     networks:
-      - nexgate_network
+      - nexgate-local
 
 volumes:
   nexgate_postgres_data:
-    driver: local
   nexgate_minio_data:
-    driver: local
-  nexgate_vault_data:
-    driver: local
-  nexgate_vault_logs:
-    driver: local
+  notification_postgres_data:
+  notification_rabbitmq_data:
+  notification_redis_data:
 
 networks:
-  nexgate_network:
+  nexgate-local:
     driver: bridge

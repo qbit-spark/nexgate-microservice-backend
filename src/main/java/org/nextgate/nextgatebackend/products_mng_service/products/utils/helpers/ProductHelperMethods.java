@@ -226,9 +226,7 @@ public class ProductHelperMethods {
             product.setMaxOrderQuantity(request.getMaxOrderQuantity());
         }
 
-        if (request.getRequiresApproval() != null) {
-            product.setRequiresApproval(request.getRequiresApproval());
-        }
+
 
         // ===============================
         // NEW FIELDS - GROUP BUYING

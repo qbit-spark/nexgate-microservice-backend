@@ -219,12 +219,10 @@ public class ProductBuildResponseHelper {
         return ProductDetailedResponse.OrderingLimitsResponse.builder()
                 .minOrderQuantity(product.getMinOrderQuantity())
                 .maxOrderQuantity(product.getMaxOrderQuantity())
-                .requiresApproval(product.getRequiresApproval())
                 .canOrderQuantity(product.getMaxAllowedQuantity())
                 .maxAllowedQuantity(product.getMaxAllowedQuantity())
                 .hasOrderingLimits(product.getMaxOrderQuantity() != null ||
-                        product.getMinOrderQuantity() > 1 ||
-                        product.getRequiresApproval())
+                        product.getMinOrderQuantity() > 1 )
                 .build();
     }
 
