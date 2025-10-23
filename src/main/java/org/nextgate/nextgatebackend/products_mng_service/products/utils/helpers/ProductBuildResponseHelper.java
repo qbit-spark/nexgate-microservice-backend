@@ -240,7 +240,6 @@ public class ProductBuildResponseHelper {
         // In a real implementation, you'd fetch current group data from database
         // For now, we'll simulate some data
 
-        LocalDateTime expiresAt = LocalDateTime.now().plusHours(product.getGroupTimeLimitHours());
 
         return ProductDetailedResponse.OrderingLimitsResponse.GroupBuyingDetailedResponse.builder()
                 .isEnabled(true)
@@ -249,8 +248,6 @@ public class ProductBuildResponseHelper {
                 .groupDiscount(product.getGroupDiscount())
                 .groupDiscountPercentage(product.getGroupDiscountPercentage())
                 .timeLimitHours(product.getGroupTimeLimitHours())
-                .expiresAt(expiresAt)
-                .status("ACTIVE")
                 .build();
     }
 

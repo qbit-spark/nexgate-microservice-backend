@@ -142,8 +142,6 @@ public class ProductDetailedResponse {
             private BigDecimal groupDiscount;
             private BigDecimal groupDiscountPercentage;
             private Integer timeLimitHours;
-            private LocalDateTime expiresAt;
-            private String status;
             private Boolean canJoinGroup;
         }
 
