@@ -127,7 +127,6 @@ public class ProductDetailedResponse {
     public static class OrderingLimitsResponse {
         private Integer minOrderQuantity;
         private Integer maxOrderQuantity;
-        private Boolean requiresApproval;
         private Integer canOrderQuantity;
         private Integer maxAllowedQuantity;
         private Boolean hasOrderingLimits;
@@ -138,18 +137,11 @@ public class ProductDetailedResponse {
         @AllArgsConstructor
         public static class GroupBuyingDetailedResponse {
             private Boolean isEnabled;
-            private Boolean isAvailable;
             private Integer maxGroupSize;
-            private Integer currentGroupSize;
-            private Integer remainingSlots;
-            private Double progressPercentage;
             private BigDecimal groupPrice;
             private BigDecimal groupDiscount;
             private BigDecimal groupDiscountPercentage;
             private Integer timeLimitHours;
-            private Long timeRemainingHours;
-            private LocalDateTime expiresAt;
-            private String status;
             private Boolean canJoinGroup;
         }
 

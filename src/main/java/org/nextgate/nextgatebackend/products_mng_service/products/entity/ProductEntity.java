@@ -125,8 +125,6 @@ public class ProductEntity {
     @Column(name = "max_order_quantity")
     private Integer maxOrderQuantity;
 
-    @Column(name = "requires_approval")
-    private Boolean requiresApproval = false;
 
     // ===============================
     // NEW FIELDS - GROUP BUYING
@@ -158,7 +156,7 @@ public class ProductEntity {
 
     // KEEP THIS (limits quantity for installments)
     @Column(name = "max_quantity_for_installment")
-    private Integer maxQuantityForInstallment = 1;
+    private Integer maxQuantityForInstallment = 10;
 
     // ADD THIS RELATIONSHIP (replaces the JSONB field)
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, fetch = FetchType.LAZY)

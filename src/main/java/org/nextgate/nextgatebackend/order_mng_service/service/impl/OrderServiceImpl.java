@@ -384,7 +384,9 @@ public class OrderServiceImpl implements OrderService {
         log.info("New confirmation code generated for order: {}", order.getOrderNumber());
 
         //Todo: Step 3: Placeholder for notification
-        //logCodeRegenerationNotification(order, newCode);
+        sendOrderShippedNotification(order, newCode);
+
+
 
     }
 

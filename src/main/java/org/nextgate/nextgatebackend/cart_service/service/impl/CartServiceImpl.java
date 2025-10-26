@@ -241,25 +241,18 @@ public class CartServiceImpl implements CartService {
         int totalItems = items.size();
         int totalQuantity = items.stream().mapToInt(CartResponse.CartItemResponse::getQuantity).sum();
 
-        BigDecimal subtotal = items.stream()
+        BigDecimal totalAmount = items.stream()
                 .map(CartResponse.CartItemResponse::getItemSubtotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        BigDecimal totalDiscount = items.stream()
-                .map(CartResponse.CartItemResponse::getItemDiscount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        BigDecimal totalAmount = subtotal.subtract(totalDiscount);
 
         return CartResponse.CartSummary.builder()
                 .totalItems(totalItems)
                 .totalQuantity(totalQuantity)
-                .subtotal(subtotal)
-                .totalDiscount(totalDiscount)
+                .subtotal(totalAmount)
+                .totalDiscount(BigDecimal.ZERO)  // ← Set to ZERO instead of null
                 .totalAmount(totalAmount)
                 .build();
     }
-
     private AccountEntity getAuthenticatedAccount() throws ItemNotFoundException {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.isAuthenticated()) {

@@ -98,7 +98,6 @@ public class CreateProductRequest {
     @Min(value = 1, message = "Maximum order quantity must be at least 1")
     private Integer maxOrderQuantity;
 
-    private Boolean requiresApproval = false;
 
     // ===============================
     // NEW FIELDS - GROUP BUYING
@@ -120,13 +119,6 @@ public class CreateProductRequest {
 
 
     // ===============================
-    // NEW FIELDS - INSTALLMENT OPTIONS
-    // ===============================
-
-    private Boolean installmentEnabled = false;
-    private Integer maxQuantityForInstallment = 1;
-
-    // ===============================
     // NESTED CLASSES FOR VALIDATION
     // ===============================
 
@@ -145,25 +137,6 @@ public class CreateProductRequest {
         @DecimalMin(value = "0.0", message = "Price adjustment cannot be negative")
         @Digits(integer = 8, fraction = 2, message = "Price adjustment must have at most 8 digits and 2 decimal places")
         private BigDecimal priceAdjustment = BigDecimal.ZERO;
-    }
-
-    @Data
-    public static class InstallmentPlanRequest {
-        @NotNull(message = "Duration is required")
-        @Min(value = 1, message = "Duration must be at least 1")
-        private Integer duration;
-
-        @NotBlank(message = "Interval is required")
-        @Pattern(regexp = "^(DAYS|WEEKS|MONTHS)$", message = "Interval must be DAYS, WEEKS, or MONTHS")
-        private String interval;
-
-        @DecimalMin(value = "0.0", message = "Interest rate cannot be negative")
-        @DecimalMax(value = "100.0", message = "Interest rate cannot exceed 100%")
-        @Digits(integer = 3, fraction = 2, message = "Interest rate must have at most 3 digits and 2 decimal places")
-        private BigDecimal interestRate = BigDecimal.ZERO;
-
-        @Size(max = 200, message = "Description must not exceed 200 characters")
-        private String description;
     }
 
     // ===============================

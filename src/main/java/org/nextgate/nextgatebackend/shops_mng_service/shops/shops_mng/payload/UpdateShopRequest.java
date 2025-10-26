@@ -30,4 +30,6 @@ public class UpdateShopRequest {
     private BigDecimal longitude;
     private String locationNotes;
     private String promotionText;
+    private String businessRegistrationNumber;
+    private String taxNumber;
 }

@@ -158,6 +158,8 @@ public class ShopServiceImpl implements ShopService {
         if (request.getLongitude() != null) shop.setLongitude(request.getLongitude());
         if (request.getLocationNotes() != null) shop.setLocationNotes(request.getLocationNotes());
         if (request.getPromotionText() != null) shop.setPromotionText(request.getPromotionText());
+        if (request.getBusinessRegistrationNumber() != null) shop.setBusinessRegistrationNumber(request.getBusinessRegistrationNumber());
+        if (request.getTaxNumber() != null) shop.setBusinessRegistrationNumber(request.getTaxNumber());
 
         return shopRepository.save(shop);
     }

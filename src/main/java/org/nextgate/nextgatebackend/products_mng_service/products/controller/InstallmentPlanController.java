@@ -78,13 +78,13 @@ public class InstallmentPlanController {
             @PathVariable UUID shopId,
             @PathVariable UUID productId,
             @PathVariable UUID planId)
-            throws ItemNotFoundException, RandomExceptions {
+                                throws ItemNotFoundException, RandomExceptions {
 
-        GlobeSuccessResponseBuilder response = installmentPlanService.deleteInstallmentPlan(
-                shopId, productId, planId);
+                            GlobeSuccessResponseBuilder response = installmentPlanService.deleteInstallmentPlan(
+                                    shopId, productId, planId);
 
-        return ResponseEntity.ok(response);
-    }
+                            return ResponseEntity.ok(response);
+                        }
 
     @PatchMapping("/{planId}/activate")
     public ResponseEntity<GlobeSuccessResponseBuilder> activateInstallmentPlan(
@@ -101,7 +101,7 @@ public class InstallmentPlanController {
 
     @PatchMapping("/{planId}/deactivate")
     public ResponseEntity<GlobeSuccessResponseBuilder> deactivateInstallmentPlan(
-            @PathVariable UUID shopId,
+                                            @PathVariable UUID shopId,
             @PathVariable UUID productId,
             @PathVariable UUID planId)
             throws ItemNotFoundException, RandomExceptions {
@@ -125,27 +125,4 @@ public class InstallmentPlanController {
         return ResponseEntity.ok(response);
     }
 
-    @PatchMapping("/enable-installments")
-    public ResponseEntity<GlobeSuccessResponseBuilder> enableInstallments(
-            @PathVariable UUID shopId,
-            @PathVariable UUID productId)
-            throws ItemNotFoundException, RandomExceptions {
-
-        GlobeSuccessResponseBuilder response = installmentPlanService.toggleProductInstallments(
-                shopId, productId, true);
-
-        return ResponseEntity.ok(response);
-    }
-
-    @PatchMapping("/disable-installments")
-    public ResponseEntity<GlobeSuccessResponseBuilder> disableInstallments(
-            @PathVariable UUID shopId,
-            @PathVariable UUID productId)
-            throws ItemNotFoundException, RandomExceptions {
-
-        GlobeSuccessResponseBuilder response = installmentPlanService.toggleProductInstallments(
-                shopId, productId, false);
-
-        return ResponseEntity.ok(response);
-    }
 }
