@@ -3,6 +3,8 @@ package org.nextgate.nextgatebackend.group_purchase_mng.listeners;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jobrunr.jobs.JobId;
+import org.jobrunr.scheduling.JobScheduler;
 import org.nextgate.nextgatebackend.group_purchase_mng.entity.GroupParticipantEntity;
 import org.nextgate.nextgatebackend.group_purchase_mng.entity.GroupPurchaseInstanceEntity;
 import org.nextgate.nextgatebackend.group_purchase_mng.enums.ParticipantStatus;
@@ -52,6 +54,7 @@ public class GroupCompletionHandler {
     private final GroupParticipantRepo participantRepo;
     private final GroupPurchaseInstanceRepo groupPurchaseInstanceRepo;
     private final NotificationPublisher notificationPublisher;
+    private final JobScheduler jobScheduler;
 
     private static final int MAX_RETRY_ATTEMPTS = 3;
     private static final long INITIAL_DELAY_MS = 500;
@@ -72,6 +75,9 @@ public class GroupCompletionHandler {
             // Fetch fresh data with new Hibernate session
             GroupPurchaseInstanceEntity group = fetchGroup(event.getGroupInstanceId());
             List<GroupParticipantEntity> activeParticipants = fetchActiveParticipants(group);
+
+
+            cancelExpirationJob(group);
 
             // Validate we have participants
             if (activeParticipants.isEmpty()) {
@@ -456,6 +462,40 @@ public class GroupCompletionHandler {
         } catch (Exception e) {
             log.error("❌ Failed to send shop owner notification", e);
             // Don't throw - order creation already succeeded
+        }
+    }
+
+    /**
+     * Cancel the scheduled expiration job since group completed.
+     * This is optional - the expireGroup() method is idempotent,
+     * but canceling saves resources.
+     */
+    private void cancelExpirationJob(GroupPurchaseInstanceEntity group) {
+
+        if (group.getMetadata() == null) {
+            log.debug("No metadata - expiration job might not have been scheduled");
+            return;
+        }
+
+        String jobIdStr = (String) group.getMetadata().get("expirationJobId");
+
+        if (jobIdStr == null || jobIdStr.isEmpty()) {
+            log.debug("No expirationJobId in metadata");
+            return;
+        }
+
+        try {
+            JobId jobId = JobId.parse(jobIdStr);
+            jobScheduler.delete(jobId);
+
+            log.info("✅ Cancelled expiration job: {}", jobId);
+            log.info("   Reason: Group completed before expiration");
+            log.info("   Group: {} ({})", group.getGroupCode(), group.getGroupInstanceId());
+
+        } catch (Exception e) {
+            log.warn("Could not cancel expiration job: {}", e.getMessage());
+            // Not critical - expireGroup() is idempotent anyway
+            // If job runs, it will see group is COMPLETED and exit early
         }
     }
 }
