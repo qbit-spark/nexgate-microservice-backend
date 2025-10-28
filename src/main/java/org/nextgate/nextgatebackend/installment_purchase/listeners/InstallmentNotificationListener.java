@@ -27,16 +27,7 @@ public class InstallmentNotificationListener {
                 event.getAgreement().getCustomer().getUserName());
 
         try {
-            String message = event.isEarlyPayoff()
-                    ? "Congratulations on paying off early! Your order is being processed."
-                    : "Congratulations on completing your payment plan! Your order is being processed.";
 
-            // TODO: Send notification
-            // notificationService.sendAgreementCompletionNotification(
-            //     event.getAgreement().getCustomer(),
-            //     event.getAgreement(),
-            //     message
-            // );
 
             log.info("✓ Notification sent to: {}",
                     event.getAgreement().getCustomer().getEmail());
