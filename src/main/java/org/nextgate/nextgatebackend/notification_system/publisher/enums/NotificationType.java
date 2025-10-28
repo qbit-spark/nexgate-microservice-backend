@@ -29,6 +29,7 @@ public enum NotificationType {
     // Group purchase notifications
     GROUP_PURCHASE_COMPLETE,
 
+    //Todo: we need template and consumer for this
     GROUP_PURCHASE_FAILED,
 
     // User notifications

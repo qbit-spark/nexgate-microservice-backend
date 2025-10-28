@@ -156,7 +156,7 @@ public class InstallmentPaymentEntity {
     public void recordSuccessfulPayment(String transactionId, String paymentMethod) {
         this.paymentStatus = PaymentStatus.COMPLETED;
         this.paidAt = LocalDateTime.now();
-        this.paidAmount = this.scheduledAmount;
+        this.paidAmount = this.scheduledAmount;  // Full payment
         this.transactionId = transactionId;
         this.paymentMethod = paymentMethod;
         this.failureReason = null;
@@ -190,4 +190,48 @@ public class InstallmentPaymentEntity {
         long days = java.time.Duration.between(dueDate, LocalDateTime.now()).toDays();
         return (int) days;
     }
+
+    // ADD: New helper methods
+    public BigDecimal getRemainingAmount() {
+        if (paidAmount == null) {
+            return scheduledAmount;
+        }
+        return scheduledAmount.subtract(paidAmount);
+    }
+
+    public boolean isPartiallyPaid() {
+        if (paidAmount == null || paidAmount.compareTo(BigDecimal.ZERO) == 0) {
+            return false;
+        }
+        return paidAmount.compareTo(scheduledAmount) < 0;
+    }
+
+    public boolean isFullyPaid() {
+        return paidAmount != null &&
+                paidAmount.compareTo(scheduledAmount) >= 0;
+    }
+
+    // NEW: Record partial payment
+    public void recordPartialPayment(BigDecimal amount, String transactionId, String paymentMethod) {
+        if (this.paidAmount == null) {
+            this.paidAmount = amount;
+        } else {
+            this.paidAmount = this.paidAmount.add(amount);
+        }
+
+        if (this.paidAmount.compareTo(this.scheduledAmount) >= 0) {
+            // Became fully paid
+            this.paymentStatus = PaymentStatus.COMPLETED;
+            this.paidAt = LocalDateTime.now();
+            this.paidAmount = this.scheduledAmount; // Cap at scheduled
+        } else {
+            // Still partial
+            this.paymentStatus = PaymentStatus.PARTIALLY_PAID;
+        }
+
+        this.transactionId = transactionId;
+        this.paymentMethod = paymentMethod;
+        this.attemptedAt = LocalDateTime.now();
+    }
+
 }

@@ -23,17 +23,3 @@ public class ExpireGroupJobRequest implements JobRequest {
     }
 }
 
-@Component
-class ExpireGroupJobRequestHandler implements JobRequestHandler<ExpireGroupJobRequest> {
-
-    private final GroupExpirationService groupExpirationService;
-
-    public ExpireGroupJobRequestHandler(GroupExpirationService groupExpirationService) {
-        this.groupExpirationService = groupExpirationService;
-    }
-
-    @Override
-    public void run(ExpireGroupJobRequest jobRequest) {
-        groupExpirationService.expireGroup(jobRequest.getGroupId());
-    }
-}

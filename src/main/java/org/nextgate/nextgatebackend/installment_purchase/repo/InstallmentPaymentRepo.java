@@ -4,6 +4,8 @@ import org.nextgate.nextgatebackend.installment_purchase.entity.InstallmentAgree
 import org.nextgate.nextgatebackend.installment_purchase.entity.InstallmentPaymentEntity;
 import org.nextgate.nextgatebackend.installment_purchase.enums.PaymentStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
@@ -40,4 +42,27 @@ public interface InstallmentPaymentRepo extends JpaRepository<InstallmentPayment
 
     List<InstallmentPaymentEntity> findByAgreementAndPaymentStatusOrderByPaymentNumberAsc(
             InstallmentAgreementEntity agreement, PaymentStatus status);
+
+    // NEW: Find all unpaid or partially paid payments in order
+    @Query("SELECT p FROM InstallmentPaymentEntity p " +
+            "WHERE p.agreement = :agreement " +
+            "AND p.paymentStatus IN ('SCHEDULED', 'PENDING', 'PARTIALLY_PAID', 'LATE') " +
+            "ORDER BY p.paymentNumber ASC")
+    List<InstallmentPaymentEntity> findUnpaidPaymentsInOrder(
+            @Param("agreement") InstallmentAgreementEntity agreement);
+
+    // NEW: Get next incomplete payment
+    @Query("SELECT p FROM InstallmentPaymentEntity p " +
+            "WHERE p.agreement = :agreement " +
+            "AND p.paymentStatus IN ('SCHEDULED', 'PENDING', 'PARTIALLY_PAID', 'LATE') " +
+            "ORDER BY p.paymentNumber ASC")
+    Optional<InstallmentPaymentEntity> findNextIncompletePayment(
+            @Param("agreement") InstallmentAgreementEntity agreement);
+
+    // NEW: Count unpaid/partial payments
+    @Query("SELECT COUNT(p) FROM InstallmentPaymentEntity p " +
+            "WHERE p.agreement = :agreement " +
+            "AND p.paymentStatus IN ('SCHEDULED', 'PENDING', 'PARTIALLY_PAID', 'LATE')")
+    long countIncompletePayments(
+            @Param("agreement") InstallmentAgreementEntity agreement);
 }

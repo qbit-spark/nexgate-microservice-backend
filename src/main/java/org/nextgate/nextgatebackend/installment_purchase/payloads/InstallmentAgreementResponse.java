@@ -93,4 +93,9 @@ public class InstallmentAgreementResponse {
     private Boolean canMakeEarlyPayment;
     private Boolean canCancel;
     private Boolean canUpdatePaymentMethod;
+
+    private Boolean canMakeFlexiblePayment;
+    private BigDecimal minimumFlexiblePayment;  // Next incomplete payment amount
+    private BigDecimal maximumFlexiblePayment;  // Total remaining
+    private Integer paymentsPartiallyPaid;      // Count of partial payments
 }

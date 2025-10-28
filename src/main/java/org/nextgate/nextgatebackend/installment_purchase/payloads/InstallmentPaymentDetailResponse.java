@@ -44,4 +44,8 @@ public class InstallmentPaymentDetailResponse {
 
     private Boolean canPay;
     private Boolean canRetry;
+
+    private BigDecimal remainingAmount;  // How much left to pay
+    private Boolean isPartiallyPaid;     // Has some money applied
+    private Double percentComplete;       // paidAmount / scheduledAmount * 100
 }
