@@ -78,7 +78,7 @@ public class InstallmentPlanServiceImpl implements InstallmentPlanService {
                 .numberOfPayments(request.getNumberOfPayments())
                 .apr(request.getApr())
                 .minDownPaymentPercent(request.getMinDownPaymentPercent())
-                .gracePeriodDays(request.getGracePeriodDays())
+                .paymentStartDelayDays(request.getPaymentStartDelayDays())
                 .fulfillmentTiming(request.getFulfillmentTiming())
                 .displayOrder(request.getDisplayOrder())
                 .isFeatured(request.getIsFeatured())
@@ -186,7 +186,7 @@ public class InstallmentPlanServiceImpl implements InstallmentPlanService {
         if (request.getNumberOfPayments() != null) plan.setNumberOfPayments(request.getNumberOfPayments());
         if (request.getApr() != null) plan.setApr(request.getApr());
         if (request.getMinDownPaymentPercent() != null) plan.setMinDownPaymentPercent(request.getMinDownPaymentPercent());
-        if (request.getGracePeriodDays() != null) plan.setGracePeriodDays(request.getGracePeriodDays());
+        if (request.getPaymentStartDelayDays() != null) plan.setPaymentStartDelayDays(request.getPaymentStartDelayDays());
         if (request.getFulfillmentTiming() != null) plan.setFulfillmentTiming(request.getFulfillmentTiming());
         if (request.getDisplayOrder() != null) plan.setDisplayOrder(request.getDisplayOrder());
 
@@ -424,7 +424,7 @@ public class InstallmentPlanServiceImpl implements InstallmentPlanService {
                 .numberOfPayments(plan.getNumberOfPayments())
                 .apr(plan.getApr())
                 .minDownPaymentPercent(plan.getMinDownPaymentPercent())
-                .gracePeriodDays(plan.getGracePeriodDays())
+                .paymentStartDelayDays(plan.getPaymentStartDelayDays())
                 .calculatedDurationDays(plan.getCalculatedDurationDays())
                 .calculatedDurationDisplay(plan.getCalculatedDurationDisplay())
                 .fulfillmentTiming(plan.getFulfillmentTiming())

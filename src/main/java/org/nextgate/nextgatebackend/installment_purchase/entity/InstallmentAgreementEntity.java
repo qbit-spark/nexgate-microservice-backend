@@ -109,8 +109,8 @@ public class InstallmentAgreementEntity {
     @Column(nullable = false, precision = 5, scale = 2)
     private BigDecimal apr;  // Snapshot of APR at creation
 
-    @Column(nullable = false)
-    private Integer gracePeriodDays;
+    @Column(name = "payment_start_delay_days", nullable = false)
+    private Integer paymentStartDelayDays;
 
     // ========================================
     // FINANCIAL BREAKDOWN

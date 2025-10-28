@@ -28,7 +28,7 @@ public class InstallmentPlanResponse {
     private Integer numberOfPayments;
     private BigDecimal apr;
     private Integer minDownPaymentPercent;
-    private Integer gracePeriodDays;
+    private Integer paymentStartDelayDays;
 
     // Calculated duration
     private Integer calculatedDurationDays;

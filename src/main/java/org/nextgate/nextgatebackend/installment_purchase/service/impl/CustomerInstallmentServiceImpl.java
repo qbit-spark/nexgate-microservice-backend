@@ -347,7 +347,7 @@ public class CustomerInstallmentServiceImpl implements CustomerInstallmentServic
         response.setNumberOfPayments(agreement.getNumberOfPayments());
         response.setDuration(agreement.getSelectedPlan().getCalculatedDurationDisplay());
         response.setApr(agreement.getApr());
-        response.setGracePeriodDays(agreement.getGracePeriodDays());
+        response.setPaymentStartDelayDays(agreement.getPaymentStartDelayDays());
         response.setDownPaymentAmount(agreement.getDownPaymentAmount());
         response.setFinancedAmount(agreement.getFinancedAmount());
         response.setMonthlyPaymentAmount(agreement.getMonthlyPaymentAmount());
