@@ -20,7 +20,25 @@ public enum NotificationType {
     WALLET_BALANCE_UPDATE,
 
     // Installment notifications
-    INSTALLMENT_DUE,
+
+    // Payment notifications
+    INSTALLMENT_PAYMENT_SUCCESS,
+    INSTALLMENT_PAYMENT_FAILED,
+    INSTALLMENT_PAYMENT_REMINDER,
+    INSTALLMENT_PAYMENT_OVERDUE,
+
+    // Lifecycle notifications
+    INSTALLMENT_AGREEMENT_CREATED,
+    INSTALLMENT_AGREEMENT_COMPLETED,
+    INSTALLMENT_AGREEMENT_DEFAULTED,
+
+    // Special payment notifications
+    INSTALLMENT_EARLY_PAYOFF_SUCCESS,
+    INSTALLMENT_FLEXIBLE_PAYMENT_SUCCESS,
+
+    // Admin/Collections notifications
+    INSTALLMENT_DEFAULT_ADMIN_ALERT,
+    INSTALLMENT_COLLECTIONS_REQUIRED,
 
     // Shop notifications
     SHOP_NEW_ORDER,

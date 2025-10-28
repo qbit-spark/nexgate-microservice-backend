@@ -35,8 +35,28 @@ public enum NotificationDomain {
             NotificationType.WALLET_BALANCE_UPDATE),
 
     // Installment domain
-    INSTALLMENT("notification.installment",
-            NotificationType.INSTALLMENT_DUE),
+    INSTALLMENT(
+            "notification.installment",
+
+                    // Lifecycle
+                    NotificationType.INSTALLMENT_AGREEMENT_CREATED,
+                    NotificationType.INSTALLMENT_AGREEMENT_COMPLETED,
+                    NotificationType.INSTALLMENT_AGREEMENT_DEFAULTED,
+
+                    // Payments
+                    NotificationType.INSTALLMENT_PAYMENT_SUCCESS,
+                    NotificationType.INSTALLMENT_PAYMENT_FAILED,
+                    NotificationType.INSTALLMENT_PAYMENT_REMINDER,
+                    NotificationType.INSTALLMENT_PAYMENT_OVERDUE,
+
+                    // Special payments
+                    NotificationType.INSTALLMENT_EARLY_PAYOFF_SUCCESS,
+                    NotificationType.INSTALLMENT_FLEXIBLE_PAYMENT_SUCCESS,
+
+                    // Admin
+                    NotificationType.INSTALLMENT_DEFAULT_ADMIN_ALERT,
+                    NotificationType.INSTALLMENT_COLLECTIONS_REQUIRED
+    ),
 
     // Shop domain
     SHOP("notification.shop",
