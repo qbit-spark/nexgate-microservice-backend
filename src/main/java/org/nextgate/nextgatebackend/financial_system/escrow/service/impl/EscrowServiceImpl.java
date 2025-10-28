@@ -45,11 +45,7 @@ public class EscrowServiceImpl implements EscrowService {
 
     @Override
     @Transactional
-    public EscrowAccountEntity holdMoney(
-            CheckoutSessionEntity checkoutSession,
-            AccountEntity buyer,
-            AccountEntity seller,
-            BigDecimal amount) throws ItemNotFoundException, RandomExceptions {
+    public EscrowAccountEntity holdMoney(CheckoutSessionEntity checkoutSession, AccountEntity buyer, AccountEntity seller, BigDecimal amount) throws ItemNotFoundException, RandomExceptions {
 
         // Prevent duplicate escrow for same checkout session
         if (escrowExistsForCheckoutSession(checkoutSession)) {
@@ -152,7 +148,6 @@ public class EscrowServiceImpl implements EscrowService {
         return savedEscrow;
     }
 
-
     @Override
     @Transactional
     public void releaseMoney(UUID escrowId) throws ItemNotFoundException, RandomExceptions {
@@ -224,6 +219,9 @@ public class EscrowServiceImpl implements EscrowService {
 
         log.info("Escrow released: {} - Seller received: {} TZS, Platform fee: {} TZS",
                 escrow.getEscrowNumber(), escrow.getSellerAmount(), escrow.getPlatformFeeAmount());
+
+        //Todo: We need to send a notification to the seller
+
     }
 
     @Override
@@ -288,8 +286,9 @@ public class EscrowServiceImpl implements EscrowService {
 
         log.info("Escrow refunded: {} - Amount: {} TZS returned to buyer",
                 escrow.getEscrowNumber(), escrow.getTotalAmount());
-    }
 
+        //Todo: We need to send a notification to the buyer about the refund
+    }
 
     @Override
     @Transactional

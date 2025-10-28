@@ -258,6 +258,48 @@ public class InstallmentController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/agreements/{agreementId}/flexible-payment/preview")
+    public ResponseEntity<GlobeSuccessResponseBuilder> previewFlexiblePayment(
+            @PathVariable UUID agreementId,
+            @Valid @RequestBody FlexiblePaymentPreviewRequest request
+    ) throws ItemNotFoundException, BadRequestException {
+
+        AccountEntity customer = getAuthenticatedAccount();
+
+        FlexiblePaymentPreviewResponse preview =
+                customerInstallmentService.previewFlexiblePayment(
+                        agreementId, request, customer
+                );
+
+        GlobeSuccessResponseBuilder response = GlobeSuccessResponseBuilder.builder()
+                .message("Flexible payment preview calculated successfully")
+                .data(preview)
+                .build();
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/agreements/{agreementId}/flexible-payment")
+    public ResponseEntity<GlobeSuccessResponseBuilder> makeFlexiblePayment(
+            @PathVariable UUID agreementId,
+            @Valid @RequestBody FlexiblePaymentRequest request
+    ) throws ItemNotFoundException, BadRequestException {
+
+        AccountEntity customer = getAuthenticatedAccount();
+
+        FlexiblePaymentResponse payment =
+                customerInstallmentService.makeFlexiblePayment(
+                        agreementId, request, customer
+                );
+
+        GlobeSuccessResponseBuilder response = GlobeSuccessResponseBuilder.builder()
+                .message(payment.getMessage())
+                .data(payment)
+                .build();
+
+        return ResponseEntity.ok(response);
+    }
+
     private AccountEntity getAuthenticatedAccount() throws ItemNotFoundException {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.isAuthenticated()) {

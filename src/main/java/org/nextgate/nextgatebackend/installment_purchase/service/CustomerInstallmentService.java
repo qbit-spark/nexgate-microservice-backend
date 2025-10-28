@@ -62,4 +62,18 @@ public interface CustomerInstallmentService {
             CancelAgreementRequest request,
             AccountEntity customer)
             throws ItemNotFoundException, BadRequestException;
+
+
+    FlexiblePaymentPreviewResponse previewFlexiblePayment(
+            UUID agreementId,
+            FlexiblePaymentPreviewRequest request,
+            AccountEntity customer
+    ) throws ItemNotFoundException, BadRequestException;
+
+    // : Process flexible payment
+    FlexiblePaymentResponse makeFlexiblePayment(
+            UUID agreementId,
+            FlexiblePaymentRequest request,
+            AccountEntity customer
+    ) throws ItemNotFoundException, BadRequestException;
 }

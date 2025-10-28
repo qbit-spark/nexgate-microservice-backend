@@ -11,7 +11,11 @@ import org.nextgate.nextgatebackend.installment_purchase.entity.InstallmentAgree
 import org.nextgate.nextgatebackend.installment_purchase.entity.InstallmentPaymentEntity;
 import org.nextgate.nextgatebackend.installment_purchase.enums.AgreementStatus;
 import org.nextgate.nextgatebackend.installment_purchase.enums.PaymentStatus;
+import org.nextgate.nextgatebackend.installment_purchase.repo.InstallmentPaymentRepo;
 import org.springframework.stereotype.Component;
+
+import java.math.BigDecimal;
+import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
@@ -185,5 +189,68 @@ public class InstallmentValidator {
                     "Agreement is in default. Please contact support."
             );
         }
+    }
+
+    // NEW: Validate flexible payment request
+    public void validateFlexiblePaymentRequest(
+            InstallmentAgreementEntity agreement,
+            BigDecimal requestedAmount
+    ) throws BadRequestException {
+
+        // 1. Agreement must be active
+        if (agreement.getAgreementStatus() != AgreementStatus.ACTIVE &&
+                agreement.getAgreementStatus() != AgreementStatus.PENDING_FIRST_PAYMENT) {
+            throw new BadRequestException(
+                    "Cannot make payment on inactive agreement. Status: " +
+                            agreement.getAgreementStatus()
+            );
+        }
+
+        // 2. Agreement must not be defaulted
+        if (agreement.getAgreementStatus() == AgreementStatus.DEFAULTED) {
+            throw new BadRequestException(
+                    "Agreement is in default. Please contact support."
+            );
+        }
+
+        // 3. Must have remaining balance
+        if (agreement.getAmountRemaining().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException(
+                    "Agreement is already fully paid"
+            );
+        }
+
+        // 4. Amount must be positive
+        if (requestedAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException(
+                    "Payment amount must be greater than zero"
+            );
+        }
+
+        // 5. Amount cannot exceed remaining balance
+        if (requestedAmount.compareTo(agreement.getAmountRemaining()) > 0) {
+            throw new BadRequestException(
+                    String.format(
+                            "Payment amount (%s) exceeds remaining balance (%s). " +
+                                    "Use early payoff endpoint if paying off completely.",
+                            requestedAmount, agreement.getAmountRemaining()
+                    )
+            );
+        }
+    }
+
+    // NEW: Get minimum payment required (next incomplete payment)
+    public BigDecimal getMinimumPaymentRequired(
+            InstallmentAgreementEntity agreement,
+            InstallmentPaymentRepo paymentRepo
+    ) {
+        Optional<InstallmentPaymentEntity> nextPayment =
+                paymentRepo.findNextIncompletePayment(agreement);
+
+        if (nextPayment.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+
+        return nextPayment.get().getRemainingAmount();
     }
 }

@@ -8,5 +8,7 @@ public enum PaymentStatus {
     FAILED,       // Payment attempt failed
     LATE,         // Past due date
     SKIPPED,      // Missed completely
-    WAIVED        // Forgiven (special cases)
+    WAIVED ,    // Forgiven (special cases)
+
+    PARTIALLY_PAID
 }

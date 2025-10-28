@@ -7,10 +7,13 @@ import org.jobrunr.jobs.annotations.Job;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.installment_purchase.entity.InstallmentAgreementEntity;
 import org.nextgate.nextgatebackend.installment_purchase.entity.InstallmentPaymentEntity;
+import org.nextgate.nextgatebackend.installment_purchase.enums.PaymentStatus;
 import org.nextgate.nextgatebackend.installment_purchase.repo.InstallmentPaymentRepo;
 import org.nextgate.nextgatebackend.installment_purchase.service.InstallmentService;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Component
@@ -27,10 +30,44 @@ public class InstallmentPaymentProcessor {
         log.info("Processing payment: {}", paymentId);
 
         try {
-            InstallmentPaymentEntity payment = installmentService.processInstallmentPayment(paymentId);
+            // 1. Fetch payment
+            InstallmentPaymentEntity payment = paymentRepo.findById(paymentId)
+                    .orElseThrow(() -> new ItemNotFoundException("Payment not found: " + paymentId));
+
+            log.info("Payment Details:");
+            log.info("  Payment #: {}", payment.getPaymentNumber());
+            log.info("  Scheduled Amount: {} TZS", payment.getScheduledAmount());
+            log.info("  Already Paid: {} TZS",
+                    payment.getPaidAmount() != null ? payment.getPaidAmount() : BigDecimal.ZERO);
+            log.info("  Status: {}", payment.getPaymentStatus());
+
+            // 2. Check if already completed (via flexible payment)
+            if (payment.getPaymentStatus() == PaymentStatus.COMPLETED) {
+                log.info("✓ Payment already completed via flexible payment - skipping");
+                return;
+            }
+
+            // 3. Calculate the remaining amount to charge
+            BigDecimal amountDue = payment.getRemainingAmount();
+
+            if (amountDue.compareTo(BigDecimal.ZERO) == 0) {
+                log.info("✓ Payment fully paid via flexible payment - marking complete");
+                payment.setPaymentStatus(PaymentStatus.COMPLETED);
+                payment.setPaidAt(LocalDateTime.now());
+                paymentRepo.save(payment);
+                return;
+            }
+
+            log.info("Amount to charge: {} TZS {}",
+                    amountDue,
+                    payment.isPartiallyPaid() ? "(remaining from partial payment)" : "(full payment)");
+
+            // 4. Process the payment (remaining amount only)
+            InstallmentPaymentEntity processedPayment =
+                    installmentService.processInstallmentPayment(paymentId);
 
             log.info("Payment processed successfully: {} - Status: {}",
-                    paymentId, payment.getPaymentStatus());
+                    paymentId, processedPayment.getPaymentStatus());
 
         } catch (ItemNotFoundException e) {
             log.error("Payment not found: {}", paymentId);
@@ -39,7 +76,8 @@ public class InstallmentPaymentProcessor {
         } catch (BadRequestException e) {
             log.error("Payment processing failed (business logic): {} - Reason: {}",
                     paymentId, e.getMessage());
-            throw new RuntimeException("Payment processing failed: " + e.getMessage(), e);
+            // Payment failure is already handled by installmentService.handleMissedPayment
+            // Don't throw - let it retry via the retry job
 
         } catch (Exception e) {
             log.error("Unexpected error processing payment: {}", paymentId, e);
