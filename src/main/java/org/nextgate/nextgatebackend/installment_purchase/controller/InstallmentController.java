@@ -258,7 +258,7 @@ public class InstallmentController {
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/agreements/{agreementId}/flexible-payment/preview")
+    @PostMapping("/agreements/{agreementId}/early-flexible-payment/preview")
     public ResponseEntity<GlobeSuccessResponseBuilder> previewFlexiblePayment(
             @PathVariable UUID agreementId,
             @Valid @RequestBody FlexiblePaymentPreviewRequest request
@@ -279,7 +279,7 @@ public class InstallmentController {
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/agreements/{agreementId}/flexible-payment")
+    @PostMapping("/agreements/{agreementId}/early-flexible-payment")
     public ResponseEntity<GlobeSuccessResponseBuilder> makeFlexiblePayment(
             @PathVariable UUID agreementId,
             @Valid @RequestBody FlexiblePaymentRequest request
