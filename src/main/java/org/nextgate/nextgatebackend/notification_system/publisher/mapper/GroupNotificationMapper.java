@@ -385,4 +385,71 @@ public class GroupNotificationMapper {
         if (total == 0) return "0.00";
         return String.format("%.2f", (occupied * 100.0) / total);
     }
+
+
+    /**
+     * Map data for group failure notification to participants
+     */
+    public static Map<String, Object> mapGroupFailed(
+            GroupPurchaseInstanceEntity group,
+            GroupParticipantEntity participant) {
+
+        Map<String, Object> data = new HashMap<>();
+
+        // Group info
+        data.put("groupCode", group.getGroupCode());
+        data.put("productName", group.getProductName());
+        data.put("productImage", group.getProductImage());
+        data.put("groupPrice", group.getGroupPrice());
+
+        // Participant info
+        data.put("quantity", participant.getQuantity());
+        data.put("amountPaid", participant.getTotalPaid());
+        data.put("refundStatus", "PROCESSING");
+
+        // Group stats
+        data.put("seatsFilled", group.getSeatsOccupied());
+        data.put("totalSeats", group.getTotalSeats());
+        data.put("seatsUnfilled", group.getSeatsRemaining());
+
+        // Timing
+        data.put("expiresAt", group.getExpiresAt());
+        data.put("failedAt", LocalDateTime.now());
+
+        return data;
+    }
+
+    /**
+     * Map data for group failure notification to shop owner
+     */
+    public static Map<String, Object> mapGroupFailedForShopOwner(
+            GroupPurchaseInstanceEntity group,
+            List<GroupParticipantEntity> participants) {
+
+        Map<String, Object> data = new HashMap<>();
+
+        // Group info
+        data.put("groupCode", group.getGroupCode());
+        data.put("productName", group.getProductName());
+        data.put("shopName", group.getShop().getShopName());
+
+        // Stats
+        data.put("totalParticipants", participants.size());
+        data.put("seatsFilled", group.getSeatsOccupied());
+        data.put("totalSeats", group.getTotalSeats());
+        data.put("seatsUnfilled", group.getSeatsRemaining());
+
+        // Financial
+        BigDecimal totalRevenueLost = participants.stream()
+                .map(GroupParticipantEntity::getTotalPaid)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        data.put("totalRevenueLost", totalRevenueLost);
+
+        // Timing
+        data.put("createdAt", group.getCreatedAt());
+        data.put("expiresAt", group.getExpiresAt());
+        data.put("failedAt", LocalDateTime.now());
+
+        return data;
+    }
 }

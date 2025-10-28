@@ -3,6 +3,10 @@ package org.nextgate.nextgatebackend.group_purchase_mng.service.impl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.coyote.BadRequestException;
+import org.jobrunr.jobs.JobId;
+import org.jobrunr.scheduling.BackgroundJob;
+import org.jobrunr.scheduling.BackgroundJobRequest;
+import org.jobrunr.scheduling.JobScheduler;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.authentication_service.repo.AccountRepo;
 import org.nextgate.nextgatebackend.checkout_session.entity.CheckoutSessionEntity;
@@ -13,8 +17,10 @@ import org.nextgate.nextgatebackend.group_purchase_mng.entity.GroupPurchaseInsta
 import org.nextgate.nextgatebackend.group_purchase_mng.enums.GroupStatus;
 import org.nextgate.nextgatebackend.group_purchase_mng.enums.ParticipantStatus;
 import org.nextgate.nextgatebackend.group_purchase_mng.events.GroupCompletedEvent;
+import org.nextgate.nextgatebackend.group_purchase_mng.jobs.ExpireGroupJobRequest;
 import org.nextgate.nextgatebackend.group_purchase_mng.repo.GroupParticipantRepo;
 import org.nextgate.nextgatebackend.group_purchase_mng.repo.GroupPurchaseInstanceRepo;
+import org.nextgate.nextgatebackend.group_purchase_mng.service.GroupExpirationService;
 import org.nextgate.nextgatebackend.group_purchase_mng.service.GroupPurchaseService;
 import org.nextgate.nextgatebackend.group_purchase_mng.utils.GroupPurchaseValidator;
 import org.nextgate.nextgatebackend.notification_system.publisher.NotificationPublisher;
@@ -34,7 +40,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.*;
 
 @Service
@@ -50,7 +58,8 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
     private final ApplicationEventPublisher eventPublisher;
     private final CheckoutSessionRepo checkoutSessionRepo;
     private final NotificationPublisher notificationPublisher;
-    
+    private final JobScheduler jobScheduler;
+
     @Override
     @Transactional
     public void createGroupInstance(
@@ -97,7 +106,7 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
                 .participants(new ArrayList<>())
                 .productName(product.getProductName())
                 .productImage(product.getProductImages() != null && !product.getProductImages().isEmpty()
-                        ? product.getProductImages().get(0) : null)
+                        ? product.getProductImages().getFirst() : null)
                 .regularPrice(product.getPrice())
                 .groupPrice(product.getGroupPrice())
                 .totalSeats(product.getGroupMaxSize())
@@ -118,6 +127,11 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
 
         log.info("Group instance created: {} with code: {}",
                 savedGroup.getGroupInstanceId(), savedGroup.getGroupCode());
+
+        // ========================================
+        // SCHEDULE EXPIRATION JOB
+        // ========================================
+        scheduleExpirationJob(savedGroup);
 
         // ========================================
         //          LINK CHECKOUT SESSION TO GROUP
@@ -161,6 +175,7 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
                 isGroupFull,
                 savedGroup.getSeatsOccupied(),
                 savedGroup.getTotalSeats());
+
 
         sendGroupCreatedNotification(savedGroup, customer, quantity);
 
@@ -741,7 +756,6 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
     }
 
 
-
     // Helper method
     private AccountEntity getAuthenticatedAccount() throws ItemNotFoundException {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -755,13 +769,12 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
     }
 
 
-
     /**
      * Checks if group is full and handles completion.
      * Publishes GroupCompletedEvent if group just became full.
-     *
+     * <p>
      * IMPORTANT: This method is idempotent - safe to call multiple times.
-     *
+     * <p>
      * Call this after any operation that changes seatsOccupied:
      * - createGroupInstance()
      * - joinGroup()
@@ -1152,5 +1165,56 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
         notificationPublisher.publish(event);
 
         log.info("✅ Seats transferred notification sent to: {}", user.getUserName());
+    }
+
+
+
+    private void scheduleExpirationJob(GroupPurchaseInstanceEntity group) {
+
+        LocalDateTime expiresAt = group.getExpiresAt();
+        UUID groupId = group.getGroupInstanceId();
+
+        log.info("════════════════════════════════════════════════════════");
+        log.info("SCHEDULING EXPIRATION JOB");
+        log.info("Group ID: {}", groupId);
+        log.info("Group Code: {}", group.getGroupCode());
+        log.info("Expires At: {}", expiresAt);
+        log.info("════════════════════════════════════════════════════════");
+
+        try {
+            // Convert to Instant
+            Instant expirationInstant = expiresAt
+                    .atZone(ZoneId.systemDefault())
+                    .toInstant();
+
+            log.info("Expiration instant (UTC): {}", expirationInstant);
+
+            // ✅ USE BackgroundJobRequest.schedule() for JobRequest pattern
+            ExpireGroupJobRequest jobRequest = new ExpireGroupJobRequest(groupId);
+            JobId jobId = BackgroundJobRequest.schedule(expirationInstant, jobRequest);
+
+            log.info("✅ SUCCESS - Job scheduled!");
+            log.info("   JobId: {}", jobId);
+            log.info("   Method: ExpireGroupJobRequest");
+            log.info("   Group ID: {}", groupId);
+
+            // Store jobId in metadata
+            if (group.getMetadata() == null) {
+                group.setMetadata(new HashMap<>());
+            }
+            group.getMetadata().put("expirationJobId", jobId.toString());
+            group.getMetadata().put("expirationScheduledAt", LocalDateTime.now().toString());
+            groupPurchaseInstanceRepo.save(group);
+
+            log.info("✅ JobId stored in group metadata");
+
+        } catch (Exception e) {
+            log.error("❌ FAILED TO SCHEDULE EXPIRATION JOB", e);
+            log.error("   Group: {}", group.getGroupCode());
+            log.error("   Error: {}", e.getMessage());
+            throw e;
+        }
+
+        log.info("════════════════════════════════════════════════════════");
     }
 }

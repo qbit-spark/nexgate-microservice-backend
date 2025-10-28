@@ -29,6 +29,8 @@ public enum NotificationType {
     // Group purchase notifications
     GROUP_PURCHASE_COMPLETE,
 
+    GROUP_PURCHASE_FAILED,
+
     // User notifications
     WELCOME_EMAIL,
 
@@ -38,4 +40,5 @@ public enum NotificationType {
     GROUP_PURCHASE_CREATED,
     GROUP_MEMBER_JOINED,
     GROUP_SEATS_TRANSFERRED
+
 }

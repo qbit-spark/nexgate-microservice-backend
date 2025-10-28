@@ -21,4 +21,6 @@ public interface CheckoutSessionRepo extends JpaRepository<CheckoutSessionEntity
 
     // Find active sessions by customer and status
     List<CheckoutSessionEntity> findByCustomerAndStatus(AccountEntity customer, CheckoutSessionStatus status);
+
+    Optional<CheckoutSessionEntity> findBySessionId(UUID sessionId);
 }
