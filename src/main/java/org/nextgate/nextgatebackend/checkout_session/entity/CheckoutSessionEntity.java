@@ -317,7 +317,7 @@ public class CheckoutSessionEntity {
 
         // Timing
         private LocalDateTime firstPaymentDate;
-        private Integer gracePeriodDays;
+        private Integer paymetnStartDelayDays;
         private String fulfillmentTiming;        // IMMEDIATE or AFTER_PAYMENT
 
         // Full schedule preview

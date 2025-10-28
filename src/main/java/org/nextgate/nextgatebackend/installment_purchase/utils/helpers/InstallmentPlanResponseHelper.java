@@ -212,7 +212,7 @@ public class InstallmentPlanResponseHelper {
         List<ProductDetailedResponse.OrderingLimitsResponse.PaymentScheduleResponse> schedule = new ArrayList<>();
 
         // Start date is today + grace period
-        LocalDateTime startDate = LocalDateTime.now().plusDays(plan.getGracePeriodDays());
+        LocalDateTime startDate = LocalDateTime.now().plusDays(plan.getPaymentStartDelayDays());
 
         for (int paymentNumber = 1; paymentNumber <= plan.getNumberOfPayments(); paymentNumber++) {
             LocalDateTime dueDate = calculatePaymentDueDate(plan, startDate, paymentNumber);

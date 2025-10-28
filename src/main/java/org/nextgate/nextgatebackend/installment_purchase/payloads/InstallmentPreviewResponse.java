@@ -36,7 +36,7 @@ public class InstallmentPreviewResponse {
     private Integer numberOfPayments;       // 6, 12, etc.
     private String durationDisplay;         // "6 months", "12 weeks"
     private BigDecimal apr;                 // 15.00
-    private Integer gracePeriodDays;        // 30
+    private Integer paymentStartDelayDays;        // 30
 
     // ========================================
     // PRODUCT INFO

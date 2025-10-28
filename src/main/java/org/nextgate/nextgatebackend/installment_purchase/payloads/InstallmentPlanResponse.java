@@ -25,7 +25,7 @@ public class InstallmentPlanResponse {
     // Terms
     private BigDecimal apr;
     private Integer minDownPaymentPercent;
-    private Integer gracePeriodDays;
+    private Integer paymentStartDelayDays;
     private FulfillmentTiming fulfillmentTiming;
 
     // Status

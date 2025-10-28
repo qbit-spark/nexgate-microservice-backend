@@ -224,7 +224,7 @@ public class CheckoutSessionMapper {
                 .totalInterest(config.getTotalInterest())
                 .totalAmount(config.getTotalAmount())
                 .firstPaymentDate(config.getFirstPaymentDate())
-                .gracePeriodDays(config.getGracePeriodDays())
+                .paymentStartDelayDays(config.getPaymetnStartDelayDays())
                 .fulfillmentTiming(config.getFulfillmentTiming())
                 .schedule(mapScheduleToResponse(config.getSchedule()))
                 .build();

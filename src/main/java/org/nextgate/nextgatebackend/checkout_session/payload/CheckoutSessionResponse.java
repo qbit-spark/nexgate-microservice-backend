@@ -191,7 +191,7 @@ public class CheckoutSessionResponse {
         private BigDecimal totalInterest;
         private BigDecimal totalAmount;
         private LocalDateTime firstPaymentDate;
-        private Integer gracePeriodDays;
+        private Integer paymentStartDelayDays;
         private String fulfillmentTiming;
         private List<PaymentScheduleItemResponse> schedule;
     }

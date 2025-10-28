@@ -98,7 +98,7 @@ public class InstallmentServiceImpl implements InstallmentService {
         // ========================================
         // 3. EXTRACT DATA FROM CHECKOUT SESSION
         // ========================================
-        CheckoutSessionEntity.CheckoutItem item = checkoutSession.getItems().get(0);
+        CheckoutSessionEntity.CheckoutItem item = checkoutSession.getItems().getFirst();
         CheckoutSessionEntity.InstallmentConfiguration config =
                 checkoutSession.getInstallmentConfig();
 
@@ -152,7 +152,7 @@ public class InstallmentServiceImpl implements InstallmentService {
                 .numberOfPayments(plan.getNumberOfPayments())
                 .termMonths(config.getTermMonths())
                 .apr(plan.getApr())
-                .gracePeriodDays(plan.getGracePeriodDays())
+                .paymentStartDelayDays(plan.getPaymentStartDelayDays())
 
                 // Financial breakdown
                 .downPaymentPercent(config.getDownPaymentPercent())

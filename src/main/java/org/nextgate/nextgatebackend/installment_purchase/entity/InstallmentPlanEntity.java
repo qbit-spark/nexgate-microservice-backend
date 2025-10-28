@@ -101,8 +101,9 @@ public class InstallmentPlanEntity {
     // GRACE PERIOD
     // ========================================
 
-    @Column(name = "grace_period_days", nullable = false)
-    private Integer gracePeriodDays;  // Days before first payment due (0-60)
+    @Column(name = "payment_start_delay_days", nullable = false)
+    private Integer paymentStartDelayDays;  // Days before first payment due (0-60)
+
 
     // ========================================
     // FULFILLMENT
@@ -216,7 +217,7 @@ public class InstallmentPlanEntity {
         if (numberOfPayments == null || numberOfPayments < 2 || numberOfPayments > 120) return false;
         if (apr == null || apr.compareTo(BigDecimal.ZERO) < 0 || apr.compareTo(BigDecimal.valueOf(36)) > 0) return false;
         if (minDownPaymentPercent == null || minDownPaymentPercent < 10 || minDownPaymentPercent > 50) return false;
-        if (gracePeriodDays == null || gracePeriodDays < 0 || gracePeriodDays > 60) return false;
+        if (paymentStartDelayDays == null || paymentStartDelayDays < 0 || paymentStartDelayDays > 60) return false;
         if (fulfillmentTiming == null) return false;
         if (requiresCustomDays()) return false;
 

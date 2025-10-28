@@ -53,7 +53,7 @@ public class InstallmentCalculator {
 
         // 5. Calculate first payment date (after grace period)
         LocalDateTime firstPaymentDate = LocalDateTime.now()
-                .plusDays(plan.getGracePeriodDays());
+                .plusDays(plan.getPaymentStartDelayDays());
 
         // 6. Generate full payment schedule
         List<CheckoutSessionEntity.PaymentScheduleItem> schedule =
@@ -80,7 +80,7 @@ public class InstallmentCalculator {
                 .totalInterest(totalInterest)
                 .totalAmount(grandTotal)
                 .firstPaymentDate(firstPaymentDate)
-                .gracePeriodDays(plan.getGracePeriodDays())
+                .paymetnStartDelayDays(plan.getPaymentStartDelayDays())
                 .fulfillmentTiming(plan.getFulfillmentTiming().name())
                 .schedule(schedule)
                 .build();

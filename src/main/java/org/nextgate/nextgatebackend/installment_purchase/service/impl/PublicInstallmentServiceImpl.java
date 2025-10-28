@@ -119,7 +119,7 @@ public class PublicInstallmentServiceImpl implements PublicInstallmentService {
 
         // 8. Calculate dates
         LocalDateTime firstPaymentDate = LocalDateTime.now()
-                .plusDays(plan.getGracePeriodDays());
+                .plusDays(plan.getPaymentStartDelayDays());
         LocalDateTime lastPaymentDate = calculateLastPaymentDate(
                 firstPaymentDate, plan);
 
@@ -150,7 +150,7 @@ public class PublicInstallmentServiceImpl implements PublicInstallmentService {
                 .numberOfPayments(plan.getNumberOfPayments())
                 .durationDisplay(plan.getCalculatedDurationDisplay())
                 .apr(plan.getApr())
-                .gracePeriodDays(plan.getGracePeriodDays())
+                .paymentStartDelayDays(plan.getPaymentStartDelayDays())
 
                 // Product info
                 .productPrice(request.getProductPrice())
@@ -230,7 +230,7 @@ public class PublicInstallmentServiceImpl implements PublicInstallmentService {
         BigDecimal grandTotal = productPrice.add(totalInterest);
 
         LocalDateTime firstPaymentDate = LocalDateTime.now()
-                .plusDays(plan.getGracePeriodDays());
+                .plusDays(plan.getPaymentStartDelayDays());
         LocalDateTime lastPaymentDate = calculateLastPaymentDate(firstPaymentDate, plan);
 
         // Build preview
@@ -258,7 +258,7 @@ public class PublicInstallmentServiceImpl implements PublicInstallmentService {
         response.setDuration(plan.getCalculatedDurationDisplay());
         response.setApr(plan.getApr());
         response.setMinDownPaymentPercent(plan.getMinDownPaymentPercent());
-        response.setGracePeriodDays(plan.getGracePeriodDays());
+        response.setPaymentStartDelayDays(plan.getPaymentStartDelayDays());
         response.setFulfillmentTiming(plan.getFulfillmentTiming());
         response.setIsActive(plan.getIsActive());
         response.setIsFeatured(plan.getIsFeatured());

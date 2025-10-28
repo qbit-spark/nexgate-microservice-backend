@@ -36,10 +36,10 @@ public class CreateInstallmentPlanRequest {
     @Max(value = 50, message = "Minimum down payment cannot exceed 50%")
     private Integer minDownPaymentPercent;
 
-    @NotNull(message = "Grace period days is required")
-    @Min(value = 0, message = "Grace period days cannot be negative")
-    @Max(value = 60, message = "Grace period days cannot exceed 60")
-    private Integer gracePeriodDays;
+    @NotNull(message = "Payment start delay days is required")
+    @Min(value = 0, message = "Payment start delay days cannot be negative")
+    @Max(value = 60, message = "Payment start delay days cannot exceed 60")
+    private Integer paymentStartDelayDays;
 
     @NotNull(message = "Fulfillment timing is required")
     private FulfillmentTiming fulfillmentTiming;

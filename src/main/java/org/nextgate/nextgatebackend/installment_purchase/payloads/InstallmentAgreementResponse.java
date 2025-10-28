@@ -45,7 +45,7 @@ public class InstallmentAgreementResponse {
     private Integer numberOfPayments;
     private String duration; // "6 months", "12 weeks"
     private BigDecimal apr;
-    private Integer gracePeriodDays;
+    private Integer paymentStartDelayDays;
 
     // Financial breakdown
     private BigDecimal downPaymentAmount;
