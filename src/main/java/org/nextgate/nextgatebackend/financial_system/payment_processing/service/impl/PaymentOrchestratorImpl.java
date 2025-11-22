@@ -4,11 +4,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.coyote.BadRequestException;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
-import org.nextgate.nextgatebackend.checkout_session.entity.CheckoutSessionEntity;
-import org.nextgate.nextgatebackend.checkout_session.enums.CheckoutSessionStatus;
-import org.nextgate.nextgatebackend.checkout_session.enums.CheckoutSessionType;
-import org.nextgate.nextgatebackend.checkout_session.events.PaymentCompletedEvent;
-import org.nextgate.nextgatebackend.checkout_session.repo.CheckoutSessionRepo;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.CheckoutSessionEntity;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.enums.CheckoutSessionStatus;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.enums.CheckoutSessionType;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.events.PaymentCompletedEvent;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.repo.CheckoutSessionRepo;
 import org.nextgate.nextgatebackend.financial_system.escrow.entity.EscrowAccountEntity;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.callbacks.PaymentCallback;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.enums.PaymentMethod;
@@ -28,9 +28,8 @@ import org.nextgate.nextgatebackend.notification_system.publisher.enums.Notifica
 import org.nextgate.nextgatebackend.notification_system.publisher.enums.NotificationPriority;
 import org.nextgate.nextgatebackend.notification_system.publisher.enums.NotificationType;
 import org.nextgate.nextgatebackend.notification_system.publisher.mapper.PaymentNotificationMapper;
-import org.nextgate.nextgatebackend.order_mng_service.entity.OrderEntity;
-import org.nextgate.nextgatebackend.order_mng_service.repo.OrderRepository;
-import org.nextgate.nextgatebackend.order_mng_service.service.OrderService;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.repo.OrderRepository;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.service.OrderService;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,8 +38,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-
-import static org.nextgate.nextgatebackend.checkout_session.enums.CheckoutSessionType.*;
 
 @Service
 @RequiredArgsConstructor
@@ -336,7 +333,7 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
 
         AccountEntity customer = checkoutSession.getCustomer();
 
-        // 1. Prepare notification data using mapper
+        // 1. Prepare notification data using EventCategoryMapper
         Map<String, Object> data = PaymentNotificationMapper.mapPaymentReceived(
                 customer.getFirstName(),
                 customer.getEmail(),

@@ -336,7 +336,7 @@ public class WalletServiceImpl implements WalletService {
             BigDecimal newBalance,
             String transactionId) {
 
-            // 1. Prepare notification data using mapper
+            // 1. Prepare notification data using EventCategoryMapper
             Map<String, Object> data = WalletNotificationMapper.mapWalletTopUp(
                     customer.getFirstName(),
                     topUpAmount,

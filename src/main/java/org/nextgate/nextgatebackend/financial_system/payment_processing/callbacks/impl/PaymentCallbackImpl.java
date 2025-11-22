@@ -3,17 +3,16 @@ package org.nextgate.nextgatebackend.financial_system.payment_processing.callbac
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.coyote.BadRequestException;
-import org.nextgate.nextgatebackend.cart_service.entity.CartEntity;
-import org.nextgate.nextgatebackend.cart_service.service.CartService;
-import org.nextgate.nextgatebackend.checkout_session.entity.CheckoutSessionEntity;
-import org.nextgate.nextgatebackend.checkout_session.enums.CheckoutSessionStatus;
-import org.nextgate.nextgatebackend.checkout_session.repo.CheckoutSessionRepo;
+import org.nextgate.nextgatebackend.e_commerce.cart_service.service.CartService;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.CheckoutSessionEntity;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.enums.CheckoutSessionStatus;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.repo.CheckoutSessionRepo;
 import org.nextgate.nextgatebackend.financial_system.escrow.entity.EscrowAccountEntity;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.callbacks.PaymentCallback;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.payloads.PaymentResult;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
-import org.nextgate.nextgatebackend.group_purchase_mng.service.GroupPurchaseService;
-import org.nextgate.nextgatebackend.installment_purchase.service.InstallmentService; // ADD THIS
+import org.nextgate.nextgatebackend.e_commerce.group_purchase_mng.service.GroupPurchaseService;
+import org.nextgate.nextgatebackend.e_commerce.installment_purchase.service.InstallmentService; // ADD THIS
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;

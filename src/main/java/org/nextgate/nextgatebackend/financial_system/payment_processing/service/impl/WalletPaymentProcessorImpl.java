@@ -3,7 +3,7 @@ package org.nextgate.nextgatebackend.financial_system.payment_processing.service
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
-import org.nextgate.nextgatebackend.checkout_session.entity.CheckoutSessionEntity;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.CheckoutSessionEntity;
 import org.nextgate.nextgatebackend.financial_system.escrow.entity.EscrowAccountEntity;
 import org.nextgate.nextgatebackend.financial_system.escrow.service.EscrowService;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.enums.PaymentStatus;
@@ -13,7 +13,7 @@ import org.nextgate.nextgatebackend.financial_system.wallet.entity.WalletEntity;
 import org.nextgate.nextgatebackend.financial_system.wallet.service.WalletService;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
-import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.repo.ShopRepo;
+import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng.repo.ShopRepo;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

@@ -1,7 +1,7 @@
 package org.nextgate.nextgatebackend.notification_system.publisher.mapper;
 
-import org.nextgate.nextgatebackend.order_mng_service.entity.OrderEntity;
-import org.nextgate.nextgatebackend.order_mng_service.entity.OrderItemEntity;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.entity.OrderEntity;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.entity.OrderItemEntity;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;

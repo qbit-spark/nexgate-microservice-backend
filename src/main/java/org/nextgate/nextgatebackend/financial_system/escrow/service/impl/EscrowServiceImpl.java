@@ -3,7 +3,7 @@ package org.nextgate.nextgatebackend.financial_system.escrow.service.impl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
-import org.nextgate.nextgatebackend.checkout_session.entity.CheckoutSessionEntity;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.CheckoutSessionEntity;
 import org.nextgate.nextgatebackend.financial_system.escrow.entity.EscrowAccountEntity;
 import org.nextgate.nextgatebackend.financial_system.escrow.enums.EscrowStatus;
 import org.nextgate.nextgatebackend.financial_system.escrow.repo.EscrowAccountRepo;

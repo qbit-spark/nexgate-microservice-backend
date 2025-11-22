@@ -1,8 +1,8 @@
 package org.nextgate.nextgatebackend.notification_system.publisher.mapper;
 
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
-import org.nextgate.nextgatebackend.group_purchase_mng.entity.GroupParticipantEntity;
-import org.nextgate.nextgatebackend.group_purchase_mng.entity.GroupPurchaseInstanceEntity;
+import org.nextgate.nextgatebackend.e_commerce.group_purchase_mng.entity.GroupParticipantEntity;
+import org.nextgate.nextgatebackend.e_commerce.group_purchase_mng.entity.GroupPurchaseInstanceEntity;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
