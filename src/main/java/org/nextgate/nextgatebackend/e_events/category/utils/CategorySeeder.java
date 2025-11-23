@@ -2,6 +2,7 @@ package org.nextgate.nextgatebackend.e_events.category.utils;
 
 import org.nextgate.nextgatebackend.e_events.category.entity.EventsCategoryEntity;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public class CategorySeeder {
@@ -17,6 +18,7 @@ public class CategorySeeder {
                         .colorCode("#E91E63")
                         .isActive(true)
                         .isFeatured(true)
+                        .createdAt(LocalDateTime.now())
                         .eventCount(0L)
                         .build(),
 
@@ -29,6 +31,7 @@ public class CategorySeeder {
                         .colorCode("#4CAF50")
                         .isActive(true)
                         .isFeatured(true)
+                        .createdAt(LocalDateTime.now())
                         .eventCount(0L)
                         .build(),
 
@@ -42,6 +45,7 @@ public class CategorySeeder {
                         .isActive(true)
                         .isFeatured(true)
                         .eventCount(0L)
+                        .createdAt(LocalDateTime.now())
                         .build(),
 
                 // 4. Food & Drink
@@ -54,6 +58,7 @@ public class CategorySeeder {
                         .isActive(true)
                         .isFeatured(false)
                         .eventCount(0L)
+                        .createdAt(LocalDateTime.now())
                         .build(),
 
                 // 5. Arts & Culture
@@ -65,6 +70,7 @@ public class CategorySeeder {
                         .colorCode("#9C27B0")
                         .isActive(true)
                         .isFeatured(false)
+                        .createdAt(LocalDateTime.now())
                         .eventCount(0L)
                         .build(),
 
@@ -76,6 +82,7 @@ public class CategorySeeder {
                         .iconUrl("")
                         .colorCode("#00BCD4")
                         .isActive(true)
+                        .createdAt(LocalDateTime.now())
                         .isFeatured(true)
                         .eventCount(0L)
                         .build(),
@@ -89,6 +96,7 @@ public class CategorySeeder {
                         .colorCode("#FF5722")
                         .isActive(true)
                         .isFeatured(false)
+                        .createdAt(LocalDateTime.now())
                         .eventCount(0L)
                         .build(),
 
@@ -100,6 +108,7 @@ public class CategorySeeder {
                         .iconUrl("")
                         .colorCode("#607D8B")
                         .isActive(true)
+                        .createdAt(LocalDateTime.now())
                         .isFeatured(false)
                         .eventCount(0L)
                         .build(),
@@ -112,6 +121,7 @@ public class CategorySeeder {
                         .iconUrl("")
                         .colorCode("#8BC34A")
                         .isActive(true)
+                        .createdAt(LocalDateTime.now())
                         .isFeatured(false)
                         .eventCount(0L)
                         .build(),
@@ -123,6 +133,7 @@ public class CategorySeeder {
                         .description("Comedy shows, movie screenings, gaming, and entertainment events")
                         .iconUrl("")
                         .colorCode("#F44336")
+                        .createdAt(LocalDateTime.now())
                         .isActive(true)
                         .isFeatured(false)
                         .eventCount(0L)

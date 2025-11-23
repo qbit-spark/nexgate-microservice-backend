@@ -23,6 +23,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
@@ -82,6 +83,7 @@ public class EventCategoryServiceImpl implements EventsCategoryService {
                 .isFeatured(createEventCategoryRequest.getIsFeatured())
                 .eventCount(0L)
                 .createdBy(currentUser)
+                .createdAt(LocalDateTime.now())
                 .build();
 
         // Step 7: Save to a database
