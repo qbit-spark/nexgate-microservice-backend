@@ -27,7 +27,4 @@ public class ScheduleRequest {
     @Builder.Default
     private List<EventDayRequest> days = new ArrayList<>();
 
-    // For RECURRING events
-    @Valid
-    private RecurrenceRequest recurrence;
 }

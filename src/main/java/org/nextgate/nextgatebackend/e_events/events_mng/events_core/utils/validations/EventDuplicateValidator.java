@@ -243,11 +243,11 @@ public class EventDuplicateValidator {
         if (name1.contains(name2) || name2.contains(name1)) return true;
 
         // Check coordinates if both provided
-        if (venue1.getLatitude() != null && venue1.getLongitude() != null &&
+        if (venue1.getCoordinates().getLatitude() != null && venue1.getCoordinates().getLongitude() != null &&
                 venue2.getCoordinates().getLatitude() != null && venue2.getCoordinates().getLongitude() != null) {
 
             double distance = calculateDistance(
-                    venue1.getLatitude(), venue1.getLongitude(),
+                    venue1.getCoordinates().getLatitude(), venue1.getCoordinates().getLongitude(),
                     venue2.getCoordinates().getLatitude(), venue2.getCoordinates().getLongitude()
             );
 
@@ -401,11 +401,11 @@ public class EventDuplicateValidator {
         }
 
         // Check GPS coordinates if both available
-        if (venue1.getLatitude() != null && venue1.getLongitude() != null &&
+        if (venue1.getCoordinates().getLatitude() != null && venue1.getCoordinates().getLongitude() != null &&
                 venue2.getCoordinates().getLatitude() != null && venue2.getCoordinates().getLongitude() != null) {
 
             double distance = calculateDistance(
-                    venue1.getLatitude(), venue1.getLongitude(),
+                    venue1.getCoordinates().getLatitude(),  venue1.getCoordinates().getLongitude(),
                     venue2.getCoordinates().getLatitude(), venue2.getCoordinates().getLongitude()
             );
 

@@ -2,7 +2,6 @@ package org.nextgate.nextgatebackend.e_events.events_mng.events_core.utils.valid
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.nextgate.nextgatebackend.authentication_service.repo.AccountRepo;
 import org.nextgate.nextgatebackend.e_commerce.products_mng_service.products.enums.ProductStatus;
 import org.nextgate.nextgatebackend.e_commerce.products_mng_service.products.repo.ProductRepo;
 import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng.enums.ShopStatus;
@@ -17,7 +16,6 @@ import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventC
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventFormat;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventType;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.payloads.CreateEventRequest;
-import org.nextgate.nextgatebackend.e_events.events_mng.events_core.payloads.RecurrenceRequest;
 
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -101,10 +99,6 @@ public class EventValidations {
             validateTimezone(request.getSchedule().getTimezone());
         }
 
-        // Soft validate recurrence if provided
-        if (request.getSchedule().getRecurrence() != null) {
-            softValidateRecurrence(request.getSchedule().getRecurrence());
-        }
     }
 
     /**
@@ -258,7 +252,7 @@ public class EventValidations {
         if (request.getEventType() == EventType.MULTI_DAY) {
             validateMultiDaySchedule(request);
         } else if (request.getEventType() == EventType.RECURRING) {
-            validateRecurringSchedule(request);
+            throw new RuntimeException("RECURRING is yet implemented");
         }
 
         log.debug("Schedule hard validation passed");
@@ -537,17 +531,7 @@ public class EventValidations {
         }
     }
 
-    private void softValidateRecurrence(RecurrenceRequest recurrence) throws EventValidationException {
-        // Only validate if dates are provided
-        if (recurrence.getRecurrenceStartDate() != null && recurrence.getRecurrenceEndDate() != null) {
-            if (recurrence.getRecurrenceEndDate().isBefore(recurrence.getRecurrenceStartDate())) {
-                throw new EventValidationException(
-                        "Recurrence end date must be after start date",
-                        EventCreationStage.SCHEDULE
-                );
-            }
-        }
-    }
+
 
     private void validateMultiDaySchedule(CreateEventRequest request) throws EventValidationException {
         if (request.getSchedule().getDays() == null || request.getSchedule().getDays().isEmpty()) {
@@ -593,70 +577,6 @@ public class EventValidations {
         });
     }
 
-    private void validateRecurringSchedule(CreateEventRequest request) throws EventValidationException {
-        if (request.getSchedule().getRecurrence() == null) {
-            throw new EventValidationException(
-                    "Recurring events require recurrence pattern",
-                    EventCreationStage.SCHEDULE
-            );
-        }
-
-        RecurrenceRequest recurrence = request.getSchedule().getRecurrence();
-
-        // Required: Frequency
-        if (recurrence.getFrequency() == null) {
-            throw new EventValidationException("Recurrence frequency is required", EventCreationStage.SCHEDULE);
-        }
-
-        // Required: Interval
-        if (recurrence.getInterval() == null || recurrence.getInterval() < 1) {
-            throw new EventValidationException("Recurrence interval must be at least 1", EventCreationStage.SCHEDULE);
-        }
-
-        // Required: Start Date
-        if (recurrence.getRecurrenceStartDate() == null) {
-            throw new EventValidationException("Recurrence start date is required", EventCreationStage.SCHEDULE);
-        }
-
-        // Required: End Date
-        if (recurrence.getRecurrenceEndDate() == null) {
-            throw new EventValidationException("Recurrence end date is required", EventCreationStage.SCHEDULE);
-        }
-
-        // Validate date logic
-        if (recurrence.getRecurrenceEndDate().isBefore(recurrence.getRecurrenceStartDate())) {
-            throw new EventValidationException(
-                    "Recurrence end date must be after start date",
-                    EventCreationStage.SCHEDULE
-            );
-        }
-
-        // WEEKLY frequency requires days of week
-        if (recurrence.getFrequency().name().equals("WEEKLY")) {
-            if (recurrence.getDaysOfWeek() == null || recurrence.getDaysOfWeek().isEmpty()) {
-                throw new EventValidationException(
-                        "Weekly recurrence requires at least one day of week",
-                        EventCreationStage.SCHEDULE
-                );
-            }
-        }
-
-        // MONTHLY frequency requires day of month
-        if (recurrence.getFrequency().name().equals("MONTHLY")) {
-            if (recurrence.getDayOfMonth() == null) {
-                throw new EventValidationException(
-                        "Monthly recurrence requires day of month",
-                        EventCreationStage.SCHEDULE
-                );
-            }
-            if (recurrence.getDayOfMonth() < 1 || recurrence.getDayOfMonth() > 31) {
-                throw new EventValidationException(
-                        "Day of month must be between 1 and 31",
-                        EventCreationStage.SCHEDULE
-                );
-            }
-        }
-    }
 
     private void validateVenueRequired(CreateEventRequest request) throws EventValidationException {
         if (request.getVenue() == null) {

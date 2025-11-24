@@ -15,7 +15,6 @@ import org.nextgate.nextgatebackend.e_events.category.entity.EventsCategoryEntit
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.embedded.*;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.*;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.utils.MediaJsonConverter;
-import org.nextgate.nextgatebackend.e_events.events_mng.events_core.utils.RecurrenceJsonConverter;
 
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -126,11 +125,6 @@ public class EventEntity {
     @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<EventDayEntity> days = new ArrayList<>();
-
-    // For RECURRING events - Make this JSONB
-    @Column(name = "recurrence", columnDefinition = "jsonb")
-    @Convert(converter = RecurrenceJsonConverter.class)
-    private Recurrence recurrence;
 
     // Organizer
     @ManyToOne(fetch = FetchType.LAZY)

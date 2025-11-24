@@ -20,7 +20,5 @@ public class VenueRequest {
     @Size(max = 500, message = "Address must not exceed 500 characters")
     private String address;
 
-    private BigDecimal latitude;
-
-    private BigDecimal longitude;
+    private CoordinatesRequest coordinates;
 }
