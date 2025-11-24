@@ -265,7 +265,7 @@ public class EventServiceImpl implements EventsService {
 
 
     /**
-     * Map linked product IDs to ProductEntity list
+     * Map linked product IDs to the ProductEntity list
      */private List<ProductEntity> mapLinkedProducts(List<UUID> productIds) throws EventValidationException {
         log.debug("Mapping {} linked products", productIds.size());
 
