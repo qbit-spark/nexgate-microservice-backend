@@ -22,6 +22,7 @@ public class EventDayEntity {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    // Many days belong to one event
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "event_id", nullable = false)
     private EventEntity eventEntity;

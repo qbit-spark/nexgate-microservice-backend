@@ -25,42 +25,7 @@ import java.util.stream.Collectors;
 
 @Entity
 @Table(name = "events", indexes = {
-        // Basic lookups
-        @Index(name = "idx_event_slug", columnList = "slug"),
-        @Index(name = "idx_event_status", columnList = "status"),
-        @Index(name = "idx_event_type", columnList = "event_type"),
-        @Index(name = "idx_event_format", columnList = "event_format"),
-        @Index(name = "idx_event_visibility", columnList = "visibility"),
-
-        // Foreign key indexes
-        @Index(name = "idx_event_organizer", columnList = "organizer_id"),
-        @Index(name = "idx_event_category", columnList = "category_id"),
-
-        // Date queries
-        @Index(name = "idx_event_dates", columnList = "start_date_time, end_date_time"),
-        @Index(name = "idx_event_start_date", columnList = "start_date_time"),
-
-        // Soft delete
-        @Index(name = "idx_event_is_deleted", columnList = "is_deleted"),
-
-        // ===== PERFORMANCE-CRITICAL COMPOSITE INDEXES =====
-
-        // Duplicate detection (MOST IMPORTANT)
-        @Index(name = "idx_event_duplicate_check",
-                columnList = "status, is_deleted, start_date_time"),
-
-        // Organizer queries (dashboard, my events)
-        @Index(name = "idx_event_organizer_status",
-                columnList = "organizer_id, status, is_deleted, start_date_time"),
-
-        // Public listings (homepage, search)
-        @Index(name = "idx_event_public_listing",
-                columnList = "status, visibility, is_deleted, start_date_time"),
-
-        // Category browsing
-        @Index(name = "idx_event_category_status",
-                columnList = "category_id, status, is_deleted, start_date_time")
-})
+        @Index(name = "idx_event_slug", columnList = "slug"), @Index(name = "idx_event_status", columnList = "status"), @Index(name = "idx_event_type", columnList = "event_type"), @Index(name = "idx_event_format", columnList = "event_format"), @Index(name = "idx_event_visibility", columnList = "visibility"), @Index(name = "idx_event_organizer", columnList = "organizer_id"), @Index(name = "idx_event_category", columnList = "category_id"), @Index(name = "idx_event_dates", columnList = "start_date_time, end_date_time"), @Index(name = "idx_event_start_date", columnList = "start_date_time"), @Index(name = "idx_event_is_deleted", columnList = "is_deleted"), @Index(name = "idx_event_duplicate_check", columnList = "status, is_deleted, start_date_time"), @Index(name = "idx_event_organizer_status", columnList = "organizer_id, status, is_deleted, start_date_time"), @Index(name = "idx_event_public_listing", columnList = "status, visibility, is_deleted, start_date_time"), @Index(name = "idx_event_category_status", columnList = "category_id, status, is_deleted, start_date_time")})
 @Data
 @Builder
 @NoArgsConstructor
@@ -89,10 +54,10 @@ public class EventEntity {
     @Column(name = "event_visibility", nullable = false, length = 20)
     private EventVisibility eventVisibility;
 
-    // Event classification
+    // Event classification - SIMPLIFIED: Only ONE_TIME and MULTI_DAY
     @Enumerated(EnumType.STRING)
     @Column(name = "event_type", nullable = false, length = 20)
-    private EventType eventType; // ONE_TIME, MULTI_DAY, RECURRING
+    private EventType eventType; // ONE_TIME, MULTI_DAY
 
     @Enumerated(EnumType.STRING)
     @Column(name = "event_format", nullable = false, length = 20)
@@ -122,7 +87,8 @@ public class EventEntity {
     private String timezone;
 
     // For MULTI_DAY events - Keep as separate table
-    @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
+    // FIXED: mappedBy must match the field name in EventDayEntity
+    @OneToMany(mappedBy = "eventEntity", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<EventDayEntity> days = new ArrayList<>();
 
@@ -138,21 +104,13 @@ public class EventEntity {
 
     // Linked products - Relationship with ProductEntity
     @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-            name = "event_products",
-            joinColumns = @JoinColumn(name = "event_id"),
-            inverseJoinColumns = @JoinColumn(name = "product_id")
-    )
+    @JoinTable(name = "event_products", joinColumns = @JoinColumn(name = "event_id"), inverseJoinColumns = @JoinColumn(name = "product_id"))
     @Builder.Default
     private List<ProductEntity> linkedProducts = new ArrayList<>();
 
     // Linked shops - Relationship with ShopEntity
     @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-            name = "event_shops",
-            joinColumns = @JoinColumn(name = "event_id"),
-            inverseJoinColumns = @JoinColumn(name = "shop_id")
-    )
+    @JoinTable(name = "event_shops", joinColumns = @JoinColumn(name = "event_id"), inverseJoinColumns = @JoinColumn(name = "shop_id"))
     @Builder.Default
     private List<ShopEntity> linkedShops = new ArrayList<>();
 
@@ -218,21 +176,13 @@ public class EventEntity {
     }
 
     public List<EventCreationStage> getRemainingRequiredStages() {
-        return Arrays.stream(EventCreationStage.values())
-                .filter(EventCreationStage::isRequired)
-                .filter(stage -> !isStageCompleted(stage))
-                .collect(Collectors.toList());
+        return Arrays.stream(EventCreationStage.values()).filter(EventCreationStage::isRequired).filter(stage -> !isStageCompleted(stage)).collect(Collectors.toList());
     }
 
     public int getCompletionPercentage() {
-        long totalRequired = Arrays.stream(EventCreationStage.values())
-                .filter(EventCreationStage::isRequired)
-                .count();
+        long totalRequired = Arrays.stream(EventCreationStage.values()).filter(EventCreationStage::isRequired).count();
 
-        long completed = completedStages.stream()
-                .map(EventCreationStage::valueOf)
-                .filter(EventCreationStage::isRequired)
-                .count();
+        long completed = completedStages.stream().map(EventCreationStage::valueOf).filter(EventCreationStage::isRequired).count();
 
         return (int) ((completed * 100) / totalRequired);
     }
