@@ -8,9 +8,12 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
+import org.nextgate.nextgatebackend.authentication_service.utils.StringListJsonConverter;
 import org.nextgate.nextgatebackend.e_commerce.products_mng_service.products.entity.ProductEntity;
 import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng.entity.ShopEntity;
+import org.nextgate.nextgatebackend.e_events.category.entity.EventsCategoryEntity;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.embedded.*;
+import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventCreationStage;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventFormat;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventStatus;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventType;
@@ -19,7 +22,10 @@ import org.nextgate.nextgatebackend.e_events.events_mng.events_core.utils.Recurr
 
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Entity
 @Table(name = "events", indexes = {
@@ -38,7 +44,7 @@ public class EventEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
-    private String id;
+    private UUID id;
 
     @Column(nullable = false, length = 200)
     private String title;
@@ -50,11 +56,9 @@ public class EventEntity {
     private String description;
 
     // Category relationship
-    @Column(name = "category_id", nullable = false)
-    private String categoryId;
-
-    @Column(name = "category_name")
-    private String categoryName;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id", referencedColumnName = "category_id", nullable = false)
+    private EventsCategoryEntity category;
 
     // Event classification
     @Enumerated(EnumType.STRING)
@@ -77,7 +81,6 @@ public class EventEntity {
     // Virtual details (for ONLINE and HYBRID)
     @Embedded
     private VirtualDetails virtualDetails;
-
 
     // Schedule - Keep as direct columns for querying
     @Column(name = "start_date_time", nullable = false)
@@ -138,17 +141,76 @@ public class EventEntity {
     @Column(name = "updated_at")
     private ZonedDateTime updatedAt;
 
-    @Column(name = "created_by")
-    private String createdBy;
+    // Audit fields - User associations
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by", referencedColumnName = "id", nullable = false, updatable = false)
+    private AccountEntity createdBy;
 
-    @Column(name = "updated_by")
-    private String updatedBy;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "updated_by", referencedColumnName = "id")
+    private AccountEntity updatedBy;
 
     // Soft delete
-    @Column(name = "deleted")
+    @Column(name = "is_deleted")
     @Builder.Default
-    private Boolean deleted = false;
+    private Boolean isDeleted = false;
 
     @Column(name = "deleted_at")
     private ZonedDateTime deletedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "deleted_by", referencedColumnName = "id")
+    private AccountEntity deletedBy;
+
+    @Column(name = "current_stage")
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    private EventCreationStage currentStage = EventCreationStage.BASIC_INFO;
+
+    @Column(name = "completed_stages", columnDefinition = "jsonb")
+    @Convert(converter = StringListJsonConverter.class)
+    @Builder.Default
+    private List<String> completedStages = new ArrayList<>();
+
+    // Helper methods
+    public boolean isStageCompleted(EventCreationStage stage) {
+        return completedStages.contains(stage.name());
+    }
+
+    public void markStageCompleted(EventCreationStage stage) {
+        if (!completedStages.contains(stage.name())) {
+            completedStages.add(stage.name());
+        }
+    }
+
+    public boolean canPublish() {
+        // Check if all required stages are completed
+        for (EventCreationStage stage : EventCreationStage.values()) {
+            if (stage.isRequired() && !isStageCompleted(stage)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public List<EventCreationStage> getRemainingRequiredStages() {
+        return Arrays.stream(EventCreationStage.values())
+                .filter(EventCreationStage::isRequired)
+                .filter(stage -> !isStageCompleted(stage))
+                .collect(Collectors.toList());
+    }
+
+    public int getCompletionPercentage() {
+        long totalRequired = Arrays.stream(EventCreationStage.values())
+                .filter(EventCreationStage::isRequired)
+                .count();
+
+        long completed = completedStages.stream()
+                .map(EventCreationStage::valueOf)
+                .filter(EventCreationStage::isRequired)
+                .count();
+
+        return (int) ((completed * 100) / totalRequired);
+    }
+
 }

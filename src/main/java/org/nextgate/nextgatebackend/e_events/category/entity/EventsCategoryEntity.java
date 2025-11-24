@@ -1,12 +1,16 @@
 package org.nextgate.nextgatebackend.e_events.category.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
+import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.EventEntity;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -49,6 +53,7 @@ public class EventsCategoryEntity {
 
     @Column(name = "is_featured", nullable = false)
     private Boolean isFeatured = false;
+
 
     @Column(name = "event_count", nullable = false)
     private Long eventCount = 0L;
