@@ -51,6 +51,8 @@ public class EventServiceImpl implements EventsService {
     private final ShopRepo shopRepo;
     private final ProductRepo productRepo;
 
+
+
     @Override
     @Transactional
     public EventEntity createEvent(CreateEventRequest createEventRequest, EventSubmissionAction action)
@@ -72,6 +74,31 @@ public class EventServiceImpl implements EventsService {
 
         log.info("Event created successfully with ID: {}", eventEntity.getId());
         return eventEntity;
+
+
+        /***
+         *
+         * // User is creating a recurring event in draft mode
+         * Recurrence recurrence = Recurrence.builder()
+         *     .frequency(RecurrenceFrequency.WEEKLY)
+         *     .interval(1)
+         *     .daysOfWeek(Set.of("MONDAY", "WEDNESDAY"))
+         *     .recurrenceStartDate(LocalDate.of(2025, 3, 1))
+         *     .recurrenceEndDate(LocalDate.of(2025, 6, 30))
+         *     .build();
+         *
+         * // Preview WITHOUT saving
+         * SessionPreviewResponse preview = sessionGenerator.previewSessions(
+         *     recurrence,
+         *     LocalTime.of(18, 0),
+         *     LocalTime.of(19, 30)
+         * );
+         *
+         * // Return to frontend
+         * return preview;
+         *
+         *
+         */
     }
 
     /**
