@@ -13,11 +13,13 @@ import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng
 import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng.repo.ShopRepo;
 import org.nextgate.nextgatebackend.e_events.category.entity.EventsCategoryEntity;
 import org.nextgate.nextgatebackend.e_events.category.repo.EventsCategoryRepository;
+import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.EventDayEntity;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.EventEntity;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.embedded.*;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventCreationStage;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventStatus;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventSubmissionAction;
+import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventType;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.payloads.*;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.repo.EventsRepo;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.service.EventsService;
@@ -229,7 +231,24 @@ public class EventServiceImpl implements EventsService {
             builder.media(mapMedia(request.getMedia()));
         }
 
+        // Build the event first
         EventEntity event = builder.build();
+
+        // ========== NEW: Map EventDays for MULTI_DAY events ==========
+        if (request.getEventType() == EventType.MULTI_DAY &&
+                request.getSchedule() != null &&
+                request.getSchedule().getDays() != null &&
+                !request.getSchedule().getDays().isEmpty()) {
+
+            List<EventDayEntity> eventDays = mapEventDays(
+                    request.getSchedule().getDays(),
+                    event
+            );
+            event.setDays(eventDays);
+
+            log.debug("Added {} days to MULTI_DAY event", eventDays.size());
+        }
+        // ============================================================
 
         // Map linked products
         if (request.getLinkedProductIds() != null && !request.getLinkedProductIds().isEmpty()) {
@@ -314,8 +333,7 @@ public class EventServiceImpl implements EventsService {
     /**
      * Map VirtualDetailsRequest to VirtualDetails (embedded)
      */
-    private VirtualDetails mapVirtualDetails(
-            VirtualDetailsRequest request) {
+    private VirtualDetails mapVirtualDetails(VirtualDetailsRequest request) {
         if (request == null) return null;
 
         return VirtualDetails.builder()
@@ -326,10 +344,42 @@ public class EventServiceImpl implements EventsService {
     }
 
     /**
+     * Map EventDayRequest list to EventDayEntity list
+     * For MULTI_DAY events
+     */
+    private List<EventDayEntity> mapEventDays(
+            List<EventDayRequest> dayRequests,
+            EventEntity parentEvent) {
+
+        if (dayRequests == null || dayRequests.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        log.debug("Mapping {} event days for event", dayRequests.size());
+
+        List<EventDayEntity> eventDays = new ArrayList<>();
+
+        for (EventDayRequest dayRequest : dayRequests) {
+            EventDayEntity eventDay = EventDayEntity.builder()
+                    .eventEntity(parentEvent)
+                    .date(dayRequest.getDate())
+                    .startTime(dayRequest.getStartTime())
+                    .endTime(dayRequest.getEndTime())
+                    .description(dayRequest.getDescription())
+                    .dayOrder(dayRequest.getDayOrder())
+                    .build();
+
+            eventDays.add(eventDay);
+        }
+
+        log.debug("Successfully mapped {} event days", eventDays.size());
+        return eventDays;
+    }
+
+    /**
      * Map RecurrenceRequest to Recurrence
      */
-    private Recurrence mapRecurrence(
-            RecurrenceRequest request) {
+    private Recurrence mapRecurrence(RecurrenceRequest request) {
         if (request == null) return null;
 
         return Recurrence.builder()
@@ -346,8 +396,7 @@ public class EventServiceImpl implements EventsService {
     /**
      * Map MediaRequest to Media
      */
-    private Media mapMedia(
-            MediaRequest request) {
+    private Media mapMedia(MediaRequest request) {
         if (request == null) return null;
 
         return Media.builder()
