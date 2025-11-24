@@ -78,10 +78,6 @@ public class EventEntity {
     @Embedded
     private VirtualDetails virtualDetails;
 
-    // Schedule
-//    @Embedded
-//    private Schedule schedule;
-
 
     // Schedule - Keep as direct columns for querying
     @Column(name = "start_date_time", nullable = false)
@@ -96,7 +92,7 @@ public class EventEntity {
     // For MULTI_DAY events - Keep as separate table
     @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
-    private List<EventDay> days = new ArrayList<>();
+    private List<EventDayEntity> days = new ArrayList<>();
 
     // For RECURRING events - Make this JSONB
     @Column(name = "recurrence", columnDefinition = "jsonb")

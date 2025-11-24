@@ -1,14 +1,14 @@
-package org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.embedded;
+package org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.EventEntity;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "event_days")
@@ -16,11 +16,11 @@ import java.time.LocalTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class EventDay {
+public class EventDayEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    private String id;
+    private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "event_id", nullable = false)

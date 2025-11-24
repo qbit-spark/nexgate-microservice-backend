@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.EventDayEntity;
 
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -29,7 +30,7 @@ public class Schedule {
     // For MULTI_DAY events
     @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
-    private List<EventDay> days = new ArrayList<>();
+    private List<EventDayEntity> days = new ArrayList<>();
 
     // For RECURRING events
     @Embedded
