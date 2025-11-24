@@ -2,6 +2,7 @@ package org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mn
 
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng.entity.ShopEntity;
+import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng.enums.ShopStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -31,5 +32,7 @@ public interface ShopRepo extends JpaRepository<ShopEntity, UUID> {
     Page<ShopEntity> findByIsDeletedFalseAndIsApprovedTrueOrderByCreatedAtDesc(Pageable pageable);
 
     Optional<ShopEntity> findByShopIdAndOwnerAndIsDeletedFalse(UUID shopId, AccountEntity owner);
+
+    Optional<ShopEntity> findByShopIdAndIsDeletedFalseAndStatus(UUID shopId, ShopStatus status);
 
 }

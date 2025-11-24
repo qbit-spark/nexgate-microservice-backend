@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-@Repository
 public interface EventsCategoryRepository extends JpaRepository<EventsCategoryEntity, UUID> {
 
     Optional<EventsCategoryEntity> findBySlug(String slug);
