@@ -22,7 +22,7 @@ public interface TicketService {
             throws ItemNotFoundException, AccessDeniedException, EventValidationException;
 
     /**
-     * Get single ticket by ID
+     * Get a single ticket by ID
      */
     TicketEntity getTicketById(UUID ticketId)
             throws ItemNotFoundException;
