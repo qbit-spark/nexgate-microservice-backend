@@ -218,7 +218,7 @@ public class TicketEntity {
                 .replaceAll("[^A-Z0-9]", "")
                 .replaceAll("\\s+", "");
 
-        // Take first 5 characters (or less if shorter)
+        // Take the first 5 characters (or less if shorter)
         return cleaned.length() <= 5 ? cleaned : cleaned.substring(0, 5);
     }
 
