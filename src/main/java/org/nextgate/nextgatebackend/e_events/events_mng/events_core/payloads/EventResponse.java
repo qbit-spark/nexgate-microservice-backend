@@ -193,7 +193,6 @@ public class EventResponse {
         private UUID id;
         private String name;
         private BigDecimal price;
-        private String currency;
         private Integer totalTickets;
         private Integer ticketsSold;
         private Integer ticketsAvailable;

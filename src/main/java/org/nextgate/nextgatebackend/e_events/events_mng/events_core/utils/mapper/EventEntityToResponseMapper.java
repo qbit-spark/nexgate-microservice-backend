@@ -130,6 +130,14 @@ public class EventEntityToResponseMapper {
                     .build());
         }
 
+        // Tickets
+        if (event.getTickets() != null && !event.getTickets().isEmpty()) {
+            builder.tickets(event.getTickets().stream()
+                    .filter(ticket -> !ticket.getIsDeleted())
+                    .map(this::mapTicketToSummary)
+                    .collect(Collectors.toList()));
+        }
+
         // Audit info
         if (event.getCreatedBy() != null) {
             builder.createdBy(event.getCreatedBy().getUserName());
@@ -152,6 +160,27 @@ public class EventEntityToResponseMapper {
                 .endTime(day.getEndTime().toString())
                 .description(day.getDescription())
                 .dayOrder(day.getDayOrder())
+                .build();
+    }
+
+    /**
+     * Map TicketEntity to TicketSummaryInfo
+     */
+    private EventResponse.TicketSummaryInfo mapTicketToSummary(
+            org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.entity.TicketEntity ticket) {
+
+        return EventResponse.TicketSummaryInfo.builder()
+                .id(ticket.getId())
+                .name(ticket.getName())
+                .price(ticket.getPrice())
+                .totalTickets(ticket.getTotalQuantity())
+                .ticketsSold(ticket.getQuantitySold())
+                .ticketsAvailable(ticket.getQuantityAvailable())
+                .isUnlimited(ticket.getIsUnlimited())
+                .isSoldOut(ticket.isSoldOut())
+                .attendanceMode(ticket.getAttendanceMode())
+                .status(ticket.getStatus())
+                .isOnSale(ticket.isOnSale())
                 .build();
     }
 }

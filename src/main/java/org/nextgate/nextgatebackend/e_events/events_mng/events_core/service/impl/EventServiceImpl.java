@@ -53,7 +53,6 @@ public class EventServiceImpl implements EventsService {
     private final ShopRepo shopRepo;
     private final ProductRepo productRepo;
 
-
     @Override
     @Transactional
     public EventEntity createEvent(CreateEventRequest createEventRequest)
@@ -135,7 +134,27 @@ public class EventServiceImpl implements EventsService {
         return publishedEvent;
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public EventEntity getEventById(UUID eventId) throws ItemNotFoundException, AccessDeniedException {
+        log.debug("Fetching event with ID: {}", eventId);
 
+        EventEntity event = eventsRepo.findByIdAndIsDeletedFalse(eventId)
+                .orElseThrow(() -> new ItemNotFoundException("Event not found with ID: " + eventId));
+
+
+        // Only organizer can view DRAFT events
+        if (event.getStatus() == EventStatus.DRAFT) {
+            AccountEntity currentUser = getAuthenticatedAccount();
+
+            if (!event.getOrganizer().getId().equals(currentUser.getId())) {
+                throw new AccessDeniedException("Only event organizer can view draft events");
+            }
+        }
+
+        // PUBLISHED events are public - anyone can view
+        return event;
+    }
 
 
     /**

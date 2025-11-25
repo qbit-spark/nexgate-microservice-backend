@@ -64,4 +64,22 @@ public class EventsController {
                         .data(eventResponse)
                         .build());
     }
+
+    @GetMapping("/{eventId}")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getEventById(@PathVariable UUID eventId)
+            throws ItemNotFoundException, AccessDeniedException {
+
+        log.info("Fetching event: {}", eventId);
+
+        EventEntity event = eventsService.getEventById(eventId);
+        EventResponse eventResponse = eventMapper.toResponse(event);
+
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(GlobeSuccessResponseBuilder.builder()
+                        .success(true)
+                        .httpStatus(HttpStatus.OK)
+                        .message("Event retrieved successfully")
+                        .data(eventResponse)
+                        .build());
+    }
 }

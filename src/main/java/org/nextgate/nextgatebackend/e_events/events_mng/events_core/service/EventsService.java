@@ -15,4 +15,6 @@ public interface EventsService {
 
     EventEntity publishEvent(UUID eventId)
             throws ItemNotFoundException, AccessDeniedException, EventValidationException;
+
+    EventEntity getEventById(UUID eventId) throws ItemNotFoundException, AccessDeniedException;
 }

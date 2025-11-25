@@ -63,7 +63,6 @@ public class TicketEntityToResponseMapper {
                 .id(ticket.getId())
                 .name(ticket.getName())
                 .price(ticket.getPrice())
-                .currency(ticket.getCurrency())
                 .totalTickets(ticket.getTotalQuantity())
                 .ticketsSold(ticket.getQuantitySold())
                 .ticketsAvailable(ticket.getQuantityAvailable())
