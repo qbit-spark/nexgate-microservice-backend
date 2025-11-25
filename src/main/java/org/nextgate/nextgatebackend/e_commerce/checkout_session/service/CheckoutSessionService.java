@@ -15,11 +15,11 @@ import java.util.UUID;
 
 public interface CheckoutSessionService {
 
-    // Create new checkout session
+    // Create a new checkout session
     CheckoutSessionResponse createCheckoutSession(CreateCheckoutSessionRequest request)
             throws ItemNotFoundException, BadRequestException;
 
-    // Get checkout session by ID
+    // Get a checkout session by ID
     CheckoutSessionResponse getCheckoutSessionById(UUID sessionId)
             throws ItemNotFoundException;
 

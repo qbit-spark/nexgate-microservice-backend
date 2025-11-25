@@ -84,6 +84,8 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
             );
         }
 
+        //Todo: Before save we have to find the best
+
         // Check if session expired
         if (checkoutSession.isExpired()) {
             checkoutSession.setStatus(CheckoutSessionStatus.EXPIRED);

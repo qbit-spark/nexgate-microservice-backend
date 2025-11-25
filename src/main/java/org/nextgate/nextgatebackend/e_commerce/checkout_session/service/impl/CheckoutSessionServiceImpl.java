@@ -1005,8 +1005,8 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // ========================================
         // 2. EXTRACT DATA FROM REQUEST
         // ========================================
-        UUID productId = request.getItems().get(0).getProductId();
-        Integer quantity = request.getItems().get(0).getQuantity();
+        UUID productId = request.getItems().getFirst().getProductId();
+        Integer quantity = request.getItems().getFirst().getQuantity();
         UUID planId = request.getInstallmentPlanId();
         Integer downPaymentPercent = request.getDownPaymentPercent();
 
