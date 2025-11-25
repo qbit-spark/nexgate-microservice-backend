@@ -114,7 +114,7 @@ public class WalletPaymentProcessorImpl implements WalletPaymentProcessor {
             throw new RandomExceptions("No items found in checkout session");
         }
 
-        var firstItem = checkoutSession.getItems().get(0);
+        var firstItem = checkoutSession.getItems().getFirst();
         var shopId = firstItem.getShopId();
 
         var shop = shopRepo.findById(shopId)

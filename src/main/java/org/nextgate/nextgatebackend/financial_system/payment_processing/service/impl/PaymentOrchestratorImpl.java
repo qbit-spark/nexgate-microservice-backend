@@ -72,6 +72,7 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
 
         log.info("Processing payment for checkout session: {}", request.getCheckoutSessionId());
 
+        //Todo we need to be able to handle both and fetch based on which kind of sessions
         // Fetch checkout session
         CheckoutSessionEntity checkoutSession = checkoutSessionRepo
                 .findById(request.getCheckoutSessionId())
@@ -84,9 +85,8 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
             );
         }
 
-        //Todo: Before save we have to find the best
-
-        // Check if session expired
+        //Todo: Before save we have to find the best session kind we are dealing with its either EVENT SESSION, OR PRODUCT SESSION
+        // Check if the session expired
         if (checkoutSession.isExpired()) {
             checkoutSession.setStatus(CheckoutSessionStatus.EXPIRED);
             checkoutSessionRepo.save(checkoutSession);
