@@ -34,7 +34,7 @@ public class WalletPaymentProcessorImpl implements WalletPaymentProcessor {
             throws ItemNotFoundException, RandomExceptions {
 
         try {
-            // Extract buyer and seller from checkout session
+            // Extract buyer and seller from the checkout session
             var buyer = checkoutSession.getCustomer();
             var seller = extractSellerFromCheckoutSession(checkoutSession);
             var totalAmount = checkoutSession.getPricing().getTotal();
