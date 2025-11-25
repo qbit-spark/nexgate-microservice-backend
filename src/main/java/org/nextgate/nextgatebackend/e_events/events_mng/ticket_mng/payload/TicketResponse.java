@@ -1,5 +1,6 @@
 package org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.payload;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -22,6 +23,7 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class TicketResponse {
 
     private UUID id;
@@ -31,7 +33,6 @@ public class TicketResponse {
     private String name;
     private String description;
     private BigDecimal price;
-    private String currency;
 
     // ========== QUANTITY (Using "tickets" terminology) ==========
     private Integer totalTickets;

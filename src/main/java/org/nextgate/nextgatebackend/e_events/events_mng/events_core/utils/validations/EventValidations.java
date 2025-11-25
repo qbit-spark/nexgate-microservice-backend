@@ -8,6 +8,7 @@ import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng
 import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng.repo.ShopRepo;
 import org.nextgate.nextgatebackend.e_events.category.repo.EventsCategoryRepository;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.repo.EventsRepo;
+import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.utils.validations.TicketValidations;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.EventValidationException;
 import org.springframework.stereotype.Service;
 import org.nextgate.nextgatebackend.e_events.category.entity.EventsCategoryEntity;
@@ -32,6 +33,7 @@ public class EventValidations {
     private final EventsCategoryRepository eventsCategoryRepository;
     private final ShopRepo shopRepo;
     private final ProductRepo productRepo;
+    private final TicketValidations ticketValidations;
 
     // ========================================================================
     // SOFT VALIDATIONS (For Drafts - Format checks only, no required fields)
@@ -455,6 +457,18 @@ public class EventValidations {
     }
 
 
+    /**
+     * Validate event has required tickets before publishing
+     */
+    public void validateEventHasRequiredTickets(EventEntity event) throws EventValidationException {
+        log.debug("Validating event has required tickets: {}", event.getId());
+
+        ticketValidations.validateEventHasRequiredTickets(event);
+
+        log.debug("Event ticket validation passed");
+    }
+
+
     // ========================================================================
     // PUBLISH VALIDATION (Final validation before publishing)
     // ========================================================================
@@ -502,8 +516,7 @@ public class EventValidations {
         // Validate entity data
         validateEventEntityData(event);
 
-        // TODO: Validate tickets exist
-        // validateEventHasTickets(event.getId());
+        validateEventHasRequiredTickets(event);
 
         log.debug("Event entity publish validation passed");
     }

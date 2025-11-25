@@ -1,11 +1,15 @@
 package org.nextgate.nextgatebackend.e_events.events_mng.events_core.payloads;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.*;
+import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.enums.AttendanceMode;
+import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.enums.TicketStatus;
 
+import java.math.BigDecimal;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,6 +23,7 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class EventResponse {
 
     private UUID id;
@@ -51,6 +56,10 @@ public class EventResponse {
 
     @Builder.Default
     private List<LinkedShopInfo> linkedShops = new ArrayList<>();
+
+    // Tickets
+    @Builder.Default
+    private List<TicketSummaryInfo> tickets = new ArrayList<>();
 
     // Organizer info
     private OrganizerInfo organizer;
@@ -175,5 +184,24 @@ public class EventResponse {
         private UUID organizerId;
         private String organizerName;
         private String organizerUsername;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TicketSummaryInfo {
+        private UUID id;
+        private String name;
+        private BigDecimal price;
+        private String currency;
+        private Integer totalTickets;
+        private Integer ticketsSold;
+        private Integer ticketsAvailable;
+        private Boolean isUnlimited;
+        private Boolean isSoldOut;
+        private AttendanceMode attendanceMode;
+        private TicketStatus status;
+        private Boolean isOnSale;
     }
 }

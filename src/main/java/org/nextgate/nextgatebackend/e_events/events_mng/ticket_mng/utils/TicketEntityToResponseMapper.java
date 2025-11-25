@@ -8,15 +8,9 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * Mapper to convert TicketTypeEntity to Response DTOs
- */
 @Component
 public class TicketEntityToResponseMapper {
 
-    /**
-     * Convert TicketTypeEntity to full TicketResponse
-     */
     public TicketResponse toResponse(TicketEntity ticket) {
         if (ticket == null) {
             return null;
@@ -28,7 +22,6 @@ public class TicketEntityToResponseMapper {
                 .name(ticket.getName())
                 .description(ticket.getDescription())
                 .price(ticket.getPrice())
-                .currency(ticket.getCurrency())
                 .totalTickets(ticket.getTotalQuantity())
                 .ticketsSold(ticket.getQuantitySold())
                 .ticketsRemaining(ticket.getQuantityRemaining())
@@ -50,12 +43,10 @@ public class TicketEntityToResponseMapper {
                 .createdAt(ticket.getCreatedAt())
                 .updatedAt(ticket.getUpdatedAt());
 
-        // Add creator username
         if (ticket.getCreatedBy() != null) {
             builder.createdBy(ticket.getCreatedBy().getUserName());
         }
 
-        // Add updater username
         if (ticket.getUpdatedBy() != null) {
             builder.updatedBy(ticket.getUpdatedBy().getUserName());
         }
@@ -63,9 +54,6 @@ public class TicketEntityToResponseMapper {
         return builder.build();
     }
 
-    /**
-     * Convert TicketTypeEntity to lightweight TicketSummaryResponse
-     */
     public TicketSummaryResponse toSummaryResponse(TicketEntity ticket) {
         if (ticket == null) {
             return null;
@@ -87,9 +75,6 @@ public class TicketEntityToResponseMapper {
                 .build();
     }
 
-    /**
-     * Convert list of TicketTypeEntity to list of TicketResponse
-     */
     public List<TicketResponse> toResponseList(List<TicketEntity> tickets) {
         if (tickets == null) {
             return List.of();
@@ -100,9 +85,6 @@ public class TicketEntityToResponseMapper {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Convert list of TicketTypeEntity to list of TicketSummaryResponse
-     */
     public List<TicketSummaryResponse> toSummaryList(List<TicketEntity> tickets) {
         if (tickets == null) {
             return List.of();
