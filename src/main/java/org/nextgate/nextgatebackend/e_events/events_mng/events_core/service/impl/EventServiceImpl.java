@@ -17,9 +17,9 @@ import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.Event
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.EventEntity;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.embedded.*;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventCreationStage;
+import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventFormat;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventStatus;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventSubmissionAction;
-import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventType;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.payloads.*;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.repo.EventsRepo;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.service.EventsService;
@@ -35,6 +35,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -54,91 +56,63 @@ public class EventServiceImpl implements EventsService {
 
     @Override
     @Transactional
-    public EventEntity createEvent(CreateEventRequest createEventRequest, EventSubmissionAction action)
+    public EventEntity createEvent(CreateEventRequest createEventRequest)
             throws ItemNotFoundException, AccessDeniedException, EventValidationException {
 
-        log.info("Creating event with action: {}", action);
+        log.info("Creating event as draft");
 
-        // Get an authenticated user
         AccountEntity currentUser = getAuthenticatedAccount();
-
-
-        // Route to the appropriate method based on action
-        EventEntity eventEntity = switch (action) {
-            case SAVE_DRAFT -> saveEventAsDraft(createEventRequest, currentUser);
-            case PUBLISH -> saveAndPublishEvent(createEventRequest, currentUser);
-        };
-
-        log.info("Event created successfully with ID: {}", eventEntity.getId());
-        return eventEntity;
-
-    }
-
-    /**
-     * Save event as DRAFT
-     * - Deep validation for Basic Info
-     * - Soft validation for other sections
-     */
-    private EventEntity saveEventAsDraft(CreateEventRequest request, AccountEntity currentUser)
-            throws EventValidationException {
 
         log.debug("Saving event as DRAFT for user: {}", currentUser.getUserName());
 
-        // 1. DEEP validation for Basic Info (always required)
-        eventValidations.hardValidateBasicInfo(request);
+        eventValidations.hardValidateBasicInfo(createEventRequest);
+        eventValidations.softValidateSchedule(createEventRequest);
+        eventValidations.softValidateLocation(createEventRequest);
+        eventValidations.softValidateMedia(createEventRequest);
 
-        // 2. SOFT validation for other sections (format checks only)
-        eventValidations.softValidateSchedule(request);
-        eventValidations.softValidateLocation(request);
-        eventValidations.softValidateMedia(request);
-
-        // 3. Get category
-        EventsCategoryEntity category = categoryRepository.findById(request.getCategoryId())
+        EventsCategoryEntity category = categoryRepository.findById(createEventRequest.getCategoryId())
                 .orElseThrow(() -> new EventValidationException(
                         "Category not found",
                         EventCreationStage.BASIC_INFO
                 ));
 
-        // 4. Build event entity
-        EventEntity event = buildEventEntity(request, currentUser, category);
+        EventEntity event = buildEventEntity(createEventRequest, currentUser, category);
 
-        // 5. Set as DRAFT
         event.setStatus(EventStatus.DRAFT);
-        event.setCurrentStage(EventCreationStage.BASIC_INFO);
-        event.setCompletedStages(new ArrayList<>());
-        event.markStageCompleted(EventCreationStage.BASIC_INFO);
-        event.setSlug(generateUniqueSlug(request.getTitle()));
+        event.setSlug(generateUniqueSlug(createEventRequest.getTitle()));
 
-        // 7. Save
+        markCompletedStagesForDraft(event, createEventRequest);
+
         EventEntity savedEvent = eventsRepo.save(event);
 
         log.info("Event saved as DRAFT with ID: {}", savedEvent.getId());
         return savedEvent;
     }
 
-    /**
-     * Save and publish event
-     * - Deep validation for ALL sections
-     * - Check for duplicates
-     * - Update category count
-     */
-    private EventEntity saveAndPublishEvent(CreateEventRequest request, AccountEntity currentUser)
-            throws EventValidationException {
 
-        log.debug("Publishing event for user: {}", currentUser.getUserName());
+    @Override
+    @Transactional
+    public EventEntity publishEvent(UUID eventId)
+            throws ItemNotFoundException, AccessDeniedException, EventValidationException {
 
-        // 1. HARD validation for ALL sections
-        eventValidations.hardValidateBasicInfo(request);
-        eventValidations.hardValidateSchedule(request);
-        eventValidations.hardValidateLocation(request);
-        eventValidations.hardValidateMedia(request);
-        eventValidations.hardValidateLinks(request);
+        log.info("Publishing event: {}", eventId);
 
-        // 2. Check for duplicates (fraud prevention)
-        DuplicateValidationResult duplicateCheck = duplicateValidator.validateNoDuplicate(
-                request,
-                currentUser.getId()
-        );
+        AccountEntity currentUser = getAuthenticatedAccount();
+
+        EventEntity event = eventsRepo.findByIdAndIsDeletedFalse(eventId)
+                .orElseThrow(() -> new ItemNotFoundException("Event not found with ID: " + eventId));
+
+        if (!event.getOrganizer().getId().equals(currentUser.getId())) {
+            throw new AccessDeniedException("Only event organizer can publish the event");
+        }
+
+        if (event.getStatus() == EventStatus.PUBLISHED) {
+            throw new EventValidationException("Event is already published", EventCreationStage.REVIEW);
+        }
+
+        eventValidations.validateEventEntityForPublish(event);
+
+        DuplicateValidationResult duplicateCheck = duplicateValidator.validateNoDuplicateForEntity(event);
 
         if (duplicateCheck.isBlocked()) {
             log.warn("Duplicate event detected for user: {}", currentUser.getUserName());
@@ -148,41 +122,21 @@ public class EventServiceImpl implements EventsService {
             );
         }
 
-        // Log warning if similar event exists (but allow)
-        if (duplicateCheck.isWarning()) {
-            log.warn("Similar event exists: {}", duplicateCheck.getMessage());
-            // Could store this warning to return in response
-        }
-
-        // 3. Get category
-        EventsCategoryEntity category = categoryRepository.findById(request.getCategoryId())
-                .orElseThrow(() -> new EventValidationException(
-                        "Category not found",
-                        EventCreationStage.BASIC_INFO
-                ));
-
-        // 4. Build event entity
-        EventEntity event = buildEventEntity(request, currentUser, category);
-
-        // 5. Set as PUBLISHED
         event.setStatus(EventStatus.PUBLISHED);
-        markAllStagesCompleted(event);
+        event.setUpdatedBy(currentUser);
 
-        // 6. Generate slug if not provided
-        if (event.getSlug() == null || event.getSlug().isBlank()) {
-            event.setSlug(generateUniqueSlug(request.getTitle()));
-        }
-
-        // 7. Save event
-        EventEntity savedEvent = eventsRepo.save(event);
-
-        // 8. Update category event count
+        EventsCategoryEntity category = event.getCategory();
         category.setEventCount(category.getEventCount() + 1);
         categoryRepository.save(category);
 
-        log.info("Event published successfully with ID: {}", savedEvent.getId());
-        return savedEvent;
+        EventEntity publishedEvent = eventsRepo.save(event);
+
+        log.info("Event published successfully with ID: {}", eventId);
+        return publishedEvent;
     }
+
+
+
 
     /**
      * Build EventEntity from CreateEventRequest
@@ -197,21 +151,12 @@ public class EventServiceImpl implements EventsService {
                 .slug(generateUniqueSlug(request.getTitle()))
                 .description(request.getDescription())
                 .category(category)
-                .eventType(request.getEventType())
                 .eventFormat(request.getEventFormat())
                 .organizer(organizer)
                 .createdBy(organizer)
                 .eventVisibility(request.getEventVisibility())
                 .isDeleted(false)
                 .completedStages(new ArrayList<>());
-
-        // Map schedule
-        if (request.getSchedule() != null) {
-            builder.startDateTime(request.getSchedule().getStartDateTime())
-                    .endDateTime(request.getSchedule().getEndDateTime())
-                    .timezone(request.getSchedule().getTimezone());
-
-        }
 
         // Map venue (for IN_PERSON and HYBRID)
         if (request.getVenue() != null) {
@@ -232,8 +177,7 @@ public class EventServiceImpl implements EventsService {
         EventEntity event = builder.build();
 
         // ========== NEW: Map EventDays for MULTI_DAY events ==========
-        if (request.getEventType() == EventType.MULTI_DAY &&
-                request.getSchedule() != null &&
+        if (request.getSchedule() != null &&
                 request.getSchedule().getDays() != null &&
                 !request.getSchedule().getDays().isEmpty()) {
 
@@ -243,7 +187,30 @@ public class EventServiceImpl implements EventsService {
             );
             event.setDays(eventDays);
 
-            log.debug("Added {} days to MULTI_DAY event", eventDays.size());
+            // Auto-calculate startDateTime and endDateTime from days
+            EventDayEntity firstDay = eventDays.getFirst();
+            EventDayEntity lastDay = eventDays.getLast();
+
+            String timezone = request.getSchedule().getTimezone() != null
+                    ? request.getSchedule().getTimezone()
+                    : "UTC";
+
+            event.setStartDateTime(ZonedDateTime.of(
+                    firstDay.getDate(),
+                    firstDay.getStartTime(),
+                    ZoneId.of(timezone)
+            ));
+
+            event.setEndDateTime(ZonedDateTime.of(
+                    lastDay.getDate(),
+                    lastDay.getEndTime(),
+                    ZoneId.of(timezone)
+            ));
+
+            event.setTimezone(timezone);
+
+            log.debug("Added {} days to event, start: {}, end: {}",
+                    eventDays.size(), event.getStartDateTime(), event.getEndDateTime());
         }
         // ============================================================
 
@@ -260,6 +227,67 @@ public class EventServiceImpl implements EventsService {
         return event;
     }
 
+
+    private void markCompletedStagesForDraft(EventEntity event, CreateEventRequest request) {
+        List<String> completedStages = new ArrayList<>();
+
+        completedStages.add(EventCreationStage.BASIC_INFO.name());
+
+        if (request.getSchedule() != null &&
+                request.getSchedule().getDays() != null &&
+                !request.getSchedule().getDays().isEmpty()) {
+            completedStages.add(EventCreationStage.SCHEDULE.name());
+        }
+
+        if (isLocationComplete(request)) {
+            completedStages.add(EventCreationStage.LOCATION_DETAILS.name());
+        }
+
+        if (request.getMedia() != null &&
+                (request.getMedia().getBanner() != null || request.getMedia().getThumbnail() != null)) {
+            completedStages.add(EventCreationStage.MEDIA.name());
+        }
+
+        if ((request.getLinkedProductIds() != null && !request.getLinkedProductIds().isEmpty()) ||
+                (request.getLinkedShopIds() != null && !request.getLinkedShopIds().isEmpty())) {
+            completedStages.add(EventCreationStage.LINKS.name());
+        }
+
+        event.setCompletedStages(completedStages);
+        event.setCurrentStage(determineCurrentStage(completedStages));
+    }
+
+    private boolean isLocationComplete(CreateEventRequest request) {
+        EventFormat format = request.getEventFormat();
+
+        if (format == EventFormat.IN_PERSON) {
+            return request.getVenue() != null && request.getVenue().getName() != null;
+        } else if (format == EventFormat.ONLINE) {
+            return request.getVirtualDetails() != null && request.getVirtualDetails().getMeetingLink() != null;
+        } else if (format == EventFormat.HYBRID) {
+            return request.getVenue() != null && request.getVenue().getName() != null &&
+                    request.getVirtualDetails() != null && request.getVirtualDetails().getMeetingLink() != null;
+        }
+
+        return false;
+    }
+
+    private EventCreationStage determineCurrentStage(List<String> completedStages) {
+        if (!completedStages.contains(EventCreationStage.BASIC_INFO.name())) {
+            return EventCreationStage.BASIC_INFO;
+        }
+        if (!completedStages.contains(EventCreationStage.SCHEDULE.name())) {
+            return EventCreationStage.SCHEDULE;
+        }
+        if (!completedStages.contains(EventCreationStage.LOCATION_DETAILS.name())) {
+            return EventCreationStage.LOCATION_DETAILS;
+        }
+        if (!completedStages.contains(EventCreationStage.TICKETS.name())) {
+            return EventCreationStage.TICKETS;
+        }
+
+        return EventCreationStage.REVIEW;
+    }
 
     /**
      * Map linked product IDs to the ProductEntity list
@@ -313,7 +341,10 @@ public class EventServiceImpl implements EventsService {
         if (request == null) return null;
 
         Coordinates coordinates = null;
-        if (request.getCoordinates().getLatitude() != null && request.getCoordinates().getLongitude() != null) {
+        // Only create coordinates if they exist
+        if (request.getCoordinates() != null &&
+                request.getCoordinates().getLatitude() != null &&
+                request.getCoordinates().getLongitude() != null) {
             coordinates = Coordinates.builder()
                     .latitude(request.getCoordinates().getLatitude())
                     .longitude(request.getCoordinates().getLongitude())
@@ -323,7 +354,7 @@ public class EventServiceImpl implements EventsService {
         return Venue.builder()
                 .name(request.getName())
                 .address(request.getAddress())
-                .coordinates(coordinates)
+                .coordinates(coordinates)  // ← Will be null if not provided, that's fine
                 .build();
     }
 
@@ -356,14 +387,16 @@ public class EventServiceImpl implements EventsService {
 
         List<EventDayEntity> eventDays = new ArrayList<>();
 
-        for (EventDayRequest dayRequest : dayRequests) {
+        for (int i = 0; i < dayRequests.size(); i++) {
+            EventDayRequest dayRequest = dayRequests.get(i);
+
             EventDayEntity eventDay = EventDayEntity.builder()
                     .eventEntity(parentEvent)
                     .date(dayRequest.getDate())
                     .startTime(dayRequest.getStartTime())
                     .endTime(dayRequest.getEndTime())
                     .description(dayRequest.getDescription())
-                    .dayOrder(dayRequest.getDayOrder())
+                    .dayOrder(dayRequest.getDayOrder() != null ? dayRequest.getDayOrder() : i + 1)
                     .build();
 
             eventDays.add(eventDay);
@@ -410,19 +443,6 @@ public class EventServiceImpl implements EventsService {
 
         log.debug("Generated unique slug: {}", slug);
         return slug;
-    }
-
-    /**
-     * Mark all stages as completed (for publish)
-     */
-    private void markAllStagesCompleted(EventEntity event) {
-        event.markStageCompleted(EventCreationStage.BASIC_INFO);
-        event.markStageCompleted(EventCreationStage.SCHEDULE);
-        event.markStageCompleted(EventCreationStage.LOCATION_DETAILS);
-        event.markStageCompleted(EventCreationStage.TICKETS);
-        event.markStageCompleted(EventCreationStage.MEDIA);
-        event.markStageCompleted(EventCreationStage.LINKS);
-        event.markStageCompleted(EventCreationStage.REVIEW);
     }
 
     /**

@@ -17,6 +17,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.UUID;
+
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/e-events")
@@ -28,26 +30,37 @@ public class EventsController {
 
     @PostMapping
     public ResponseEntity<GlobeSuccessResponseBuilder> createEvent(
-            @Valid @RequestBody CreateEventRequest createEventRequest,
-            @RequestParam(name = "action", defaultValue = "SAVE_DRAFT") EventSubmissionAction action)
+            @Valid @RequestBody CreateEventRequest createEventRequest)
             throws ItemNotFoundException, AccessDeniedException, EventValidationException {
 
-        log.info("Creating event with action: {}", action);
+        log.info("Creating event as draft");
 
-        EventEntity createdEvent = eventsService.createEvent(createEventRequest, action);
-
-        // Map entity to response DTO
+        EventEntity createdEvent = eventsService.createEvent(createEventRequest);
         EventResponse eventResponse = eventMapper.toResponse(createdEvent);
-
-        String message = action == EventSubmissionAction.PUBLISH
-                ? "Event published successfully"
-                : "Event saved as draft successfully";
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(GlobeSuccessResponseBuilder.builder()
                         .success(true)
                         .httpStatus(HttpStatus.CREATED)
-                        .message(message)
+                        .message("Event saved as draft successfully")
+                        .data(eventResponse)
+                        .build());
+    }
+
+    @PatchMapping("/{eventId}/publish")
+    public ResponseEntity<GlobeSuccessResponseBuilder> publishEvent(@PathVariable UUID eventId)
+            throws ItemNotFoundException, AccessDeniedException, EventValidationException {
+
+        log.info("Publishing event: {}", eventId);
+
+        EventEntity publishedEvent = eventsService.publishEvent(eventId);
+        EventResponse eventResponse = eventMapper.toResponse(publishedEvent);
+
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(GlobeSuccessResponseBuilder.builder()
+                        .success(true)
+                        .httpStatus(HttpStatus.OK)
+                        .message("Event published successfully")
                         .data(eventResponse)
                         .build());
     }

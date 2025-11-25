@@ -27,7 +27,6 @@ public class EventEntityToResponseMapper {
                 .title(event.getTitle())
                 .slug(event.getSlug())
                 .description(event.getDescription())
-                .eventType(event.getEventType())
                 .eventFormat(event.getEventFormat())
                 .eventVisibility(event.getEventVisibility())
                 .status(event.getStatus())

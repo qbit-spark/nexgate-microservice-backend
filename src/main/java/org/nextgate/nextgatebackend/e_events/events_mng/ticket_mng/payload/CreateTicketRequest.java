@@ -6,7 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.enums.AttendanceMode;
-import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.enums.TicketValidityType;
+import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.enums.CheckInValidityType;
+
 
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
@@ -37,7 +38,7 @@ public class CreateTicketRequest {
     private String currency = "USD";
 
     // ========== QUANTITY MANAGEMENT ==========
-    @Min(value = 1, message = "Total quantity must be at least 1 if not unlimited")
+    @Min(value = 0, message = "Total quantity cannot be negative")
     private Integer totalQuantity; // null if unlimited
 
     @Builder.Default
@@ -60,11 +61,10 @@ public class CreateTicketRequest {
     private Integer maxQuantityPerUser; // null = no limit
 
     // ========== TICKET VALIDITY ==========
-    @NotNull(message = "Ticket validity type is required")
     @Builder.Default
-    private TicketValidityType validUntilType = TicketValidityType.EVENT_END;
+    private CheckInValidityType checkInValidUntil = CheckInValidityType.EVENT_END;
 
-    private ZonedDateTime customValidUntil; // Required only if validUntilType = CUSTOM
+    private ZonedDateTime customCheckInDate;
 
     // ========== FOR HYBRID EVENTS ==========
     private AttendanceMode attendanceMode; // Required for HYBRID events

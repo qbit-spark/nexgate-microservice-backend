@@ -11,8 +11,9 @@ import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.authentication_service.utils.StringListJsonConverter;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.EventEntity;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.enums.AttendanceMode;
+import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.enums.CheckInValidityType;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.enums.TicketStatus;
-import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.enums.TicketValidityType;
+
 
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
@@ -95,12 +96,12 @@ public class TicketEntity {
 
     // ========== TICKET VALIDITY ==========
     @Enumerated(EnumType.STRING)
-    @Column(name = "valid_until_type", nullable = false, length = 30)
+    @Column(name = "check_in_valid_until")
     @Builder.Default
-    private TicketValidityType validUntilType = TicketValidityType.EVENT_END;
+    private CheckInValidityType checkInValidUntil = CheckInValidityType.EVENT_END;
 
-    @Column(name = "custom_valid_until")
-    private ZonedDateTime customValidUntil; // Only used when validUntilType = CUSTOM
+    @Column(name = "custom_check_in_date")
+    private ZonedDateTime customCheckInDate;
 
     // ========== FOR HYBRID EVENTS ==========
     @Enumerated(EnumType.STRING)

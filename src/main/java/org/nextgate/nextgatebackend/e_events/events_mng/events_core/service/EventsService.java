@@ -7,7 +7,12 @@ import org.nextgate.nextgatebackend.globeadvice.exceptions.AccessDeniedException
 import org.nextgate.nextgatebackend.globeadvice.exceptions.EventValidationException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 
-public interface EventsService {
-    EventEntity createEvent(CreateEventRequest createEventRequest, EventSubmissionAction action) throws ItemNotFoundException, AccessDeniedException, EventValidationException;
+import java.util.UUID;
 
+public interface EventsService {
+    EventEntity createEvent(CreateEventRequest createEventRequest)
+            throws ItemNotFoundException, AccessDeniedException, EventValidationException;
+
+    EventEntity publishEvent(UUID eventId)
+            throws ItemNotFoundException, AccessDeniedException, EventValidationException;
 }

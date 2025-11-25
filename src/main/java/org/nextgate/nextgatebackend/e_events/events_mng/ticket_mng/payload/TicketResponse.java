@@ -6,8 +6,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.enums.AttendanceMode;
+import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.enums.CheckInValidityType;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.enums.TicketStatus;
-import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.enums.TicketValidityType;
+
 
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
@@ -53,8 +54,8 @@ public class TicketResponse {
     private Integer maxQuantityPerUser;
 
     // ========== TICKET VALIDITY ==========
-    private TicketValidityType validUntilType;
-    private ZonedDateTime customValidUntil;
+    private CheckInValidityType checkInValidUntil;
+    private ZonedDateTime customCheckInDate;
 
     // ========== FOR HYBRID EVENTS ==========
     private AttendanceMode attendanceMode;

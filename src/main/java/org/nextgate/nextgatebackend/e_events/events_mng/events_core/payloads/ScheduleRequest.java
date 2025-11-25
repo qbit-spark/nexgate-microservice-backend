@@ -16,9 +16,6 @@ import java.util.List;
 @AllArgsConstructor
 public class ScheduleRequest {
 
-    private ZonedDateTime startDateTime;
-
-    private ZonedDateTime endDateTime;
 
     private String timezone;
 

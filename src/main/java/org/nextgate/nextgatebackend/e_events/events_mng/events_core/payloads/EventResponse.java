@@ -35,7 +35,6 @@ public class EventResponse {
     private CategoryInfo category;
 
     // Event classification
-    private EventType eventType;
     private EventFormat eventFormat;
     private EventVisibility eventVisibility;
     private EventStatus status;

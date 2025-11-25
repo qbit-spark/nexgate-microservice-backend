@@ -5,8 +5,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.authentication_service.repo.AccountRepo;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.EventEntity;
+import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventCreationStage;
+import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventFormat;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.repo.EventsRepo;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.entity.TicketEntity;
+import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.enums.AttendanceMode;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.enums.TicketStatus;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.payload.CreateTicketRequest;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.payload.UpdateTicketCapacityRequest;
@@ -60,6 +63,21 @@ public class TicketServiceImpl implements TicketService {
 
         // 6. Save ticket
         TicketEntity savedTicket = ticketTypeRepo.save(ticket);
+
+        // NEW: Check if TICKETS stage requirements are met
+        EventEntity eventEntity = savedTicket.getEvent();
+        if (!eventEntity.isStageCompleted(EventCreationStage.TICKETS)) {
+            if (areTicketRequirementsMet(eventEntity)) {
+                eventEntity.markStageCompleted(EventCreationStage.TICKETS);
+
+                if (eventEntity.getCurrentStage() == EventCreationStage.TICKETS) {
+                    eventEntity.setCurrentStage(EventCreationStage.REVIEW);
+                }
+
+                eventsRepo.save(eventEntity);
+                log.info("TICKETS stage marked as completed for event: {}", eventId);
+            }
+        }
 
         log.info("Ticket created successfully with ID: {} for event: {}", savedTicket.getId(), eventId);
         return savedTicket;
@@ -192,7 +210,7 @@ public class TicketServiceImpl implements TicketService {
      */
     private TicketEntity buildTicketEntity(CreateTicketRequest request, EventEntity event, AccountEntity creator) {
 
-        TicketEntity.TicketEntityBuilder builder = TicketEntity.builder().event(event).name(request.getName()).description(request.getDescription()).price(request.getPrice()).currency(request.getCurrency() != null ? request.getCurrency() : "USD").isUnlimited(request.getIsUnlimited() != null ? request.getIsUnlimited() : false).quantitySold(0).salesStartDateTime(request.getSalesStartDateTime()).salesEndDateTime(request.getSalesEndDateTime()).minQuantityPerOrder(request.getMinQuantityPerOrder() != null ? request.getMinQuantityPerOrder() : 1).maxQuantityPerOrder(request.getMaxQuantityPerOrder()).maxQuantityPerUser(request.getMaxQuantityPerUser()).validUntilType(request.getValidUntilType()).customValidUntil(request.getCustomValidUntil()).attendanceMode(request.getAttendanceMode()).inclusiveItems(request.getInclusiveItems() != null ? request.getInclusiveItems() : List.of()).isHidden(request.getIsHidden() != null ? request.getIsHidden() : false).status(TicketStatus.ACTIVE).isDeleted(false).createdBy(creator);
+        TicketEntity.TicketEntityBuilder builder = TicketEntity.builder().event(event).name(request.getName()).description(request.getDescription()).price(request.getPrice()).currency(request.getCurrency() != null ? request.getCurrency() : "USD").isUnlimited(request.getIsUnlimited() != null ? request.getIsUnlimited() : false).quantitySold(0).salesStartDateTime(request.getSalesStartDateTime()).salesEndDateTime(request.getSalesEndDateTime()).minQuantityPerOrder(request.getMinQuantityPerOrder() != null ? request.getMinQuantityPerOrder() : 1).maxQuantityPerOrder(request.getMaxQuantityPerOrder()).maxQuantityPerUser(request.getMaxQuantityPerUser()).checkInValidUntil(request.getCheckInValidUntil()).customCheckInDate(request.getCustomCheckInDate()).attendanceMode(request.getAttendanceMode()).inclusiveItems(request.getInclusiveItems() != null ? request.getInclusiveItems() : List.of()).isHidden(request.getIsHidden() != null ? request.getIsHidden() : false).status(TicketStatus.ACTIVE).isDeleted(false).createdBy(creator);
 
         // Handle quantity based on an unlimited flag
         if (request.getIsUnlimited() != null && request.getIsUnlimited()) {
@@ -234,5 +252,22 @@ public class TicketServiceImpl implements TicketService {
         // User is neither organizer nor has a required role
         log.warn("Access denied for user: {}. Not event organizer and no EVENT_MANAGER role", user.getUserName());
         throw new AccessDeniedException("Access denied. You must be the event organizer or have EVENT_MANAGER role to manage tickets.");
+    }
+
+    private boolean areTicketRequirementsMet(EventEntity event) {
+        if (event.getEventFormat() == EventFormat.HYBRID) {
+            long inPersonCount = ticketTypeRepo.countByEventAndAttendanceModeAndStatusAndIsDeletedFalse(
+                    event, AttendanceMode.IN_PERSON, TicketStatus.ACTIVE);
+
+            long onlineCount = ticketTypeRepo.countByEventAndAttendanceModeAndStatusAndIsDeletedFalse(
+                    event, AttendanceMode.ONLINE, TicketStatus.ACTIVE);
+
+            return inPersonCount >= 1 && onlineCount >= 1;
+        } else {
+            long activeCount = ticketTypeRepo.countByEventAndStatusAndIsDeletedFalse(
+                    event, TicketStatus.ACTIVE);
+
+            return activeCount >= 1;
+        }
     }
 }

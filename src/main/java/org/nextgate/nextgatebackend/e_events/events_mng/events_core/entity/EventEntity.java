@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 
 @Entity
 @Table(name = "events", indexes = {
-        @Index(name = "idx_event_slug", columnList = "slug"), @Index(name = "idx_event_status", columnList = "status"), @Index(name = "idx_event_type", columnList = "event_type"), @Index(name = "idx_event_format", columnList = "event_format"), @Index(name = "idx_event_visibility", columnList = "eventVisibility"), @Index(name = "idx_event_organizer", columnList = "organizer_id"), @Index(name = "idx_event_category", columnList = "category_id"), @Index(name = "idx_event_dates", columnList = "start_date_time, end_date_time"), @Index(name = "idx_event_start_date", columnList = "start_date_time"), @Index(name = "idx_event_is_deleted", columnList = "is_deleted"), @Index(name = "idx_event_duplicate_check", columnList = "status, is_deleted, start_date_time"), @Index(name = "idx_event_organizer_status", columnList = "organizer_id, status, is_deleted, start_date_time"), @Index(name = "idx_event_public_listing", columnList = "status, eventVisibility, is_deleted, start_date_time"), @Index(name = "idx_event_category_status", columnList = "category_id, status, is_deleted, start_date_time")})
+        @Index(name = "idx_event_slug", columnList = "slug"), @Index(name = "idx_event_status", columnList = "status"), @Index(name = "idx_event_format", columnList = "event_format"), @Index(name = "idx_event_visibility", columnList = "eventVisibility"), @Index(name = "idx_event_organizer", columnList = "organizer_id"), @Index(name = "idx_event_category", columnList = "category_id"), @Index(name = "idx_event_dates", columnList = "start_date_time, end_date_time"), @Index(name = "idx_event_start_date", columnList = "start_date_time"), @Index(name = "idx_event_is_deleted", columnList = "is_deleted"), @Index(name = "idx_event_duplicate_check", columnList = "status, is_deleted, start_date_time"), @Index(name = "idx_event_organizer_status", columnList = "organizer_id, status, is_deleted, start_date_time"), @Index(name = "idx_event_public_listing", columnList = "status, eventVisibility, is_deleted, start_date_time"), @Index(name = "idx_event_category_status", columnList = "category_id, status, is_deleted, start_date_time")})
 @Data
 @Builder
 @NoArgsConstructor
@@ -55,10 +55,6 @@ public class EventEntity {
     @Column(name = "event_visibility", nullable = false, length = 20)
     private EventVisibility eventVisibility;
 
-    // Event classification - SIMPLIFIED: Only ONE_TIME and MULTI_DAY
-    @Enumerated(EnumType.STRING)
-    @Column(name = "event_type", nullable = false, length = 20)
-    private EventType eventType; // ONE_TIME, MULTI_DAY
 
     @Enumerated(EnumType.STRING)
     @Column(name = "event_format", nullable = false, length = 20)
@@ -78,10 +74,10 @@ public class EventEntity {
     private VirtualDetails virtualDetails;
 
     // Schedule - Keep as direct columns for querying
-    @Column(name = "start_date_time", nullable = false)
+    @Column(name = "start_date_time")
     private ZonedDateTime startDateTime;
 
-    @Column(name = "end_date_time", nullable = false)
+    @Column(name = "end_date_time")
     private ZonedDateTime endDateTime;
 
     @Column(name = "timezone", length = 50)

@@ -7,8 +7,8 @@ import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventF
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventStatus;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.entity.TicketEntity;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.enums.AttendanceMode;
+import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.enums.CheckInValidityType;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.enums.TicketStatus;
-import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.enums.TicketValidityType;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.payload.CreateTicketRequest;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.repo.TicketRepo;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.EventValidationException;
@@ -75,32 +75,21 @@ public class TicketValidations {
      * Validate quantity fields (totalQuantity vs isUnlimited)
      */
     public void validateQuantityFields(CreateTicketRequest request) throws EventValidationException {
-        if (request.getIsUnlimited() != null && request.getIsUnlimited()) {
-            // Unlimited tickets - totalQuantity should be null
-            if (request.getTotalQuantity() != null) {
-                log.warn("Unlimited ticket has totalQuantity set - will be ignored");
-            }
-        } else {
-            // Limited tickets - totalQuantity is required
-            if (request.getTotalQuantity() == null) {
-                throw new EventValidationException(
-                        "Total quantity is required for limited tickets. " +
-                                "Set isUnlimited=true for unlimited tickets."
-                );
-            }
+        Integer quantity = request.getTotalQuantity();
 
-            if (request.getTotalQuantity() < 1) {
-                throw new EventValidationException(
-                        "Total quantity must be at least 1"
-                );
-            }
+        // null or 0 means unlimited - that's fine
+        if (quantity == null || quantity == 0) {
+            return;
+        }
 
-            // Reasonable upper limit check
-            if (request.getTotalQuantity() > 1_000_000) {
-                throw new EventValidationException(
-                        "Total quantity exceeds maximum allowed (1,000,000)"
-                );
-            }
+        // If quantity provided, must be positive
+        if (quantity < 0) {
+            throw new EventValidationException("Total quantity cannot be negative");
+        }
+
+        // Reasonable upper limit check
+        if (quantity > 1_000_000) {
+            throw new EventValidationException("Total quantity exceeds maximum allowed (1,000,000)");
         }
     }
 
@@ -207,8 +196,8 @@ public class TicketValidations {
     public void validateTicketValidity(CreateTicketRequest request, EventEntity event)
             throws EventValidationException {
 
-        TicketValidityType validityType = request.getValidUntilType();
-        ZonedDateTime customValidUntil = request.getCustomValidUntil();
+        CheckInValidityType validityType = request.getCheckInValidUntil();
+        ZonedDateTime customValidUntil = request.getCustomCheckInDate();
         ZonedDateTime eventEnd = event.getEndDateTime();
 
         if (validityType == null) {
@@ -218,7 +207,7 @@ public class TicketValidations {
         }
 
         // If CUSTOM type, customValidUntil is required
-        if (validityType == TicketValidityType.CUSTOM) {
+        if (validityType == CheckInValidityType.CUSTOM) {
             if (customValidUntil == null) {
                 throw new EventValidationException(
                         "Custom valid until date is required when validity type is CUSTOM"

@@ -7,6 +7,7 @@ import org.nextgate.nextgatebackend.e_commerce.products_mng_service.products.rep
 import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng.enums.ShopStatus;
 import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng.repo.ShopRepo;
 import org.nextgate.nextgatebackend.e_events.category.repo.EventsCategoryRepository;
+import org.nextgate.nextgatebackend.e_events.events_mng.events_core.payloads.EventDayRequest;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.repo.EventsRepo;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.utils.validations.TicketValidations;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.EventValidationException;
@@ -15,13 +16,12 @@ import org.nextgate.nextgatebackend.e_events.category.entity.EventsCategoryEntit
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.EventEntity;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventCreationStage;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventFormat;
-import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventType;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.payloads.CreateEventRequest;
 
+import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 
 @Slf4j
@@ -67,6 +67,8 @@ public class EventValidations {
         }
     }
 
+
+
     /**
      * Soft validation for schedule - only validates logic if fields are present
      */
@@ -77,22 +79,25 @@ public class EventValidations {
             return; // Schedule isn't provided yet, that's fine for draft
         }
 
-        // Validate date logic if both dates are provided
-        if (request.getSchedule().getStartDateTime() != null &&
-                request.getSchedule().getEndDateTime() != null) {
+        // Validate days array if provided
+        if (request.getSchedule().getDays() != null && !request.getSchedule().getDays().isEmpty()) {
+            for (EventDayRequest day : request.getSchedule().getDays()) {
+                // Validate date logic for each day
+                if (day.getStartTime() != null && day.getEndTime() != null) {
+                    if (day.getEndTime().isBefore(day.getStartTime())) {
+                        throw new EventValidationException(
+                                "End time must be after start time for day: " + day.getDate(),
+                                EventCreationStage.SCHEDULE
+                        );
+                    }
 
-            if (request.getSchedule().getEndDateTime().isBefore(request.getSchedule().getStartDateTime())) {
-                throw new EventValidationException(
-                        "End date/time must be after start date/time",
-                        EventCreationStage.SCHEDULE
-                );
-            }
-
-            if (request.getSchedule().getStartDateTime().equals(request.getSchedule().getEndDateTime())) {
-                throw new EventValidationException(
-                        "Start and end date/time cannot be the same",
-                        EventCreationStage.SCHEDULE
-                );
+                    if (day.getEndTime().equals(day.getStartTime())) {
+                        throw new EventValidationException(
+                                "Start and end time cannot be the same for day: " + day.getDate(),
+                                EventCreationStage.SCHEDULE
+                        );
+                    }
+                }
             }
         }
 
@@ -100,8 +105,8 @@ public class EventValidations {
         if (request.getSchedule().getTimezone() != null && !request.getSchedule().getTimezone().isBlank()) {
             validateTimezone(request.getSchedule().getTimezone());
         }
-
     }
+
 
     /**
      * Soft validation for location - only validates format if provided
@@ -196,10 +201,6 @@ public class EventValidations {
             throw new EventValidationException("Cannot create event in inactive category", EventCreationStage.BASIC_INFO);
         }
 
-        // Required: Event Type
-        if (request.getEventType() == null) {
-            throw new EventValidationException("Event type is required", EventCreationStage.BASIC_INFO);
-        }
 
         // Required: Event Format
         if (request.getEventFormat() == null) {
@@ -220,42 +221,19 @@ public class EventValidations {
             throw new EventValidationException("Schedule is required", EventCreationStage.SCHEDULE);
         }
 
-        // Required: Start DateTime
-        if (request.getSchedule().getStartDateTime() == null) {
-            throw new EventValidationException("Start date and time is required", EventCreationStage.SCHEDULE);
+        // Required: Days array
+        if (request.getSchedule().getDays() == null || request.getSchedule().getDays().isEmpty()) {
+            throw new EventValidationException("At least one day is required in schedule", EventCreationStage.SCHEDULE);
         }
 
-        // Required: End DateTime
-        if (request.getSchedule().getEndDateTime() == null) {
-            throw new EventValidationException("End date and time is required", EventCreationStage.SCHEDULE);
+        // Validate timezone
+        if (request.getSchedule().getTimezone() == null || request.getSchedule().getTimezone().isBlank()) {
+            throw new EventValidationException("Timezone is required", EventCreationStage.SCHEDULE);
         }
+        validateTimezone(request.getSchedule().getTimezone());
 
-        // Validate date logic
-        if (request.getSchedule().getEndDateTime().isBefore(request.getSchedule().getStartDateTime())) {
-            throw new EventValidationException(
-                    "End date/time must be after start date/time",
-                    EventCreationStage.SCHEDULE
-            );
-        }
-
-        if (request.getSchedule().getStartDateTime().equals(request.getSchedule().getEndDateTime())) {
-            throw new EventValidationException(
-                    "Start and end date/time cannot be the same",
-                    EventCreationStage.SCHEDULE
-            );
-        }
-
-        // Validate timezone (if provided)
-        if (request.getSchedule().getTimezone() != null && !request.getSchedule().getTimezone().isBlank()) {
-            validateTimezone(request.getSchedule().getTimezone());
-        }
-
-        // Event Type specific validations
-        if (request.getEventType() == EventType.MULTI_DAY) {
-            validateMultiDaySchedule(request);
-        } else if (request.getEventType() == EventType.RECURRING) {
-            throw new RuntimeException("RECURRING is yet implemented");
-        }
+        // Validate days
+        validateDaysSchedule(request);
 
         log.debug("Schedule hard validation passed");
     }
@@ -545,51 +523,86 @@ public class EventValidations {
     }
 
 
-
-    private void validateMultiDaySchedule(CreateEventRequest request) throws EventValidationException {
+    private void validateDaysSchedule(CreateEventRequest request) throws EventValidationException {
         if (request.getSchedule().getDays() == null || request.getSchedule().getDays().isEmpty()) {
             throw new EventValidationException(
-                    "Multi-day events require at least one day detail",
+                    "At least one day is required in schedule",
                     EventCreationStage.SCHEDULE
             );
         }
 
-        // Validate each day
-        request.getSchedule().getDays().forEach(day -> {
+        List<EventDayRequest> days = request.getSchedule().getDays();
+        Set<LocalDate> seenDates = new HashSet<>();
+
+        for (int i = 0; i < days.size(); i++) {
+            EventDayRequest day = days.get(i);
+
+            // Required fields
             if (day.getDate() == null) {
-                try {
-                    throw new EventValidationException("Date is required for each day", EventCreationStage.SCHEDULE);
-                } catch (EventValidationException e) {
-                    throw new RuntimeException(e);
-                }
+                throw new EventValidationException("Date is required for each day", EventCreationStage.SCHEDULE);
             }
             if (day.getStartTime() == null) {
-                try {
-                    throw new EventValidationException("Start time is required for each day", EventCreationStage.SCHEDULE);
-                } catch (EventValidationException e) {
-                    throw new RuntimeException(e);
-                }
+                throw new EventValidationException("Start time is required for each day", EventCreationStage.SCHEDULE);
             }
             if (day.getEndTime() == null) {
-                try {
-                    throw new EventValidationException("End time is required for each day", EventCreationStage.SCHEDULE);
-                } catch (EventValidationException e) {
-                    throw new RuntimeException(e);
-                }
+                throw new EventValidationException("End time is required for each day", EventCreationStage.SCHEDULE);
             }
-            if (day.getEndTime().isBefore(day.getStartTime())) {
-                try {
-                    throw new EventValidationException(
-                            "End time must be after start time for day: " + day.getDate(),
-                            EventCreationStage.SCHEDULE
-                    );
-                } catch (EventValidationException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        });
-    }
 
+            // Check time logic
+            if (day.getEndTime().isBefore(day.getStartTime())) {
+                throw new EventValidationException(
+                        "End time must be after start time for day: " + day.getDate(),
+                        EventCreationStage.SCHEDULE
+                );
+            }
+
+            if (day.getEndTime().equals(day.getStartTime())) {
+                throw new EventValidationException(
+                        "Start and end time cannot be the same for day: " + day.getDate(),
+                        EventCreationStage.SCHEDULE
+                );
+            }
+
+            // Check date is not in the past
+            if (day.getDate().isBefore(LocalDate.now())) {
+                throw new EventValidationException(
+                        "Event date cannot be in the past: " + day.getDate(),
+                        EventCreationStage.SCHEDULE
+                );
+            }
+
+            // Check for duplicate dates
+            if (seenDates.contains(day.getDate())) {
+                throw new EventValidationException(
+                        "Duplicate date found in schedule: " + day.getDate(),
+                        EventCreationStage.SCHEDULE
+                );
+            }
+            seenDates.add(day.getDate());
+
+            // Auto-set dayOrder if not provided
+            if (day.getDayOrder() == null) {
+                day.setDayOrder(i + 1);
+            }
+        }
+
+        // Ensure dates are in chronological order
+        List<LocalDate> dates = days.stream()
+                .map(EventDayRequest::getDate)
+                .sorted()
+                .collect(Collectors.toList());
+
+        List<LocalDate> providedDates = days.stream()
+                .map(EventDayRequest::getDate)
+                .collect(Collectors.toList());
+
+        if (!dates.equals(providedDates)) {
+            throw new EventValidationException(
+                    "Days must be in chronological order",
+                    EventCreationStage.SCHEDULE
+            );
+        }
+    }
 
     private void validateVenueRequired(CreateEventRequest request) throws EventValidationException {
         if (request.getVenue() == null) {

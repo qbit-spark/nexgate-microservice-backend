@@ -9,7 +9,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventFormat;
-import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventType;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventVisibility;
 
 import java.util.ArrayList;
@@ -39,8 +38,6 @@ public class CreateEventRequest {
     @NotNull(message = "Event visibility is required")
     private EventVisibility eventVisibility;
 
-    @NotNull(message = "Event type is required")
-    private EventType eventType;
 
     @NotNull(message = "Event format is required")
     private EventFormat eventFormat;

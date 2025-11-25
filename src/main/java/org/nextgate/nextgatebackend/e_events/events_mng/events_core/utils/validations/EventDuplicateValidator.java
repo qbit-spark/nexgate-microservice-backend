@@ -36,23 +36,13 @@ public class EventDuplicateValidator {
             // NOT checking: DRAFT, CANCELLED, FINISHED
     );
 
-    /**
-     * Check if event is duplicate - blocks only if DIFFERENT organizer has same event
-     * Considers event status and visibility for fraud prevention
-     */
-    public DuplicateValidationResult validateNoDuplicate(
-            CreateEventRequest request,
-            UUID currentOrganizerId) {
 
-        log.debug("Checking for duplicate events for organizer: {}", currentOrganizerId);
 
-        // Find similar events (only checking active statuses)
-        List<EventEntity> similarEvents = findSimilarEvents(
-                request.getTitle(),
-                request.getSchedule().getStartDateTime(),
-                request.getVenue(),
-                request.getEventFormat()
-        );
+
+    public DuplicateValidationResult validateNoDuplicateForEntity(EventEntity event) {
+        log.debug("Checking for duplicate events for existing event: {}", event.getId());
+
+        List<EventEntity> similarEvents = findSimilarEventsForEntity(event);
 
         if (similarEvents.isEmpty()) {
             log.debug("No similar events found");
@@ -61,30 +51,27 @@ public class EventDuplicateValidator {
 
         log.debug("Found {} potentially similar events", similarEvents.size());
 
-        // Check if any similar event belongs to DIFFERENT organizer
         for (EventEntity existing : similarEvents) {
+            if (existing.getId().equals(event.getId())) {
+                continue;
+            }
 
-            // Skip if it's the same organizer - allowed!
-            if (existing.getOrganizer().getId().equals(currentOrganizerId)) {
+            if (existing.getOrganizer().getId().equals(event.getOrganizer().getId())) {
                 log.debug("Skipping event {} - same organizer", existing.getId());
                 continue;
             }
 
-            // Skip if event visibility is UNLISTED (very low fraud risk)
             if (existing.getEventVisibility() == EventVisibility.UNLISTED) {
                 log.debug("Skipping event {} - unlisted event", existing.getId());
                 continue;
             }
 
-            // Calculate similarity score
-            int similarityScore = calculateSimilarityScore(request, existing);
+            int similarityScore = calculateSimilarityScoreForEntities(event, existing);
             log.debug("Similarity score with event {}: {}%", existing.getId(), similarityScore);
 
-            // Get threshold based on visibility
             int threshold = getSimilarityThreshold(existing.getEventVisibility());
             log.debug("Threshold for {} event: {}%", existing.getEventVisibility(), threshold);
 
-            // High similarity from DIFFERENT organizer = BLOCK
             if (similarityScore >= threshold) {
                 log.warn("Blocking duplicate event. Similarity: {}%, threshold: {}%, existing event: {}",
                         similarityScore, threshold, existing.getId());
@@ -97,7 +84,6 @@ public class EventDuplicateValidator {
                 );
             }
 
-            // Medium similarity = WARNING (10% below threshold)
             int warningThreshold = threshold - 10;
             if (similarityScore >= warningThreshold) {
                 log.info("Warning for similar event. Similarity: {}%", similarityScore);
@@ -113,6 +99,126 @@ public class EventDuplicateValidator {
         log.debug("No blocking duplicates found");
         return DuplicateValidationResult.allowed();
     }
+
+    private List<EventEntity> findSimilarEventsForEntity(EventEntity event) {
+        ZonedDateTime searchStart = event.getStartDateTime().minusDays(3);
+        ZonedDateTime searchEnd = event.getStartDateTime().plusDays(3);
+
+        log.debug("Searching for similar events from {} to {}", searchStart, searchEnd);
+
+        List<EventEntity> similarEvents = eventsRepo
+                .findByTitleContainingIgnoreCaseAndStartDateTimeBetweenAndStatusInAndIsDeletedFalse(
+                        extractKeywords(event.getTitle()),
+                        searchStart,
+                        searchEnd,
+                        CHECKABLE_STATUSES
+                );
+
+        log.debug("Found {} events matching title and date criteria", similarEvents.size());
+
+        if (event.getEventFormat() != EventFormat.ONLINE && event.getVenue() != null) {
+            similarEvents = similarEvents.stream()
+                    .filter(existing -> isVenueSimilar(event.getVenue(), existing.getVenue()))
+                    .collect(Collectors.toList());
+
+            log.debug("After location filtering: {} events remain", similarEvents.size());
+        }
+
+        return similarEvents;
+    }
+
+    private int calculateSimilarityScoreForEntities(EventEntity event1, EventEntity event2) {
+        int titleScore = calculateTitleSimilarity(event1.getTitle(), event2.getTitle());
+        int dateScore = calculateDateSimilarity(event1.getStartDateTime(), event2.getStartDateTime());
+        int locationScore = calculateVenueSimilarity(
+                event1.getVenue(),
+                event2.getVenue(),
+                event1.getEventFormat(),
+                event2.getEventFormat()
+        );
+
+        int totalScore = (titleScore * 40 + dateScore * 30 + locationScore * 30) / 100;
+
+        log.debug("Similarity breakdown - Title: {}%, Date: {}%, Location: {}%, Total: {}%",
+                titleScore, dateScore, locationScore, totalScore);
+
+        return totalScore;
+    }
+
+    private boolean isVenueSimilar(Venue venue1, Venue venue2) {
+        if (venue2 == null || venue1 == null) return false;
+        if (venue1.getName() == null) return false;
+
+        String name1 = normalizeTitle(venue1.getName());
+        String name2 = normalizeTitle(venue2.getName());
+
+        if (name1.equals(name2)) return true;
+        if (name1.contains(name2) || name2.contains(name1)) return true;
+
+        if (venue1.getCoordinates() != null && venue1.getCoordinates().getLatitude() != null &&
+                venue2.getCoordinates() != null && venue2.getCoordinates().getLatitude() != null) {
+
+            double distance = calculateDistance(
+                    venue1.getCoordinates().getLatitude(), venue1.getCoordinates().getLongitude(),
+                    venue2.getCoordinates().getLatitude(), venue2.getCoordinates().getLongitude()
+            );
+
+            return distance < 2.0;
+        }
+
+        return false;
+    }
+
+    private int calculateVenueSimilarity(Venue venue1, Venue venue2, EventFormat format1, EventFormat format2) {
+        if (format1 == EventFormat.ONLINE && format2 == EventFormat.ONLINE) {
+            return 100;
+        }
+
+        if ((format1 == EventFormat.ONLINE && format2 == EventFormat.IN_PERSON) ||
+                (format1 == EventFormat.IN_PERSON && format2 == EventFormat.ONLINE)) {
+            return 0;
+        }
+
+        if (venue1 == null || venue2 == null) {
+            return 50;
+        }
+
+        if (venue1.getName() == null || venue2.getName() == null) {
+            return 50;
+        }
+
+        String name1 = normalizeTitle(venue1.getName());
+        String name2 = normalizeTitle(venue2.getName());
+
+        if (name1.equals(name2)) {
+            return 100;
+        }
+
+        if (name1.contains(name2) || name2.contains(name1)) {
+            return 90;
+        }
+
+        if (venue1.getCoordinates() != null && venue1.getCoordinates().getLatitude() != null &&
+                venue2.getCoordinates() != null && venue2.getCoordinates().getLatitude() != null) {
+
+            double distance = calculateDistance(
+                    venue1.getCoordinates().getLatitude(), venue1.getCoordinates().getLongitude(),
+                    venue2.getCoordinates().getLatitude(), venue2.getCoordinates().getLongitude()
+            );
+
+            if (distance < 0.1) return 95;
+            if (distance < 0.5) return 80;
+            if (distance < 2.0) return 50;
+            if (distance < 10) return 20;
+
+            return 0;
+        }
+
+        int nameSimilarity = calculateTitleSimilarity(name1, name2);
+        return nameSimilarity / 2;
+    }
+
+
 
     /**
      * Find events that might be similar
@@ -165,38 +271,7 @@ public class EventDuplicateValidator {
         };
     }
 
-    /**
-     * Calculate similarity between new event and existing event
-     * Returns score from 0-100
-     */
-    private int calculateSimilarityScore(CreateEventRequest request, EventEntity existing) {
-        // 1. Title similarity (40% weight)
-        int titleScore = calculateTitleSimilarity(
-                request.getTitle(),
-                existing.getTitle()
-        );
 
-        // 2. Date similarity (30% weight)
-        int dateScore = calculateDateSimilarity(
-                request.getSchedule().getStartDateTime(),
-                existing.getStartDateTime()
-        );
-
-        // 3. Location similarity (30% weight)
-        int locationScore = calculateLocationSimilarity(
-                request.getVenue(),
-                existing.getVenue(),
-                request.getEventFormat(),
-                existing.getEventFormat()
-        );
-
-        int totalScore = (titleScore * 40 + dateScore * 30 + locationScore * 30) / 100;
-
-        log.debug("Similarity breakdown - Title: {}%, Date: {}%, Location: {}%, Total: {}%",
-                titleScore, dateScore, locationScore, totalScore);
-
-        return totalScore;
-    }
 
     /**
      * Extract main keywords from title (filter common words)
