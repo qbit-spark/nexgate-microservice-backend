@@ -1,5 +1,4 @@
-package org.nextgate.nextgatebackend.e_commerce.checkout_session.utils;
-
+package org.nextgate.nextgatebackend.financial_system.payment_processing.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -7,11 +6,11 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
 import lombok.extern.slf4j.Slf4j;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.CheckoutSessionEntity;
+import org.nextgate.nextgatebackend.financial_system.payment_processing.model.PaymentIntent;
 
 @Converter
 @Slf4j
-public class PaymentIntentJsonConverter implements AttributeConverter<CheckoutSessionEntity.PaymentIntent, String> {
+public class PaymentIntentJsonConverter implements AttributeConverter<PaymentIntent, String> {
 
     private final ObjectMapper objectMapper;
 
@@ -21,7 +20,7 @@ public class PaymentIntentJsonConverter implements AttributeConverter<CheckoutSe
     }
 
     @Override
-    public String convertToDatabaseColumn(CheckoutSessionEntity.PaymentIntent paymentIntent) {
+    public String convertToDatabaseColumn(PaymentIntent paymentIntent) {
         if (paymentIntent == null) {
             return null;
         }
@@ -34,14 +33,14 @@ public class PaymentIntentJsonConverter implements AttributeConverter<CheckoutSe
     }
 
     @Override
-    public CheckoutSessionEntity.PaymentIntent convertToEntityAttribute(String dbData) {
+    public PaymentIntent convertToEntityAttribute(String dbData) {
         if (dbData == null || dbData.trim().isEmpty()) {
             return null;
         }
         try {
-            return objectMapper.readValue(dbData, CheckoutSessionEntity.PaymentIntent.class);
+            return objectMapper.readValue(dbData, PaymentIntent.class);
         } catch (JsonProcessingException e) {
-            log.error("Error converting JSON to payment intent", e);
+            log.error("Error converting JSON to payment intent: {}", dbData, e);
             return null;
         }
     }

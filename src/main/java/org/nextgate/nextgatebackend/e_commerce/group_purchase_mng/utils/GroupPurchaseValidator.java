@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.coyote.BadRequestException;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.CheckoutSessionEntity;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.ProductCheckoutSessionEntity;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.enums.CheckoutSessionStatus;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.enums.CheckoutSessionType;
 import org.nextgate.nextgatebackend.e_commerce.group_purchase_mng.entity.GroupPurchaseInstanceEntity;
@@ -25,7 +25,7 @@ public class GroupPurchaseValidator {
     // ========================================
 
     public void validateCheckoutSessionForGroupCreation(
-            CheckoutSessionEntity session,
+            ProductCheckoutSessionEntity session,
             AccountEntity authenticatedUser
     ) throws BadRequestException {
 
@@ -183,7 +183,7 @@ public class GroupPurchaseValidator {
     // ========================================
 
     public void validateCheckoutSessionForGroupJoin(
-            CheckoutSessionEntity session,
+            ProductCheckoutSessionEntity session,
             AccountEntity authenticatedUser
     ) throws BadRequestException {
 

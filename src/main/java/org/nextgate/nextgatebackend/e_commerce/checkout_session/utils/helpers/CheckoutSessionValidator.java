@@ -9,7 +9,7 @@ import org.nextgate.nextgatebackend.e_commerce.cart_service.entity.CartEntity;
 import org.nextgate.nextgatebackend.e_commerce.cart_service.entity.CartItemEntity;
 import org.nextgate.nextgatebackend.e_commerce.cart_service.repo.CartRepo;
 import org.nextgate.nextgatebackend.e_commerce.cart_service.service.CartService;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.CheckoutSessionEntity;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.ProductCheckoutSessionEntity;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.enums.CheckoutSessionStatus;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.enums.CheckoutSessionType;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.payload.CreateCheckoutSessionRequest;
@@ -214,7 +214,7 @@ public class CheckoutSessionValidator {
                 .build();
     }
 
-    public void validateSessionCanBeUpdated(CheckoutSessionEntity session)
+    public void validateSessionCanBeUpdated(ProductCheckoutSessionEntity session)
             throws BadRequestException {
 
         // Cannot update completed sessions
@@ -257,7 +257,7 @@ public class CheckoutSessionValidator {
     }
 
     public PaymentMethodsEntity getPaymentMethodFromIntent(
-            CheckoutSessionEntity.PaymentIntent paymentIntent,
+            ProductCheckoutSessionEntity.PaymentIntent paymentIntent,
             AccountEntity user) throws ItemNotFoundException, BadRequestException {
 
         // Reconstruct payment method info from intent
@@ -306,7 +306,7 @@ public class CheckoutSessionValidator {
     }
 
 
-    public void validateSessionCanRetryPayment(CheckoutSessionEntity session)
+    public void validateSessionCanRetryPayment(ProductCheckoutSessionEntity session)
             throws BadRequestException {
 
         if (session == null) {

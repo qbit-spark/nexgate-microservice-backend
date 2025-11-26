@@ -6,11 +6,11 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
 import lombok.extern.slf4j.Slf4j;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.CheckoutSessionEntity;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.ProductCheckoutSessionEntity;
 
 @Converter
 @Slf4j
-public class ShippingAddressJsonConverter implements AttributeConverter<CheckoutSessionEntity.ShippingAddress, String> {
+public class ShippingAddressJsonConverter implements AttributeConverter<ProductCheckoutSessionEntity.ShippingAddress, String> {
 
     private final ObjectMapper objectMapper;
 
@@ -20,7 +20,7 @@ public class ShippingAddressJsonConverter implements AttributeConverter<Checkout
     }
 
     @Override
-    public String convertToDatabaseColumn(CheckoutSessionEntity.ShippingAddress address) {
+    public String convertToDatabaseColumn(ProductCheckoutSessionEntity.ShippingAddress address) {
         if (address == null) {
             return null;
         }
@@ -33,12 +33,12 @@ public class ShippingAddressJsonConverter implements AttributeConverter<Checkout
     }
 
     @Override
-    public CheckoutSessionEntity.ShippingAddress convertToEntityAttribute(String dbData) {
+    public ProductCheckoutSessionEntity.ShippingAddress convertToEntityAttribute(String dbData) {
         if (dbData == null || dbData.trim().isEmpty()) {
             return null;
         }
         try {
-            return objectMapper.readValue(dbData, CheckoutSessionEntity.ShippingAddress.class);
+            return objectMapper.readValue(dbData, ProductCheckoutSessionEntity.ShippingAddress.class);
         } catch (JsonProcessingException e) {
             log.error("Error converting JSON to shipping address", e);
             return null;

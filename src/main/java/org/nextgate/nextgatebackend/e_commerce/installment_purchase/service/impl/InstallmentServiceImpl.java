@@ -5,9 +5,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.coyote.BadRequestException;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.authentication_service.repo.AccountRepo;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.CheckoutSessionEntity;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.ProductCheckoutSessionEntity;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.enums.CheckoutSessionStatus;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.repo.CheckoutSessionRepo;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.repo.ProductCheckoutSessionRepo;
 import org.nextgate.nextgatebackend.financial_system.ledger.entity.LedgerAccountEntity;
 import org.nextgate.nextgatebackend.financial_system.ledger.entity.LedgerEntryEntity;
 import org.nextgate.nextgatebackend.financial_system.ledger.enums.LedgerEntryType;
@@ -64,7 +64,7 @@ public class InstallmentServiceImpl implements InstallmentService {
     private final LedgerService ledgerService;
     private final TransactionHistoryService transactionHistoryService;
     private final ApplicationEventPublisher eventPublisher;
-    private final CheckoutSessionRepo checkoutSessionRepo;
+    private final ProductCheckoutSessionRepo checkoutSessionRepo;
     private final OrderService orderService;
 
 
@@ -76,7 +76,7 @@ public class InstallmentServiceImpl implements InstallmentService {
     @Override
     @Transactional
     public InstallmentAgreementEntity createInstallmentAgreement(
-            CheckoutSessionEntity checkoutSession
+            ProductCheckoutSessionEntity checkoutSession
     ) throws ItemNotFoundException, BadRequestException {
 
         log.info("╔════════════════════════════════════════════════════════════╗");
@@ -98,8 +98,8 @@ public class InstallmentServiceImpl implements InstallmentService {
         // ========================================
         // 3. EXTRACT DATA FROM CHECKOUT SESSION
         // ========================================
-        CheckoutSessionEntity.CheckoutItem item = checkoutSession.getItems().getFirst();
-        CheckoutSessionEntity.InstallmentConfiguration config =
+        ProductCheckoutSessionEntity.CheckoutItem item = checkoutSession.getItems().getFirst();
+        ProductCheckoutSessionEntity.InstallmentConfiguration config =
                 checkoutSession.getInstallmentConfig();
 
         UUID productId = item.getProductId();
@@ -1411,12 +1411,12 @@ public class InstallmentServiceImpl implements InstallmentService {
    // ========================================
     private List<InstallmentPaymentEntity> generatePaymentRecords(
             InstallmentAgreementEntity agreement,
-            List<CheckoutSessionEntity.PaymentScheduleItem> schedule) {
+            List<ProductCheckoutSessionEntity.PaymentScheduleItem> schedule) {
         log.debug("Generating payment records for agreement: {}", agreement.getAgreementId());
 
         List<InstallmentPaymentEntity> payments = new ArrayList<>();
 
-        for (CheckoutSessionEntity.PaymentScheduleItem item : schedule) {
+        for (ProductCheckoutSessionEntity.PaymentScheduleItem item : schedule) {
             InstallmentPaymentEntity payment = InstallmentPaymentEntity.builder()
                     .agreement(agreement)
                     .paymentNumber(item.getPaymentNumber())
@@ -1449,7 +1449,7 @@ public class InstallmentServiceImpl implements InstallmentService {
     }
 
     private LocalDateTime calculateLastPaymentDate(
-            CheckoutSessionEntity.InstallmentConfiguration config) {
+            ProductCheckoutSessionEntity.InstallmentConfiguration config) {
         if (config.getSchedule() == null || config.getSchedule().isEmpty()) {
             return config.getFirstPaymentDate();
         }

@@ -6,15 +6,15 @@ import org.apache.coyote.BadRequestException;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.authentication_service.repo.AccountRepo;
 import org.nextgate.nextgatebackend.e_commerce.cart_service.entity.CartEntity;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.CheckoutSessionEntity;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.ProductCheckoutSessionEntity;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.enums.CheckoutSessionStatus;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.enums.CheckoutSessionType;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.payload.CheckoutSessionResponse;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.payload.CheckoutSessionSummaryResponse;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.payload.CreateCheckoutSessionRequest;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.payload.UpdateCheckoutSessionRequest;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.repo.CheckoutSessionRepo;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.service.CheckoutSessionService;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.repo.ProductCheckoutSessionRepo;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.service.ProductsCheckoutSessionService;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.utils.helpers.CheckoutSessionHelper;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.utils.helpers.CheckoutSessionMapper;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.utils.helpers.CheckoutSessionValidator;
@@ -46,10 +46,10 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class CheckoutSessionServiceImpl implements CheckoutSessionService {
+public class ProductsProductsCheckoutSessionServiceImpl implements ProductsCheckoutSessionService {
 
     private final AccountRepo accountRepo;
-    private final CheckoutSessionRepo checkoutSessionRepo;
+    private final ProductCheckoutSessionRepo checkoutSessionRepo;
     private final CheckoutSessionValidator validator;
     private final CheckoutSessionHelper helper;
     private final CheckoutSessionMapper mapper;
@@ -100,7 +100,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // ========================================
         // 2. FETCH CHECKOUT SESSION
         // ========================================
-        CheckoutSessionEntity session = checkoutSessionRepo.findBySessionIdAndCustomer(sessionId, authenticatedUser)
+        ProductCheckoutSessionEntity session = checkoutSessionRepo.findBySessionIdAndCustomer(sessionId, authenticatedUser)
                 .orElseThrow(() -> new ItemNotFoundException(
                         "Checkout session not found or you don't have permission to access it"));
 
@@ -136,7 +136,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // ========================================
         // 2. FETCH ALL SESSIONS FOR USER
         // ========================================
-        List<CheckoutSessionEntity> sessions = checkoutSessionRepo
+        List<ProductCheckoutSessionEntity> sessions = checkoutSessionRepo
                 .findByCustomerOrderByCreatedAtDesc(authenticatedUser);
 
         log.info("Found {} checkout sessions for user: {}",
@@ -168,7 +168,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // ========================================
         // 2. FETCH CHECKOUT SESSION
         // ========================================
-        CheckoutSessionEntity session = checkoutSessionRepo.findBySessionIdAndCustomer(sessionId, authenticatedUser)
+        ProductCheckoutSessionEntity session = checkoutSessionRepo.findBySessionIdAndCustomer(sessionId, authenticatedUser)
                 .orElseThrow(() -> new ItemNotFoundException(
                         "Checkout session not found or you don't have permission to access it"));
 
@@ -194,7 +194,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // 4. RELEASE HELD INVENTORY
         // ========================================
         if (session.getInventoryHeld() != null && session.getInventoryHeld()) {
-            for (CheckoutSessionEntity.CheckoutItem item : session.getItems()) {
+            for (ProductCheckoutSessionEntity.CheckoutItem item : session.getItems()) {
                 helper.releaseInventory(item.getProductId(), item.getQuantity());
                 log.info("Released inventory for product: {} quantity: {}",
                         item.getProductId(), item.getQuantity());
@@ -238,7 +238,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // ========================================
         // 2. FETCH CHECKOUT SESSION
         // ========================================
-        CheckoutSessionEntity session = checkoutSessionRepo.findBySessionIdAndCustomer(sessionId, authenticatedUser)
+        ProductCheckoutSessionEntity session = checkoutSessionRepo.findBySessionIdAndCustomer(sessionId, authenticatedUser)
                 .orElseThrow(() -> new ItemNotFoundException(
                         "Checkout session not found or you don't have permission to access it"));
 
@@ -259,7 +259,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
             log.info("Updating shipping address to: {}", request.getShippingAddressId());
 
             validator.validateShippingAddress(request.getShippingAddressId(), authenticatedUser);
-            CheckoutSessionEntity.ShippingAddress newShippingAddress =
+            ProductCheckoutSessionEntity.ShippingAddress newShippingAddress =
                     helper.fetchShippingAddress(request.getShippingAddressId());
 
             session.setShippingAddress(newShippingAddress);
@@ -273,7 +273,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
             log.info("Updating shipping method to: {}", request.getShippingMethodId());
 
             validator.validateShippingMethod(request.getShippingMethodId());
-            CheckoutSessionEntity.ShippingMethod newShippingMethod =
+            ProductCheckoutSessionEntity.ShippingMethod newShippingMethod =
                     helper.createPlaceholderShippingMethod(request.getShippingMethodId());
 
             session.setShippingMethod(newShippingMethod);
@@ -293,7 +293,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
             );
 
             // Update billing address based on new payment method
-            CheckoutSessionEntity.BillingAddress newBillingAddress =
+            ProductCheckoutSessionEntity.BillingAddress newBillingAddress =
                     helper.determineBillingAddress(
                             validator.convertToCreateRequest(request),
                             newPaymentMethod
@@ -301,7 +301,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
             session.setBillingAddress(newBillingAddress);
 
             // Create new payment intent for the new payment method
-            CheckoutSessionEntity.PaymentIntent newPaymentIntent =
+            ProductCheckoutSessionEntity.PaymentIntent newPaymentIntent =
                     helper.createPaymentIntent(
                             newPaymentMethod,
                             session.getPricing(),
@@ -335,13 +335,13 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         if (needsPricingRecalculation) {
             log.info("Recalculating pricing due to shipping method change");
 
-            CheckoutSessionEntity.PricingSummary newPricing =
+            ProductCheckoutSessionEntity.PricingSummary newPricing =
                     helper.calculatePricing(session.getItems(), session.getShippingMethod());
             session.setPricing(newPricing);
 
             // Update payment intent with new total if payment method exists
             if (session.getPaymentIntent() != null) {
-                CheckoutSessionEntity.PaymentIntent updatedPaymentIntent =
+                ProductCheckoutSessionEntity.PaymentIntent updatedPaymentIntent =
                         helper.createPaymentIntent(
                                 validator.getPaymentMethodFromIntent(session.getPaymentIntent(), authenticatedUser),
                                 newPricing,
@@ -362,7 +362,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // ========================================
         // 11. SAVE UPDATED SESSION
         // ========================================
-        CheckoutSessionEntity updatedSession = checkoutSessionRepo.save(session);
+        ProductCheckoutSessionEntity updatedSession = checkoutSessionRepo.save(session);
         log.info("Checkout session {} updated successfully", sessionId);
 
         // ========================================
@@ -384,7 +384,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         AccountEntity authenticatedUser = getAuthenticatedAccount();
 
         // Fetch checkout session
-        CheckoutSessionEntity session = checkoutSessionRepo.findBySessionIdAndCustomer(sessionId, authenticatedUser)
+        ProductCheckoutSessionEntity session = checkoutSessionRepo.findBySessionIdAndCustomer(sessionId, authenticatedUser)
                 .orElseThrow(() -> new ItemNotFoundException(
                         "Checkout session not found or you don't have permission to access it"));
 
@@ -420,7 +420,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         }
 
         // Verify inventory still available
-        for (CheckoutSessionEntity.CheckoutItem item : session.getItems()) {
+        for (ProductCheckoutSessionEntity.CheckoutItem item : session.getItems()) {
             try {
                 validator.validateInventoryAvailability(item.getProductId(), item.getQuantity());
             } catch (BadRequestException e) {
@@ -469,7 +469,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         LocalDateTime newInventoryHoldExpiration = helper.calculateInventoryHoldExpiration();
         session.setInventoryHoldExpiresAt(newInventoryHoldExpiration);
 
-        for (CheckoutSessionEntity.CheckoutItem item : session.getItems()) {
+        for (ProductCheckoutSessionEntity.CheckoutItem item : session.getItems()) {
             helper.holdInventory(item.getProductId(), item.getQuantity(), newInventoryHoldExpiration);
         }
         session.setInventoryHeld(true);
@@ -477,7 +477,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         log.info("Inventory re-held until: {}", newInventoryHoldExpiration);
 
         // Record retry attempt
-        CheckoutSessionEntity.PaymentAttempt attempt = CheckoutSessionEntity.PaymentAttempt.builder()
+        ProductCheckoutSessionEntity.PaymentAttempt attempt = ProductCheckoutSessionEntity.PaymentAttempt.builder()
                 .attemptNumber(attemptCount + 1)
                 .paymentMethod(paymentMethod.getPaymentMethodType().toString())
                 .status("RETRY_INITIATED")
@@ -497,7 +497,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         log.info("Payment retry validated for session: {}. Attempt #{}", sessionId, attemptCount + 1);
 
         // Now process the payment
-        return paymentOrchestrator.processPayment(sessionId);
+        return paymentOrchestrator.processPayment(sessionId, "PRODUCT");
     }
 
 
@@ -516,13 +516,13 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // ========================================
         // 2. FETCH PENDING_PAYMENT SESSIONS
         // ========================================
-        List<CheckoutSessionEntity> pendingSessions = checkoutSessionRepo
+        List<ProductCheckoutSessionEntity> pendingSessions = checkoutSessionRepo
                 .findByCustomerAndStatus(authenticatedUser, CheckoutSessionStatus.PENDING_PAYMENT);
 
         // ========================================
         // 3. FETCH PAYMENT_FAILED SESSIONS
         // ========================================
-        List<CheckoutSessionEntity> failedSessions = checkoutSessionRepo
+        List<ProductCheckoutSessionEntity> failedSessions = checkoutSessionRepo
                 .findByCustomerAndStatus(authenticatedUser, CheckoutSessionStatus.PAYMENT_FAILED);
 
         log.info("Found {} PENDING_PAYMENT and {} PAYMENT_FAILED sessions for user: {}",
@@ -531,11 +531,11 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // ========================================
         // 4. COMBINE AND FILTER OUT EXPIRED SESSIONS
         // ========================================
-        List<CheckoutSessionEntity> allActiveSessions = new ArrayList<>();
+        List<ProductCheckoutSessionEntity> allActiveSessions = new ArrayList<>();
         allActiveSessions.addAll(pendingSessions);
         allActiveSessions.addAll(failedSessions);
 
-        List<CheckoutSessionEntity> activeSessions = allActiveSessions.stream()
+        List<ProductCheckoutSessionEntity> activeSessions = allActiveSessions.stream()
                 .filter(session -> !session.isExpired())
                 .sorted((s1, s2) -> s2.getCreatedAt().compareTo(s1.getCreatedAt())) // Most recent first
                 .toList();
@@ -563,7 +563,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         AccountEntity authenticatedUser = getAuthenticatedAccount();
 
         // Fetch checkout session and verify ownership
-        CheckoutSessionEntity session = checkoutSessionRepo.findBySessionIdAndCustomer(sessionId, authenticatedUser)
+        ProductCheckoutSessionEntity session = checkoutSessionRepo.findBySessionIdAndCustomer(sessionId, authenticatedUser)
                 .orElseThrow(() -> new ItemNotFoundException(
                         "Checkout session not found or you don't have permission to access it"));
 
@@ -578,7 +578,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         }
 
         // Delegate to payment orchestrator
-        return paymentOrchestrator.processPayment(sessionId);
+        return paymentOrchestrator.processPayment(sessionId, "PRODUCT");
     }
 
 
@@ -632,7 +632,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // 4. VALIDATE SHIPPING ADDRESS
         // ========================================
         validator.validateShippingAddress(request.getShippingAddressId(), authenticatedUser);
-        CheckoutSessionEntity.ShippingAddress shippingAddress =
+        ProductCheckoutSessionEntity.ShippingAddress shippingAddress =
                 helper.fetchShippingAddress(request.getShippingAddressId());
         log.info("Shipping address validated");
 
@@ -640,14 +640,14 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // 5. VALIDATE SHIPPING METHOD
         // ========================================
         validator.validateShippingMethod(request.getShippingMethodId());
-        CheckoutSessionEntity.ShippingMethod shippingMethod =
+        ProductCheckoutSessionEntity.ShippingMethod shippingMethod =
                 helper.createPlaceholderShippingMethod(request.getShippingMethodId());
         log.info("Shipping method validated: {}", shippingMethod.getName());
 
         // ========================================
         // 6. FETCH & VALIDATE PRODUCTS
         // ========================================
-        List<CheckoutSessionEntity.CheckoutItem> items = new ArrayList<>();
+        List<ProductCheckoutSessionEntity.CheckoutItem> items = new ArrayList<>();
 
         for (CreateCheckoutSessionRequest.CheckoutItemDto itemDto : request.getItems()) {
             // Validate product exists and is available
@@ -655,7 +655,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
             validator.validateInventoryAvailability(itemDto.getProductId(), itemDto.getQuantity());
 
             // Fetch product and build checkout item
-            CheckoutSessionEntity.CheckoutItem item = helper.fetchAndBuildCheckoutItem(
+            ProductCheckoutSessionEntity.CheckoutItem item = helper.fetchAndBuildCheckoutItem(
                     itemDto.getProductId(),
                     itemDto.getQuantity()
             );
@@ -667,19 +667,19 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // ========================================
         // 7. CALCULATE PRICING
         // ========================================
-        CheckoutSessionEntity.PricingSummary pricing = helper.calculatePricing(items, shippingMethod);
+        ProductCheckoutSessionEntity.PricingSummary pricing = helper.calculatePricing(items, shippingMethod);
         log.info("Pricing calculated - Total: {} {}", pricing.getTotal(), pricing.getCurrency());
 
         // ========================================
         // 8. DETERMINE BILLING ADDRESS
         // ========================================
-        CheckoutSessionEntity.BillingAddress billingAddress =
+        ProductCheckoutSessionEntity.BillingAddress billingAddress =
                 helper.determineBillingAddress(request, paymentMethod);
 
         // ========================================
         // 9. CREATE PAYMENT INTENT
         // ========================================
-        CheckoutSessionEntity.PaymentIntent paymentIntent = helper.createPaymentIntent(
+        ProductCheckoutSessionEntity.PaymentIntent paymentIntent = helper.createPaymentIntent(
                 paymentMethod,
                 pricing,
                 authenticatedUser.getAccountId()
@@ -695,7 +695,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // ========================================
         // 11. HOLD INVENTORY
         // ========================================
-        for (CheckoutSessionEntity.CheckoutItem item : items) {
+        for (ProductCheckoutSessionEntity.CheckoutItem item : items) {
             helper.holdInventory(item.getProductId(), item.getQuantity(), inventoryHoldExpiration);
         }
         log.info("Inventory held for {} items until {}", items.size(), inventoryHoldExpiration);
@@ -703,7 +703,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // ========================================
         // 12. BUILD & SAVE CHECKOUT SESSION ENTITY
         // ========================================
-        CheckoutSessionEntity checkoutSession = CheckoutSessionEntity.builder()
+        ProductCheckoutSessionEntity checkoutSession = ProductCheckoutSessionEntity.builder()
                 .sessionType(request.getSessionType())
                 .customer(authenticatedUser)
                 .status(CheckoutSessionStatus.PENDING_PAYMENT)
@@ -723,7 +723,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
                 .build();
 
         // Save to database
-        CheckoutSessionEntity savedSession = checkoutSessionRepo.save(checkoutSession);
+        ProductCheckoutSessionEntity savedSession = checkoutSessionRepo.save(checkoutSession);
         log.info("Checkout session created successfully: {}", savedSession.getSessionId());
 
         // ========================================
@@ -760,7 +760,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // ========================================
         // 4. CONVERT CART ITEMS TO CHECKOUT ITEMS
         // ========================================
-        List<CheckoutSessionEntity.CheckoutItem> items = helper.convertCartItemsToCheckoutItems(cart);
+        List<ProductCheckoutSessionEntity.CheckoutItem> items = helper.convertCartItemsToCheckoutItems(cart);
         log.info("Converted {} cart items to checkout items", items.size());
 
         // ========================================
@@ -783,7 +783,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // 6. VALIDATE SHIPPING ADDRESS
         // ========================================
         validator.validateShippingAddress(request.getShippingAddressId(), authenticatedUser);
-        CheckoutSessionEntity.ShippingAddress shippingAddress =
+        ProductCheckoutSessionEntity.ShippingAddress shippingAddress =
                 helper.fetchShippingAddress(request.getShippingAddressId());
         log.info("Shipping address validated");
 
@@ -791,26 +791,26 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // 7. VALIDATE SHIPPING METHOD
         // ========================================
         validator.validateShippingMethod(request.getShippingMethodId());
-        CheckoutSessionEntity.ShippingMethod shippingMethod =
+        ProductCheckoutSessionEntity.ShippingMethod shippingMethod =
                 helper.createPlaceholderShippingMethod(request.getShippingMethodId());
         log.info("Shipping method validated: {}", shippingMethod.getName());
 
         // ========================================
         // 8. CALCULATE PRICING
         // ========================================
-        CheckoutSessionEntity.PricingSummary pricing = helper.calculatePricing(items, shippingMethod);
+        ProductCheckoutSessionEntity.PricingSummary pricing = helper.calculatePricing(items, shippingMethod);
         log.info("Pricing calculated - Total: {} {}", pricing.getTotal(), pricing.getCurrency());
 
         // ========================================
         // 9. DETERMINE BILLING ADDRESS
         // ========================================
-        CheckoutSessionEntity.BillingAddress billingAddress =
+        ProductCheckoutSessionEntity.BillingAddress billingAddress =
                 helper.determineBillingAddress(request, paymentMethod);
 
         // ========================================
         // 10. CREATE PAYMENT INTENT
         // ========================================
-        CheckoutSessionEntity.PaymentIntent paymentIntent = helper.createPaymentIntent(
+        ProductCheckoutSessionEntity.PaymentIntent paymentIntent = helper.createPaymentIntent(
                 paymentMethod,
                 pricing,
                 authenticatedUser.getAccountId()
@@ -826,7 +826,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // ========================================
         // 12. HOLD INVENTORY
         // ========================================
-        for (CheckoutSessionEntity.CheckoutItem item : items) {
+        for (ProductCheckoutSessionEntity.CheckoutItem item : items) {
             helper.holdInventory(item.getProductId(), item.getQuantity(), inventoryHoldExpiration);
         }
         log.info("Inventory held for {} items until {}", items.size(), inventoryHoldExpiration);
@@ -834,7 +834,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // ========================================
         // 13. BUILD & SAVE CHECKOUT SESSION ENTITY
         // ========================================
-        CheckoutSessionEntity checkoutSession = CheckoutSessionEntity.builder()
+        ProductCheckoutSessionEntity checkoutSession = ProductCheckoutSessionEntity.builder()
                 .sessionType(request.getSessionType())
                 .customer(authenticatedUser)
                 .status(CheckoutSessionStatus.PENDING_PAYMENT)
@@ -854,7 +854,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
                 .build();
 
         // Save to database
-        CheckoutSessionEntity savedSession = checkoutSessionRepo.save(checkoutSession);
+        ProductCheckoutSessionEntity savedSession = checkoutSessionRepo.save(checkoutSession);
         log.info("Checkout session created successfully: {}", savedSession.getSessionId());
 
         // ========================================
@@ -926,28 +926,28 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
 
         // 8. Validate shipping address
         validator.validateShippingAddress(request.getShippingAddressId(), authenticatedUser);
-        CheckoutSessionEntity.ShippingAddress shippingAddress =
+        ProductCheckoutSessionEntity.ShippingAddress shippingAddress =
                 helper.fetchShippingAddress(request.getShippingAddressId());
 
         // 9. Validate shipping method
         validator.validateShippingMethod(request.getShippingMethodId());
-        CheckoutSessionEntity.ShippingMethod shippingMethod =
+        ProductCheckoutSessionEntity.ShippingMethod shippingMethod =
                 helper.createPlaceholderShippingMethod(request.getShippingMethodId());
 
         // 10. Build checkout item (using groupPrice)
-        CheckoutSessionEntity.CheckoutItem item =
+        ProductCheckoutSessionEntity.CheckoutItem item =
                 helper.buildGroupPurchaseCheckoutItem(product, quantity);
 
         // 11. Calculate pricing (using groupPrice)
-        CheckoutSessionEntity.PricingSummary pricing =
+        ProductCheckoutSessionEntity.PricingSummary pricing =
                 helper.calculateGroupPurchasePricing(List.of(item), shippingMethod);
 
         // 12. Determine billing address
-        CheckoutSessionEntity.BillingAddress billingAddress =
+        ProductCheckoutSessionEntity.BillingAddress billingAddress =
                 helper.determineBillingAddress(request, paymentMethod);
 
         // 13. Create payment intent (WALLET only)
-        CheckoutSessionEntity.PaymentIntent paymentIntent =
+        ProductCheckoutSessionEntity.PaymentIntent paymentIntent =
                 helper.createPaymentIntent(paymentMethod, pricing, authenticatedUser.getAccountId());
 
         // 14. Calculate expiration times
@@ -958,7 +958,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         helper.holdInventory(productId, quantity, inventoryHoldExpiration);
 
         // 16. Build and save checkout session
-        CheckoutSessionEntity checkoutSession = CheckoutSessionEntity.builder()
+        ProductCheckoutSessionEntity checkoutSession = ProductCheckoutSessionEntity.builder()
                 .sessionType(CheckoutSessionType.GROUP_PURCHASE)
                 .customer(authenticatedUser)
                 .status(CheckoutSessionStatus.PENDING_PAYMENT)
@@ -976,7 +976,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
                 .expiresAt(sessionExpiration)
                 .build();
 
-        CheckoutSessionEntity savedSession = checkoutSessionRepo.save(checkoutSession);
+        ProductCheckoutSessionEntity savedSession = checkoutSessionRepo.save(checkoutSession);
 
         log.info("GROUP_PURCHASE checkout session created: {}", savedSession.getSessionId());
 
@@ -1038,7 +1038,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // ========================================
         // 5. CALCULATE INSTALLMENT CONFIGURATION
         // ========================================
-        CheckoutSessionEntity.InstallmentConfiguration installmentConfig =
+        ProductCheckoutSessionEntity.InstallmentConfiguration installmentConfig =
                 installmentCalculator.calculateInstallmentConfig(
                         plan,
                         product.getPrice(),
@@ -1079,7 +1079,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // 8. VALIDATE SHIPPING ADDRESS
         // ========================================
         validator.validateShippingAddress(request.getShippingAddressId(), authenticatedUser);
-        CheckoutSessionEntity.ShippingAddress shippingAddress =
+        ProductCheckoutSessionEntity.ShippingAddress shippingAddress =
                 helper.fetchShippingAddress(request.getShippingAddressId());
 
         log.debug("Shipping address validated");
@@ -1088,7 +1088,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // 9. VALIDATE SHIPPING METHOD
         // ========================================
         validator.validateShippingMethod(request.getShippingMethodId());
-        CheckoutSessionEntity.ShippingMethod shippingMethod =
+        ProductCheckoutSessionEntity.ShippingMethod shippingMethod =
                 helper.createPlaceholderShippingMethod(request.getShippingMethodId());
 
         log.debug("Shipping method validated: {}", shippingMethod.getName());
@@ -1096,7 +1096,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // ========================================
         // 10. BUILD CHECKOUT ITEM (Using Regular Price)
         // ========================================
-        CheckoutSessionEntity.CheckoutItem item = helper.fetchAndBuildCheckoutItem(
+        ProductCheckoutSessionEntity.CheckoutItem item = helper.fetchAndBuildCheckoutItem(
                 productId,
                 quantity
         );
@@ -1107,8 +1107,8 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // 11. CALCULATE PRICING (DOWN PAYMENT ONLY!)
         // ========================================
         // CRITICAL: pricing.total = DOWN PAYMENT, not full product price
-        CheckoutSessionEntity.PricingSummary pricing =
-                CheckoutSessionEntity.PricingSummary.builder()
+        ProductCheckoutSessionEntity.PricingSummary pricing =
+                ProductCheckoutSessionEntity.PricingSummary.builder()
                         .subtotal(downPaymentAmount)
                         .shippingCost(BigDecimal.ZERO) // Can add shipping cost if needed
                         .tax(BigDecimal.ZERO) // Can add tax if needed
@@ -1121,13 +1121,13 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // ========================================
         // 12. DETERMINE BILLING ADDRESS
         // ========================================
-        CheckoutSessionEntity.BillingAddress billingAddress =
+        ProductCheckoutSessionEntity.BillingAddress billingAddress =
                 helper.determineBillingAddress(request, paymentMethod);
 
         // ========================================
         // 13. CREATE PAYMENT INTENT (WALLET ONLY)
         // ========================================
-        CheckoutSessionEntity.PaymentIntent paymentIntent =
+        ProductCheckoutSessionEntity.PaymentIntent paymentIntent =
                 helper.createPaymentIntent(paymentMethod, pricing, authenticatedUser.getAccountId());
 
         log.debug("Payment intent created: WALLET - {}", paymentIntent.getStatus());
@@ -1148,7 +1148,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // ========================================
         // 16. BUILD AND SAVE CHECKOUT SESSION ENTITY
         // ========================================
-        CheckoutSessionEntity checkoutSession = CheckoutSessionEntity.builder()
+        ProductCheckoutSessionEntity checkoutSession = ProductCheckoutSessionEntity.builder()
                 .sessionType(CheckoutSessionType.INSTALLMENT)
                 .customer(authenticatedUser)
                 .status(CheckoutSessionStatus.PENDING_PAYMENT)
@@ -1174,7 +1174,7 @@ public class CheckoutSessionServiceImpl implements CheckoutSessionService {
         // ========================================
         // 17. SAVE TO DATABASE
         // ========================================
-        CheckoutSessionEntity savedSession = checkoutSessionRepo.save(checkoutSession);
+        ProductCheckoutSessionEntity savedSession = checkoutSessionRepo.save(checkoutSession);
 
         log.info("INSTALLMENT checkout session created: {} - Down payment: {} TZS",
                 savedSession.getSessionId(), downPaymentAmount);

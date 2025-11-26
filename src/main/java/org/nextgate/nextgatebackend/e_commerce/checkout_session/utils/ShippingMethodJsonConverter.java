@@ -6,11 +6,11 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
 import lombok.extern.slf4j.Slf4j;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.CheckoutSessionEntity;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.ProductCheckoutSessionEntity;
 
 @Converter
 @Slf4j
-public class ShippingMethodJsonConverter implements AttributeConverter<CheckoutSessionEntity.ShippingMethod, String> {
+public class ShippingMethodJsonConverter implements AttributeConverter<ProductCheckoutSessionEntity.ShippingMethod, String> {
 
     private final ObjectMapper objectMapper;
 
@@ -20,7 +20,7 @@ public class ShippingMethodJsonConverter implements AttributeConverter<CheckoutS
     }
 
     @Override
-    public String convertToDatabaseColumn(CheckoutSessionEntity.ShippingMethod shippingMethod) {
+    public String convertToDatabaseColumn(ProductCheckoutSessionEntity.ShippingMethod shippingMethod) {
         if (shippingMethod == null) {
             return null;
         }
@@ -33,12 +33,12 @@ public class ShippingMethodJsonConverter implements AttributeConverter<CheckoutS
     }
 
     @Override
-    public CheckoutSessionEntity.ShippingMethod convertToEntityAttribute(String dbData) {
+    public ProductCheckoutSessionEntity.ShippingMethod convertToEntityAttribute(String dbData) {
         if (dbData == null || dbData.trim().isEmpty()) {
             return null;
         }
         try {
-            return objectMapper.readValue(dbData, CheckoutSessionEntity.ShippingMethod.class);
+            return objectMapper.readValue(dbData, ProductCheckoutSessionEntity.ShippingMethod.class);
         } catch (JsonProcessingException e) {
             log.error("Error converting JSON to shipping method", e);
             return null;

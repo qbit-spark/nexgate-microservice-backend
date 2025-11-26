@@ -2,7 +2,7 @@ package org.nextgate.nextgatebackend.e_commerce.group_purchase_mng.service;
 
 import org.apache.coyote.BadRequestException;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.CheckoutSessionEntity;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.ProductCheckoutSessionEntity;
 import org.nextgate.nextgatebackend.e_commerce.group_purchase_mng.entity.GroupParticipantEntity;
 import org.nextgate.nextgatebackend.e_commerce.group_purchase_mng.entity.GroupPurchaseInstanceEntity;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
@@ -15,9 +15,9 @@ import java.util.UUID;
 public interface GroupPurchaseService {
 
     // Core Operations
-    void createGroupInstance(CheckoutSessionEntity checkoutSession) throws ItemNotFoundException, BadRequestException;
+    void createGroupInstance(ProductCheckoutSessionEntity checkoutSession) throws ItemNotFoundException, BadRequestException;
 
-    void joinGroup(CheckoutSessionEntity checkoutSession) throws ItemNotFoundException, BadRequestException;
+    void joinGroup(ProductCheckoutSessionEntity checkoutSession) throws ItemNotFoundException, BadRequestException;
 
      GroupParticipantEntity transferToGroup(UUID sourceGroupId, UUID targetGroupId, Integer quantity) throws ItemNotFoundException, BadRequestException;
 

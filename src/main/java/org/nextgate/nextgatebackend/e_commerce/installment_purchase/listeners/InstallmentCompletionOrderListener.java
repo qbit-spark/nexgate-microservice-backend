@@ -2,9 +2,9 @@ package org.nextgate.nextgatebackend.e_commerce.installment_purchase.listeners;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.CheckoutSessionEntity;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.ProductCheckoutSessionEntity;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.enums.CheckoutSessionStatus;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.repo.CheckoutSessionRepo;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.repo.ProductCheckoutSessionRepo;
 import org.nextgate.nextgatebackend.e_commerce.installment_purchase.entity.InstallmentAgreementEntity;
 import org.nextgate.nextgatebackend.e_commerce.installment_purchase.enums.FulfillmentTiming;
 import org.nextgate.nextgatebackend.e_commerce.installment_purchase.events.InstallmentAgreementCompletedEvent;
@@ -38,7 +38,7 @@ public class InstallmentCompletionOrderListener {
 
     private final OrderService orderService;
     private final InstallmentAgreementRepo agreementRepo;
-    private final CheckoutSessionRepo checkoutSessionRepo;
+    private final ProductCheckoutSessionRepo checkoutSessionRepo;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Async
@@ -94,7 +94,7 @@ public class InstallmentCompletionOrderListener {
             }
 
             // Check checkout session for orders
-            CheckoutSessionEntity session = checkoutSessionRepo
+            ProductCheckoutSessionEntity session = checkoutSessionRepo
                     .findById(agreement.getCheckoutSessionId())
                     .orElse(null);
 
@@ -204,7 +204,7 @@ public class InstallmentCompletionOrderListener {
                 // ========================================
                 // UPDATE CHECKOUT SESSION
                 // ========================================
-                CheckoutSessionEntity session = checkoutSessionRepo
+                ProductCheckoutSessionEntity session = checkoutSessionRepo
                         .findById(checkoutSessionId)
                         .orElse(null);
 

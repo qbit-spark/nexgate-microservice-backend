@@ -4,9 +4,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.coyote.BadRequestException;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.CheckoutSessionEntity;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.ProductCheckoutSessionEntity;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.enums.CheckoutSessionStatus;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.repo.CheckoutSessionRepo;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.repo.ProductCheckoutSessionRepo;
 import org.nextgate.nextgatebackend.financial_system.escrow.service.EscrowService;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
@@ -53,7 +53,7 @@ import java.util.stream.Collectors;
 public class OrderServiceImpl implements OrderService {
 
     private final OrderRepository orderRepo;
-    private final CheckoutSessionRepo checkoutSessionRepo;
+    private final ProductCheckoutSessionRepo checkoutSessionRepo;
     private final GroupPurchaseInstanceRepo groupRepo;
     private final InstallmentAgreementRepo agreementRepo;
     private final ProductRepo productRepo;
@@ -79,7 +79,7 @@ public class OrderServiceImpl implements OrderService {
         // ========================================
         // 1. FETCH SESSION
         // ========================================
-        CheckoutSessionEntity session = checkoutSessionRepo
+        ProductCheckoutSessionEntity session = checkoutSessionRepo
                 .findById(checkoutSessionId)
                 .orElseThrow(() -> new ItemNotFoundException("Session not found"));
 
@@ -423,7 +423,7 @@ public class OrderServiceImpl implements OrderService {
      * Creates order for direct purchase (buy now button).
      * Always creates exactly ONE order with ONE item from ONE shop.
      */
-    private List<UUID> createDirectPurchaseOrder(CheckoutSessionEntity session)
+    private List<UUID> createDirectPurchaseOrder(ProductCheckoutSessionEntity session)
             throws ItemNotFoundException, BadRequestException {
 
         log.info("╔════════════════════════════════════════╗");
@@ -440,7 +440,7 @@ public class OrderServiceImpl implements OrderService {
             );
         }
 
-        CheckoutSessionEntity.CheckoutItem item = session.getItems().get(0);
+        ProductCheckoutSessionEntity.CheckoutItem item = session.getItems().get(0);
 
         log.info("Product: {}", item.getProductName());
         log.info("Quantity: {}", item.getQuantity());
@@ -487,7 +487,7 @@ public class OrderServiceImpl implements OrderService {
      * May create MULTIPLE orders if cart has items from different shops.
      * Groups items by shop: one order per shop.
      */
-    private List<UUID> createCartPurchaseOrders(CheckoutSessionEntity session)
+    private List<UUID> createCartPurchaseOrders(ProductCheckoutSessionEntity session)
             throws ItemNotFoundException, BadRequestException {
 
         log.info("╔════════════════════════════════════════╗");
@@ -506,10 +506,10 @@ public class OrderServiceImpl implements OrderService {
         // ========================================
         // GROUP ITEMS BY SHOP
         // ========================================
-        Map<UUID, List<CheckoutSessionEntity.CheckoutItem>> itemsByShop =
+        Map<UUID, List<ProductCheckoutSessionEntity.CheckoutItem>> itemsByShop =
                 session.getItems().stream()
                         .collect(Collectors.groupingBy(
-                                CheckoutSessionEntity.CheckoutItem::getShopId
+                                ProductCheckoutSessionEntity.CheckoutItem::getShopId
                         ));
 
         int shopCount = itemsByShop.size();
@@ -528,10 +528,10 @@ public class OrderServiceImpl implements OrderService {
         List<UUID> orderIds = new ArrayList<>();
         int orderNumber = 1;
 
-        for (Map.Entry<UUID, List<CheckoutSessionEntity.CheckoutItem>> entry : itemsByShop.entrySet()) {
+        for (Map.Entry<UUID, List<ProductCheckoutSessionEntity.CheckoutItem>> entry : itemsByShop.entrySet()) {
 
             UUID shopId = entry.getKey();
-            List<CheckoutSessionEntity.CheckoutItem> shopItems = entry.getValue();
+            List<ProductCheckoutSessionEntity.CheckoutItem> shopItems = entry.getValue();
 
             log.info("════════════════════════════════════════");
             log.info("Creating order {}/{} for shop: {}",
@@ -585,7 +585,7 @@ public class OrderServiceImpl implements OrderService {
     // INSTALLMENT ORDER CREATION
     // ========================================
 
-    private List<UUID> createInstallmentOrder(CheckoutSessionEntity session)
+    private List<UUID> createInstallmentOrder(ProductCheckoutSessionEntity session)
             throws ItemNotFoundException, BadRequestException {
 
         log.info("Creating INSTALLMENT order");
@@ -675,7 +675,7 @@ public class OrderServiceImpl implements OrderService {
     // GROUP ORDER CREATION
     // ========================================
 
-    private List<UUID> createGroupOrder(CheckoutSessionEntity session)
+    private List<UUID> createGroupOrder(ProductCheckoutSessionEntity session)
             throws ItemNotFoundException, BadRequestException {
 
         log.info("Creating GROUP order");
@@ -767,10 +767,10 @@ public class OrderServiceImpl implements OrderService {
     // ORDER BUILDER
     // ========================================
 
-    private OrderEntity buildOrderFromCheckoutSession(CheckoutSessionEntity session, OrderSource orderSource) throws ItemNotFoundException {
+    private OrderEntity buildOrderFromCheckoutSession(ProductCheckoutSessionEntity session, OrderSource orderSource) throws ItemNotFoundException {
 
         // Get shop from first item
-        CheckoutSessionEntity.CheckoutItem firstItem = session.getItems().getFirst();
+        ProductCheckoutSessionEntity.CheckoutItem firstItem = session.getItems().getFirst();
         ShopEntity shop = shopRepo.findById(firstItem.getShopId())
                 .orElseThrow(() -> new ItemNotFoundException("Shop not found"));
 
@@ -849,7 +849,7 @@ public class OrderServiceImpl implements OrderService {
             order.setItems(new ArrayList<>());
         }
 
-        for (CheckoutSessionEntity.CheckoutItem sessionItem : session.getItems()) {
+        for (ProductCheckoutSessionEntity.CheckoutItem sessionItem : session.getItems()) {
 
             ProductEntity product = productRepo.findById(sessionItem.getProductId())
                     .orElseThrow(() -> new ItemNotFoundException(
@@ -880,7 +880,7 @@ public class OrderServiceImpl implements OrderService {
     // VALIDATION
     // ========================================
 
-    private void validateSessionCanCreateOrder(CheckoutSessionEntity session)
+    private void validateSessionCanCreateOrder(ProductCheckoutSessionEntity session)
             throws BadRequestException {
 
         log.debug("Validating session can create order");
@@ -914,7 +914,7 @@ public class OrderServiceImpl implements OrderService {
     // HELPER
     // ========================================
 
-    private String serializeAddress(CheckoutSessionEntity.ShippingAddress address) {
+    private String serializeAddress(ProductCheckoutSessionEntity.ShippingAddress address) {
         if (address == null) return null;
 
         return String.format("%s, %s, %s, %s %s, %s",
@@ -928,9 +928,9 @@ public class OrderServiceImpl implements OrderService {
 
 
     private OrderEntity buildSingleOrder(
-            CheckoutSessionEntity session,
+            ProductCheckoutSessionEntity session,
             UUID shopId,
-            List<CheckoutSessionEntity.CheckoutItem> items,
+            List<ProductCheckoutSessionEntity.CheckoutItem> items,
             OrderSource orderSource
     ) throws ItemNotFoundException {
 
@@ -969,7 +969,7 @@ public class OrderServiceImpl implements OrderService {
         } else {
             // Cart purchase: split shipping among shops
             int totalShops = (int) session.getItems().stream()
-                    .map(CheckoutSessionEntity.CheckoutItem::getShopId)
+                    .map(ProductCheckoutSessionEntity.CheckoutItem::getShopId)
                     .distinct()
                     .count();
 
@@ -1074,7 +1074,7 @@ public class OrderServiceImpl implements OrderService {
 
         log.info("Adding order items:");
 
-        for (CheckoutSessionEntity.CheckoutItem sessionItem : items) {
+        for (ProductCheckoutSessionEntity.CheckoutItem sessionItem : items) {
 
             log.info("  → {} x{}",
                     sessionItem.getProductName(),

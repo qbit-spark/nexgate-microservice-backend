@@ -6,12 +6,12 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
 import lombok.extern.slf4j.Slf4j;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.CheckoutSessionEntity;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.ProductCheckoutSessionEntity;
 
 @Converter
 @Slf4j
 public class InstallmentConfigJsonConverter implements
-        AttributeConverter<CheckoutSessionEntity.InstallmentConfiguration, String> {
+        AttributeConverter<ProductCheckoutSessionEntity.InstallmentConfiguration, String> {
 
     private final ObjectMapper objectMapper;
 
@@ -22,7 +22,7 @@ public class InstallmentConfigJsonConverter implements
 
     @Override
     public String convertToDatabaseColumn(
-            CheckoutSessionEntity.InstallmentConfiguration config) {
+            ProductCheckoutSessionEntity.InstallmentConfiguration config) {
         if (config == null) {
             return null;
         }
@@ -35,14 +35,14 @@ public class InstallmentConfigJsonConverter implements
     }
 
     @Override
-    public CheckoutSessionEntity.InstallmentConfiguration convertToEntityAttribute(
+    public ProductCheckoutSessionEntity.InstallmentConfiguration convertToEntityAttribute(
             String dbData) {
         if (dbData == null || dbData.trim().isEmpty()) {
             return null;
         }
         try {
             return objectMapper.readValue(dbData,
-                    CheckoutSessionEntity.InstallmentConfiguration.class);
+                    ProductCheckoutSessionEntity.InstallmentConfiguration.class);
         } catch (JsonProcessingException e) {
             log.error("Error converting JSON to installment config", e);
             return null;

@@ -2,7 +2,7 @@ package org.nextgate.nextgatebackend.e_commerce.installment_purchase.service;
 
 import org.apache.coyote.BadRequestException;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.CheckoutSessionEntity;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.ProductCheckoutSessionEntity;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.e_commerce.installment_purchase.entity.InstallmentAgreementEntity;
 import org.nextgate.nextgatebackend.e_commerce.installment_purchase.entity.InstallmentPaymentEntity;
@@ -18,7 +18,7 @@ public interface InstallmentService {
     // CORE OPERATIONS
     // ========================================
 
-    InstallmentAgreementEntity createInstallmentAgreement(CheckoutSessionEntity checkoutSession) throws ItemNotFoundException, BadRequestException;
+    InstallmentAgreementEntity createInstallmentAgreement(ProductCheckoutSessionEntity checkoutSession) throws ItemNotFoundException, BadRequestException;
 
 
     InstallmentPaymentEntity processInstallmentPayment(UUID paymentId) throws ItemNotFoundException, BadRequestException;

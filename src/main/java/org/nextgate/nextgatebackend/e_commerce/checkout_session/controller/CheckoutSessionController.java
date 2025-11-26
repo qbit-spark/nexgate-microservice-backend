@@ -7,7 +7,7 @@ import org.nextgate.nextgatebackend.e_commerce.checkout_session.payload.Checkout
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.payload.CheckoutSessionSummaryResponse;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.payload.CreateCheckoutSessionRequest;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.payload.UpdateCheckoutSessionRequest;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.service.CheckoutSessionService;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.service.ProductsCheckoutSessionService;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.payloads.PaymentResponse;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
@@ -22,14 +22,14 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class CheckoutSessionController {
 
-    private final CheckoutSessionService checkoutSessionService;
+    private final ProductsCheckoutSessionService productsCheckoutSessionService;
 
     @PostMapping
     public GlobeSuccessResponseBuilder createCheckoutSession(
             @Valid @RequestBody CreateCheckoutSessionRequest request)
             throws ItemNotFoundException, BadRequestException {
 
-        CheckoutSessionResponse response = checkoutSessionService.createCheckoutSession(request);
+        CheckoutSessionResponse response = productsCheckoutSessionService.createCheckoutSession(request);
 
         return GlobeSuccessResponseBuilder.success(
                 "Checkout session created successfully",
@@ -40,13 +40,13 @@ public class CheckoutSessionController {
     @GetMapping("/{sessionId}")
     public GlobeSuccessResponseBuilder getCheckoutSessionById(@PathVariable UUID sessionId)
             throws ItemNotFoundException, BadRequestException {
-        CheckoutSessionResponse response = checkoutSessionService.getCheckoutSessionById(sessionId);
+        CheckoutSessionResponse response = productsCheckoutSessionService.getCheckoutSessionById(sessionId);
         return GlobeSuccessResponseBuilder.success("Checkout session retrieved successfully", response);
     }
 
     @GetMapping
     public GlobeSuccessResponseBuilder getMyCheckoutSessions() throws ItemNotFoundException {
-        List<CheckoutSessionSummaryResponse> responses = checkoutSessionService.getMyCheckoutSessions();
+        List<CheckoutSessionSummaryResponse> responses = productsCheckoutSessionService.getMyCheckoutSessions();
         return GlobeSuccessResponseBuilder.success("Checkout sessions retrieved successfully", responses);
     }
 
@@ -55,7 +55,7 @@ public class CheckoutSessionController {
             @PathVariable UUID sessionId)
             throws ItemNotFoundException, BadRequestException {
 
-        checkoutSessionService.cancelCheckoutSession(sessionId);
+        productsCheckoutSessionService.cancelCheckoutSession(sessionId);
 
         return GlobeSuccessResponseBuilder.success(
                 "Checkout session cancelled successfully",
@@ -69,7 +69,7 @@ public class CheckoutSessionController {
             @Valid @RequestBody UpdateCheckoutSessionRequest request)
             throws ItemNotFoundException, BadRequestException {
 
-        CheckoutSessionResponse response = checkoutSessionService.updateCheckoutSession(sessionId, request);
+        CheckoutSessionResponse response = productsCheckoutSessionService.updateCheckoutSession(sessionId, request);
 
         return GlobeSuccessResponseBuilder.success(
                 "Checkout session updated successfully",
@@ -82,7 +82,7 @@ public class CheckoutSessionController {
     public GlobeSuccessResponseBuilder processPayment(@PathVariable UUID sessionId)
             throws ItemNotFoundException, BadRequestException, RandomExceptions {
 
-        PaymentResponse response = checkoutSessionService.processPayment(sessionId);
+        PaymentResponse response = productsCheckoutSessionService.processPayment(sessionId);
 
         return GlobeSuccessResponseBuilder.success(
                 response.getSuccess() ? "Payment processed successfully" : "Payment processing initiated",
@@ -95,7 +95,7 @@ public class CheckoutSessionController {
     public GlobeSuccessResponseBuilder retryPayment(@PathVariable UUID sessionId)
             throws ItemNotFoundException, BadRequestException, RandomExceptions {
 
-        PaymentResponse response = checkoutSessionService.retryPayment(sessionId);
+        PaymentResponse response = productsCheckoutSessionService.retryPayment(sessionId);
 
         return GlobeSuccessResponseBuilder.success(
                 response.getSuccess() ? "Payment retry successful" : "Payment retry failed",
@@ -108,7 +108,7 @@ public class CheckoutSessionController {
             throws ItemNotFoundException {
 
         List<CheckoutSessionSummaryResponse> responses =
-                checkoutSessionService.getMyActiveCheckoutSessions();
+                productsCheckoutSessionService.getMyActiveCheckoutSessions();
 
         return GlobeSuccessResponseBuilder.success(
                 "Active checkout sessions retrieved successfully",

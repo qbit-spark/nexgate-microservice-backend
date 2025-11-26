@@ -7,7 +7,7 @@ import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.e_commerce.cart_service.entity.CartEntity;
 import org.nextgate.nextgatebackend.e_commerce.cart_service.entity.CartItemEntity;
 import org.nextgate.nextgatebackend.e_commerce.cart_service.repo.CartRepo;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.CheckoutSessionEntity;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.ProductCheckoutSessionEntity;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.payload.CreateCheckoutSessionRequest;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.payload.UpdateCheckoutSessionRequest;
 import org.nextgate.nextgatebackend.financial_system.wallet.entity.WalletEntity;
@@ -40,7 +40,7 @@ public class CheckoutSessionHelper {
     // BILLING ADDRESS DETERMINATION
     // ========================================
 
-    public CheckoutSessionEntity.BillingAddress determineBillingAddress(
+    public ProductCheckoutSessionEntity.BillingAddress determineBillingAddress(
             CreateCheckoutSessionRequest request,
             PaymentMethodsEntity paymentMethod) {
 
@@ -53,10 +53,10 @@ public class CheckoutSessionHelper {
         return null;
     }
 
-    private CheckoutSessionEntity.BillingAddress convertPaymentMethodBillingToCheckoutBilling(
+    private ProductCheckoutSessionEntity.BillingAddress convertPaymentMethodBillingToCheckoutBilling(
             PaymentMethodsEntity.BillingAddress pmBilling) {
 
-        return CheckoutSessionEntity.BillingAddress.builder()
+        return ProductCheckoutSessionEntity.BillingAddress.builder()
                 .sameAsShipping(false)
                 .fullName(null)
                 .addressLine1(pmBilling.getStreet())
@@ -71,10 +71,10 @@ public class CheckoutSessionHelper {
     // SHIPPING ADDRESS FETCHING (PLACEHOLDER)
     // ========================================
 
-    public CheckoutSessionEntity.ShippingAddress fetchShippingAddress(UUID shippingAddressId) {
+    public ProductCheckoutSessionEntity.ShippingAddress fetchShippingAddress(UUID shippingAddressId) {
 
         // Todo: Fetch from ShippingAddressService/Repo when available
-        return CheckoutSessionEntity.ShippingAddress.builder()
+        return ProductCheckoutSessionEntity.ShippingAddress.builder()
                 .fullName("John Doe")
                 .addressLine1("123 Main Street")
                 .addressLine2(null)
@@ -90,10 +90,10 @@ public class CheckoutSessionHelper {
     // SHIPPING METHOD CREATION (PLACEHOLDER)
     // ========================================
 
-    public CheckoutSessionEntity.ShippingMethod createPlaceholderShippingMethod(String shippingMethodId) {
+    public ProductCheckoutSessionEntity.ShippingMethod createPlaceholderShippingMethod(String shippingMethodId) {
 
         // Todo: Fetch from ShippingService when available
-        return CheckoutSessionEntity.ShippingMethod.builder()
+        return ProductCheckoutSessionEntity.ShippingMethod.builder()
                 .id(shippingMethodId)
                 .name("Standard Shipping")
                 .carrier("DHL")
@@ -107,7 +107,7 @@ public class CheckoutSessionHelper {
     // PRODUCT FETCHING & VALIDATION - REAL IMPLEMENTATION
     // ========================================
 
-    public CheckoutSessionEntity.CheckoutItem fetchAndBuildCheckoutItem(
+    public ProductCheckoutSessionEntity.CheckoutItem fetchAndBuildCheckoutItem(
             UUID productId,
             Integer quantity) throws ItemNotFoundException, BadRequestException {
 
@@ -147,7 +147,7 @@ public class CheckoutSessionHelper {
     }
 
 
-    private CheckoutSessionEntity.CheckoutItem buildCheckoutItemFromProduct(
+    private ProductCheckoutSessionEntity.CheckoutItem buildCheckoutItemFromProduct(
             ProductEntity product,
             Integer quantity) throws ItemNotFoundException, BadRequestException {
 
@@ -285,12 +285,12 @@ public class CheckoutSessionHelper {
         // ========================================
         // 8. BUILD AND RETURN CHECKOUT ITEM
         // ========================================
-        return CheckoutSessionEntity.CheckoutItem.builder()
+        return ProductCheckoutSessionEntity.CheckoutItem.builder()
                 .productId(product.getProductId())
                 .productName(product.getProductName())
                 .productSlug(product.getProductSlug())
                 .productImage(product.getProductImages() != null && !product.getProductImages().isEmpty()
-                        ? product.getProductImages().get(0) : null)
+                        ? product.getProductImages().getFirst() : null)
                 .quantity(quantity)
                 .unitPrice(unitPrice)
                 .subtotal(subtotal)
@@ -310,14 +310,14 @@ public class CheckoutSessionHelper {
     // PRICING CALCULATION
     // ========================================
 
-    public CheckoutSessionEntity.PricingSummary calculatePricing(
-            List<CheckoutSessionEntity.CheckoutItem> items,
-            CheckoutSessionEntity.ShippingMethod shippingMethod) {
+    public ProductCheckoutSessionEntity.PricingSummary calculatePricing(
+            List<ProductCheckoutSessionEntity.CheckoutItem> items,
+            ProductCheckoutSessionEntity.ShippingMethod shippingMethod) {
 
         BigDecimal subtotal = BigDecimal.ZERO;
         BigDecimal totalTax = BigDecimal.ZERO;
 
-        for (CheckoutSessionEntity.CheckoutItem item : items) {
+        for (ProductCheckoutSessionEntity.CheckoutItem item : items) {
             subtotal = subtotal.add(item.getSubtotal());
             totalTax = totalTax.add(item.getTax());
         }
@@ -325,7 +325,7 @@ public class CheckoutSessionHelper {
         BigDecimal shippingCost = shippingMethod != null ? shippingMethod.getCost() : BigDecimal.ZERO;
         BigDecimal total = subtotal.add(shippingCost).add(totalTax);
 
-        return CheckoutSessionEntity.PricingSummary.builder()
+        return ProductCheckoutSessionEntity.PricingSummary.builder()
                 .subtotal(subtotal.setScale(2, RoundingMode.HALF_UP))
                 .shippingCost(shippingCost.setScale(2, RoundingMode.HALF_UP))
                 .tax(totalTax.setScale(2, RoundingMode.HALF_UP))
@@ -338,9 +338,9 @@ public class CheckoutSessionHelper {
     // PAYMENT INTENT CREATION
     // ========================================
 
-    public CheckoutSessionEntity.PaymentIntent createPaymentIntent(
+    public ProductCheckoutSessionEntity.PaymentIntent createPaymentIntent(
             PaymentMethodsEntity paymentMethod,
-            CheckoutSessionEntity.PricingSummary pricing,
+            ProductCheckoutSessionEntity.PricingSummary pricing,
             UUID accountId) throws BadRequestException, ItemNotFoundException {
 
         return switch (paymentMethod.getPaymentMethodType()) {
@@ -357,9 +357,9 @@ public class CheckoutSessionHelper {
         };
     }
 
-    private CheckoutSessionEntity.PaymentIntent createWalletPaymentIntent(
+    private ProductCheckoutSessionEntity.PaymentIntent createWalletPaymentIntent(
             PaymentMethodsEntity paymentMethod,
-            CheckoutSessionEntity.PricingSummary pricing,
+            ProductCheckoutSessionEntity.PricingSummary pricing,
             UUID accountId) throws BadRequestException, ItemNotFoundException {
 
         WalletEntity wallet = walletService.getWalletByAccountId(accountId);
@@ -377,7 +377,7 @@ public class CheckoutSessionHelper {
             );
         }
 
-        return CheckoutSessionEntity.PaymentIntent.builder()
+        return ProductCheckoutSessionEntity.PaymentIntent.builder()
                 .provider("WALLET")
                 .clientSecret(null)
                 .paymentMethods(List.of("WALLET"))
@@ -385,8 +385,8 @@ public class CheckoutSessionHelper {
                 .build();
     }
 
-    private CheckoutSessionEntity.PaymentIntent createCODPaymentIntent() {
-        return CheckoutSessionEntity.PaymentIntent.builder()
+    private ProductCheckoutSessionEntity.PaymentIntent createCODPaymentIntent() {
+        return ProductCheckoutSessionEntity.PaymentIntent.builder()
                 .provider("CASH_ON_DELIVERY")
                 .clientSecret(null)
                 .paymentMethods(List.of("CASH"))
@@ -436,7 +436,7 @@ public class CheckoutSessionHelper {
 // ========================================
 
     public PaymentMethodsEntity getPaymentMethodFromIntent(
-            CheckoutSessionEntity.PaymentIntent paymentIntent,
+            ProductCheckoutSessionEntity.PaymentIntent paymentIntent,
             AccountEntity user) throws ItemNotFoundException, BadRequestException {
 
         if (paymentIntent == null) {
@@ -513,13 +513,13 @@ public class CheckoutSessionHelper {
                 .build();
     }
 
-    public List<CheckoutSessionEntity.CheckoutItem> convertCartItemsToCheckoutItems(CartEntity cart)
+    public List<ProductCheckoutSessionEntity.CheckoutItem> convertCartItemsToCheckoutItems(CartEntity cart)
             throws ItemNotFoundException, BadRequestException {
 
-        List<CheckoutSessionEntity.CheckoutItem> checkoutItems = new ArrayList<>();
+        List<ProductCheckoutSessionEntity.CheckoutItem> checkoutItems = new ArrayList<>();
 
         for (CartItemEntity cartItem : cart.getCartItems()) {
-            CheckoutSessionEntity.CheckoutItem checkoutItem = fetchAndBuildCheckoutItem(
+            ProductCheckoutSessionEntity.CheckoutItem checkoutItem = fetchAndBuildCheckoutItem(
                     cartItem.getProduct().getProductId(),
                     cartItem.getQuantity()
             );
@@ -540,7 +540,7 @@ public class CheckoutSessionHelper {
 // GROUP PURCHASE HELPERS
 // ========================================
 
-    public CheckoutSessionEntity.CheckoutItem buildGroupPurchaseCheckoutItem(
+    public ProductCheckoutSessionEntity.CheckoutItem buildGroupPurchaseCheckoutItem(
             ProductEntity product,
             Integer quantity
     ) throws BadRequestException {
@@ -561,12 +561,12 @@ public class CheckoutSessionHelper {
 
         BigDecimal total = subtotal.add(tax);
 
-        return CheckoutSessionEntity.CheckoutItem.builder()
+        return ProductCheckoutSessionEntity.CheckoutItem.builder()
                 .productId(product.getProductId())
                 .productName(product.getProductName())
                 .productSlug(product.getProductSlug())
                 .productImage(product.getProductImages() != null && !product.getProductImages().isEmpty()
-                        ? product.getProductImages().get(0) : null)
+                        ? product.getProductImages().getFirst() : null)
                 .quantity(quantity)
                 .unitPrice(unitPrice) // Group price
                 .subtotal(subtotal)
@@ -580,9 +580,9 @@ public class CheckoutSessionHelper {
                 .build();
     }
 
-    public CheckoutSessionEntity.PricingSummary calculateGroupPurchasePricing(
-            List<CheckoutSessionEntity.CheckoutItem> items,
-            CheckoutSessionEntity.ShippingMethod shippingMethod
+    public ProductCheckoutSessionEntity.PricingSummary calculateGroupPurchasePricing(
+            List<ProductCheckoutSessionEntity.CheckoutItem> items,
+            ProductCheckoutSessionEntity.ShippingMethod shippingMethod
     ) {
 
         log.debug("Calculating group purchase pricing for {} items", items.size());
@@ -590,7 +590,7 @@ public class CheckoutSessionHelper {
         BigDecimal subtotal = BigDecimal.ZERO;
         BigDecimal totalTax = BigDecimal.ZERO;
 
-        for (CheckoutSessionEntity.CheckoutItem item : items) {
+        for (ProductCheckoutSessionEntity.CheckoutItem item : items) {
             subtotal = subtotal.add(item.getSubtotal());
             totalTax = totalTax.add(item.getTax());
         }
@@ -602,7 +602,7 @@ public class CheckoutSessionHelper {
 
 
 
-        return CheckoutSessionEntity.PricingSummary.builder()
+        return ProductCheckoutSessionEntity.PricingSummary.builder()
                 .subtotal(subtotal.setScale(2, RoundingMode.HALF_UP))
                 .shippingCost(shippingCost.setScale(2, RoundingMode.HALF_UP))
                 .tax(totalTax.setScale(2, RoundingMode.HALF_UP))

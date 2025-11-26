@@ -1,14 +1,15 @@
 package org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.entity;
 
 
+import com.qbitspark.jikoexpress.financial_system.payment_processing.contract.PayableCheckoutSession;
 import jakarta.persistence.*;
 import lombok.*;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.enums.CheckoutSessionStatus;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.utils.PaymentAttemptsJsonConverter;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.utils.PaymentIntentJsonConverter;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.utils.PricingSummaryJsonConverter;
 import org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.utils.TicketCheckoutDetailsJsonConverter;
+import org.nextgate.nextgatebackend.financial_system.payment_processing.utils.PaymentAttemptsJsonConverter;
+import org.nextgate.nextgatebackend.financial_system.payment_processing.utils.PaymentIntentJsonConverter;
+import org.nextgate.nextgatebackend.financial_system.payment_processing.utils.PricingDetailsJsonConverter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -16,30 +17,27 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Entity representing an event ticket checkout session
- * Holds ticket selections and attendee information while awaiting payment
- */
 @Entity
 @Table(name = "event_checkout_sessions", indexes = {
         @Index(name = "idx_event_checkout_customer", columnList = "customer_id"),
         @Index(name = "idx_event_checkout_status", columnList = "status"),
         @Index(name = "idx_event_checkout_event", columnList = "event_id"),
-        @Index(name = "idx_event_checkout_expires", columnList = "expires_at")
+        @Index(name = "idx_event_checkout_expires", columnList = "expires_at"),
+        @Index(name = "idx_event_checkout_escrow", columnList = "escrow_id")
 })
 @Getter
 @Setter
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class EventCheckoutSessionEntity {
+public class EventCheckoutSessionEntity implements PayableCheckoutSession {
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID sessionId;
 
     // ========================================
-    // CUSTOMER & EVENT REFERENCES
+    // PAYMENT PARTICIPANT (PAYER)
     // ========================================
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -55,7 +53,8 @@ public class EventCheckoutSessionEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private CheckoutSessionStatus status;
+    @Builder.Default
+    private CheckoutSessionStatus status = CheckoutSessionStatus.PENDING_PAYMENT;
 
     // ========================================
     // TICKET CHECKOUT DETAILS
@@ -70,7 +69,7 @@ public class EventCheckoutSessionEntity {
     // ========================================
 
     @Column(name = "pricing", columnDefinition = "jsonb", nullable = false)
-    @Convert(converter = PricingSummaryJsonConverter.class)
+    @Convert(converter = PricingDetailsJsonConverter.class)
     private PricingSummary pricing;
 
     // ========================================
@@ -87,6 +86,7 @@ public class EventCheckoutSessionEntity {
 
     @Column(name = "payment_attempts", columnDefinition = "jsonb")
     @Convert(converter = PaymentAttemptsJsonConverter.class)
+    @Builder.Default
     private List<PaymentAttempt> paymentAttempts = new ArrayList<>();
 
     // ========================================
@@ -94,6 +94,7 @@ public class EventCheckoutSessionEntity {
     // ========================================
 
     @Column(name = "tickets_held")
+    @Builder.Default
     private Boolean ticketsHeld = false;
 
     @Column(name = "ticket_hold_expires_at")
@@ -106,7 +107,7 @@ public class EventCheckoutSessionEntity {
     @Column(name = "expires_at", nullable = false)
     private LocalDateTime expiresAt;
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @Column(name = "updated_at")
@@ -116,8 +117,11 @@ public class EventCheckoutSessionEntity {
     private LocalDateTime completedAt;
 
     // ========================================
-    // CREATED BOOKING ORDER REFERENCE
+    // PAYMENT RESULT REFERENCES
     // ========================================
+
+    @Column(name = "escrow_id")
+    private UUID escrowId;
 
     @Column(name = "created_booking_order_id")
     private UUID createdBookingOrderId;
@@ -130,8 +134,6 @@ public class EventCheckoutSessionEntity {
     protected void onCreate() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
-
-        // Set default expiration (15 minutes from now)
         if (expiresAt == null) {
             expiresAt = LocalDateTime.now().plusMinutes(15);
         }
@@ -143,35 +145,85 @@ public class EventCheckoutSessionEntity {
     }
 
     // ========================================
-    // BUSINESS LOGIC METHODS
+    // PAYMENT CONTRACT IMPLEMENTATION
     // ========================================
 
+    @Override
+    public AccountEntity getPayer() {
+        return customer;
+    }
+
+    @Override
+    public String getSessionDomain() {
+        return "EVENT";
+    }
+
+    @Override
+    public BigDecimal getTotalAmount() {
+        return pricing != null ? pricing.getTotal() : BigDecimal.ZERO;
+    }
+
+    @Override
+    public String getCurrency() {
+        return pricing != null ? pricing.getCurrency() : "TZS";
+    }
+
+    @Override
     public boolean isExpired() {
         return LocalDateTime.now().isAfter(expiresAt);
     }
 
-    public boolean canRetryPayment() {
-        return status == CheckoutSessionStatus.PAYMENT_FAILED && !isExpired();
+    @Override
+    public int getPaymentAttemptCount() {
+        return paymentAttempts != null ? paymentAttempts.size() : 0;
     }
+
+    @Override
+    public boolean canRetryPayment() {
+        return status == CheckoutSessionStatus.PAYMENT_FAILED
+                && !isExpired()
+                && getPaymentAttemptCount() < 5;
+    }
+
+    // ========================================
+    // BUSINESS LOGIC METHODS
+    // ========================================
 
     public void addPaymentAttempt(PaymentAttempt attempt) {
         if (paymentAttempts == null) {
             paymentAttempts = new ArrayList<>();
         }
+        attempt.setAttemptNumber(paymentAttempts.size() + 1);
+        attempt.setAttemptedAt(LocalDateTime.now());
         paymentAttempts.add(attempt);
     }
 
-    public int getPaymentAttemptCount() {
-        return paymentAttempts != null ? paymentAttempts.size() : 0;
+    public void markAsCompleted() {
+        this.status = CheckoutSessionStatus.PAYMENT_COMPLETED;
+        this.completedAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void markAsFailed(String errorMessage) {
+        this.status = CheckoutSessionStatus.PAYMENT_FAILED;
+        this.updatedAt = LocalDateTime.now();
+
+        PaymentAttempt failedAttempt = PaymentAttempt.builder()
+                .status("FAILED")
+                .errorMessage(errorMessage)
+                .build();
+        addPaymentAttempt(failedAttempt);
+    }
+
+    public void markAsExpired() {
+        this.status = CheckoutSessionStatus.EXPIRED;
+        this.updatedAt = LocalDateTime.now();
     }
 
     // ========================================
     // NESTED CLASSES FOR JSON STORAGE
     // ========================================
 
-    /**
-     * Represents ticket checkout details
-     */
     @Data
     @Builder
     @NoArgsConstructor
@@ -180,16 +232,13 @@ public class EventCheckoutSessionEntity {
         private UUID ticketTypeId;
         private String ticketTypeName;
         private BigDecimal unitPrice;
-        private Integer ticketsForBuyer;  // Number of tickets for buyer
-        private List<OtherAttendee> otherAttendees;  // Other attendees with quantities
-        private Boolean sendTicketsToAttendees;  // QR distribution preference
-        private Integer totalQuantity;  // Total tickets (buyer + others)
+        private Integer ticketsForBuyer;
+        private List<OtherAttendee> otherAttendees;
+        private Boolean sendTicketsToAttendees;
+        private Integer totalQuantity;
         private BigDecimal subtotal;
     }
 
-    /**
-     * Other attendee information
-     */
     @Data
     @Builder
     @NoArgsConstructor
@@ -198,12 +247,9 @@ public class EventCheckoutSessionEntity {
         private String name;
         private String email;
         private String phone;
-        private Integer quantity;  // Number of tickets for this person
+        private Integer quantity;
     }
 
-    /**
-     * Pricing summary for the checkout
-     */
     @Data
     @Builder
     @NoArgsConstructor
@@ -211,12 +257,10 @@ public class EventCheckoutSessionEntity {
     public static class PricingSummary {
         private BigDecimal subtotal;
         private BigDecimal total;
-        private String currency;
+        @Builder.Default
+        private String currency = "TZS";
     }
 
-    /**
-     * Payment intent details
-     */
     @Data
     @Builder
     @NoArgsConstructor
@@ -228,9 +272,6 @@ public class EventCheckoutSessionEntity {
         private String status;
     }
 
-    /**
-     * Payment attempt record
-     */
     @Data
     @Builder
     @NoArgsConstructor

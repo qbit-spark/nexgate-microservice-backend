@@ -1,5 +1,4 @@
-package org.nextgate.nextgatebackend.e_commerce.checkout_session.utils;
-
+package org.nextgate.nextgatebackend.financial_system.payment_processing.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -8,14 +7,14 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
 import lombok.extern.slf4j.Slf4j;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.CheckoutSessionEntity;
+import org.nextgate.nextgatebackend.financial_system.payment_processing.model.PaymentAttempt;
 
 import java.util.ArrayList;
 import java.util.List;
 
 @Converter
 @Slf4j
-public class PaymentAttemptsJsonConverter implements AttributeConverter<List<CheckoutSessionEntity.PaymentAttempt>, String> {
+public class PaymentAttemptsJsonConverter implements AttributeConverter<List<PaymentAttempt>, String> {
 
     private final ObjectMapper objectMapper;
 
@@ -25,7 +24,7 @@ public class PaymentAttemptsJsonConverter implements AttributeConverter<List<Che
     }
 
     @Override
-    public String convertToDatabaseColumn(List<CheckoutSessionEntity.PaymentAttempt> attempts) {
+    public String convertToDatabaseColumn(List<PaymentAttempt> attempts) {
         if (attempts == null || attempts.isEmpty()) {
             return "[]";
         }
@@ -38,14 +37,14 @@ public class PaymentAttemptsJsonConverter implements AttributeConverter<List<Che
     }
 
     @Override
-    public List<CheckoutSessionEntity.PaymentAttempt> convertToEntityAttribute(String dbData) {
+    public List<PaymentAttempt> convertToEntityAttribute(String dbData) {
         if (dbData == null || dbData.trim().isEmpty() || "[]".equals(dbData)) {
             return new ArrayList<>();
         }
         try {
-            return objectMapper.readValue(dbData, new TypeReference<List<CheckoutSessionEntity.PaymentAttempt>>() {});
+            return objectMapper.readValue(dbData, new TypeReference<List<PaymentAttempt>>() {});
         } catch (JsonProcessingException e) {
-            log.error("Error converting JSON to payment attempts", e);
+            log.error("Error converting JSON to payment attempts: {}", dbData, e);
             return new ArrayList<>();
         }
     }

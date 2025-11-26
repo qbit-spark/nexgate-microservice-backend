@@ -1,7 +1,6 @@
 package org.nextgate.nextgatebackend.financial_system.escrow.repo;
 
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.CheckoutSessionEntity;
 import org.nextgate.nextgatebackend.financial_system.escrow.entity.EscrowAccountEntity;
 import org.nextgate.nextgatebackend.financial_system.escrow.enums.EscrowStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -16,9 +15,6 @@ public interface EscrowAccountRepo extends JpaRepository<EscrowAccountEntity, UU
 
     // Find by escrow number
     Optional<EscrowAccountEntity> findByEscrowNumber(String escrowNumber);
-
-    // Find by checkout session
-    Optional<EscrowAccountEntity> findByCheckoutSession(CheckoutSessionEntity checkoutSession);
 
     // Find by order ID
     Optional<EscrowAccountEntity> findByOrderId(String orderId);
@@ -35,9 +31,11 @@ public interface EscrowAccountRepo extends JpaRepository<EscrowAccountEntity, UU
     // Find held escrows (for monitoring)
     List<EscrowAccountEntity> findByStatusOrderByCreatedAtDesc(EscrowStatus status);
 
-    // Check if escrow exists for checkout session
-    boolean existsByCheckoutSession(CheckoutSessionEntity checkoutSession);
 
     // Check if escrow number exists
     boolean existsByEscrowNumber(String escrowNumber);
+
+    Optional<EscrowAccountEntity> findByCheckoutSessionIdAndSessionDomain(UUID sessionId, String sessionDomain);
+
+    boolean existsByCheckoutSessionIdAndSessionDomain(UUID sessionId, String sessionDomain);
 }

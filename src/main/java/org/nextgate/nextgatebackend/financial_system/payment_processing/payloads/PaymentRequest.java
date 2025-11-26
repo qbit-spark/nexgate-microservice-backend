@@ -18,9 +18,9 @@ public class PaymentRequest {
 
     private UUID checkoutSessionId;
 
-    // Optional: Override payment method from checkout session
+    private String sessionDomain; // "PRODUCT" or "EVENT"
+
     private PaymentMethod paymentMethod;
 
-    // Optional: Idempotency key for duplicate prevention
     private String idempotencyKey;
 }

@@ -8,8 +8,8 @@ import org.jobrunr.scheduling.BackgroundJobRequest;
 import org.jobrunr.scheduling.JobScheduler;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.authentication_service.repo.AccountRepo;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.CheckoutSessionEntity;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.repo.CheckoutSessionRepo;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.ProductCheckoutSessionEntity;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.repo.ProductCheckoutSessionRepo;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.e_commerce.group_purchase_mng.entity.GroupParticipantEntity;
 import org.nextgate.nextgatebackend.e_commerce.group_purchase_mng.entity.GroupPurchaseInstanceEntity;
@@ -54,14 +54,14 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
     private final AccountRepo accountRepo;
     private final GroupPurchaseValidator validator;
     private final ApplicationEventPublisher eventPublisher;
-    private final CheckoutSessionRepo checkoutSessionRepo;
+    private final ProductCheckoutSessionRepo checkoutSessionRepo;
     private final NotificationPublisher notificationPublisher;
     private final JobScheduler jobScheduler;
 
     @Override
     @Transactional
     public void createGroupInstance(
-            CheckoutSessionEntity checkoutSession) throws ItemNotFoundException, BadRequestException {
+            ProductCheckoutSessionEntity checkoutSession) throws ItemNotFoundException, BadRequestException {
 
         log.info("Creating group instance from checkout session: {}",
                 checkoutSession.getSessionId());
@@ -74,7 +74,7 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
         validator.validateCheckoutSessionForGroupCreation(checkoutSession, authenticatedUser);
 
         // 3. Extract data from checkout session
-        CheckoutSessionEntity.CheckoutItem item = checkoutSession.getItems().get(0);
+        ProductCheckoutSessionEntity.CheckoutItem item = checkoutSession.getItems().getFirst();
         UUID productId = item.getProductId();
         Integer quantity = item.getQuantity();
         BigDecimal totalPaid = checkoutSession.getPricing().getTotal();
@@ -182,7 +182,7 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
     @Override
     @Transactional
     public void joinGroup(
-            CheckoutSessionEntity checkoutSession) throws ItemNotFoundException, BadRequestException {
+            ProductCheckoutSessionEntity checkoutSession) throws ItemNotFoundException, BadRequestException {
 
         log.info("User joining group: {} from checkout session: {}",
                 checkoutSession.getGroupIdToBeJoined(), checkoutSession.getSessionId());
@@ -195,7 +195,7 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
         validator.validateCheckoutSessionForGroupCreation(checkoutSession, authenticatedUser);
 
         // 3. Extract data from checkout session
-        CheckoutSessionEntity.CheckoutItem item = checkoutSession.getItems().get(0);
+        ProductCheckoutSessionEntity.CheckoutItem item = checkoutSession.getItems().get(0);
         UUID productId = item.getProductId();
         Integer quantity = item.getQuantity();
         BigDecimal totalPaid = checkoutSession.getPricing().getTotal();

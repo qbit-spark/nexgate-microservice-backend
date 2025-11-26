@@ -13,7 +13,7 @@ import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
 import java.util.List;
 import java.util.UUID;
 
-public interface CheckoutSessionService {
+public interface ProductsCheckoutSessionService {
 
     // Create a new checkout session
     CheckoutSessionResponse createCheckoutSession(CreateCheckoutSessionRequest request)

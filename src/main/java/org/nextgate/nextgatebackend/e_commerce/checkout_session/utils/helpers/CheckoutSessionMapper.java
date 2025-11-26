@@ -1,7 +1,7 @@
 // CheckoutSessionMapper.java
 package org.nextgate.nextgatebackend.e_commerce.checkout_session.utils.helpers;
 
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.CheckoutSessionEntity;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.ProductCheckoutSessionEntity;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.payload.CheckoutSessionResponse;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.payload.CheckoutSessionSummaryResponse;
 import org.springframework.stereotype.Component;
@@ -16,7 +16,7 @@ public class CheckoutSessionMapper {
     // ENTITY TO RESPONSE CONVERSIONS
     // ========================================
 
-    public CheckoutSessionResponse toResponse(CheckoutSessionEntity entity) {
+    public CheckoutSessionResponse toResponse(ProductCheckoutSessionEntity entity) {
         if (entity == null) return null;
 
         return CheckoutSessionResponse.builder()
@@ -46,7 +46,7 @@ public class CheckoutSessionMapper {
                 .build();
     }
 
-    public CheckoutSessionSummaryResponse toSummaryResponse(CheckoutSessionEntity entity) {
+    public CheckoutSessionSummaryResponse toSummaryResponse(ProductCheckoutSessionEntity entity) {
         if (entity == null) return null;
 
         return CheckoutSessionSummaryResponse.builder()
@@ -64,7 +64,7 @@ public class CheckoutSessionMapper {
                 .build();
     }
 
-    public List<CheckoutSessionSummaryResponse> toSummaryResponseList(List<CheckoutSessionEntity> entities) {
+    public List<CheckoutSessionSummaryResponse> toSummaryResponseList(List<ProductCheckoutSessionEntity> entities) {
         if (entities == null) return List.of();
 
         return entities.stream()
@@ -77,7 +77,7 @@ public class CheckoutSessionMapper {
     // ========================================
 
     private List<CheckoutSessionResponse.CheckoutItemResponse> mapItemsToResponse(
-            List<CheckoutSessionEntity.CheckoutItem> items) {
+            List<ProductCheckoutSessionEntity.CheckoutItem> items) {
         if (items == null) return List.of();
 
         return items.stream()
@@ -101,7 +101,7 @@ public class CheckoutSessionMapper {
     }
 
     private CheckoutSessionResponse.PricingSummaryResponse mapPricingToResponse(
-            CheckoutSessionEntity.PricingSummary pricing) {
+            ProductCheckoutSessionEntity.PricingSummary pricing) {
         if (pricing == null) return null;
 
         return CheckoutSessionResponse.PricingSummaryResponse.builder()
@@ -114,7 +114,7 @@ public class CheckoutSessionMapper {
     }
 
     private CheckoutSessionResponse.ShippingAddressResponse mapShippingAddressToResponse(
-            CheckoutSessionEntity.ShippingAddress address) {
+            ProductCheckoutSessionEntity.ShippingAddress address) {
         if (address == null) return null;
 
         return CheckoutSessionResponse.ShippingAddressResponse.builder()
@@ -130,7 +130,7 @@ public class CheckoutSessionMapper {
     }
 
     private CheckoutSessionResponse.BillingAddressResponse mapBillingAddressToResponse(
-            CheckoutSessionEntity.BillingAddress address) {
+            ProductCheckoutSessionEntity.BillingAddress address) {
         if (address == null) return null;
 
         return CheckoutSessionResponse.BillingAddressResponse.builder()
@@ -145,7 +145,7 @@ public class CheckoutSessionMapper {
     }
 
     private CheckoutSessionResponse.ShippingMethodResponse mapShippingMethodToResponse(
-            CheckoutSessionEntity.ShippingMethod method) {
+            ProductCheckoutSessionEntity.ShippingMethod method) {
         if (method == null) return null;
 
         return CheckoutSessionResponse.ShippingMethodResponse.builder()
@@ -159,7 +159,7 @@ public class CheckoutSessionMapper {
     }
 
     private CheckoutSessionResponse.PaymentIntentResponse mapPaymentIntentToResponse(
-            CheckoutSessionEntity.PaymentIntent intent) {
+            ProductCheckoutSessionEntity.PaymentIntent intent) {
         if (intent == null) return null;
 
         return CheckoutSessionResponse.PaymentIntentResponse.builder()
@@ -171,7 +171,7 @@ public class CheckoutSessionMapper {
     }
 
     private List<CheckoutSessionResponse.PaymentAttemptResponse> mapPaymentAttemptsToResponse(
-            List<CheckoutSessionEntity.PaymentAttempt> attempts) {
+            List<ProductCheckoutSessionEntity.PaymentAttempt> attempts) {
         if (attempts == null) return List.of();
 
         return attempts.stream()
@@ -187,7 +187,7 @@ public class CheckoutSessionMapper {
     }
 
     private List<CheckoutSessionSummaryResponse.ItemPreview> mapItemsToPreview(
-            List<CheckoutSessionEntity.CheckoutItem> items) {
+            List<ProductCheckoutSessionEntity.CheckoutItem> items) {
         if (items == null || items.isEmpty()) {
             return List.of();
         }
@@ -208,7 +208,7 @@ public class CheckoutSessionMapper {
 
     // NEW: Helper method
     private CheckoutSessionResponse.InstallmentConfigResponse mapInstallmentConfigToResponse(
-            CheckoutSessionEntity.InstallmentConfiguration config) {
+            ProductCheckoutSessionEntity.InstallmentConfiguration config) {
         if (config == null) return null;
 
         return CheckoutSessionResponse.InstallmentConfigResponse.builder()
@@ -231,7 +231,7 @@ public class CheckoutSessionMapper {
 
     // NEW: Helper method
     private List<CheckoutSessionResponse.PaymentScheduleItemResponse> mapScheduleToResponse(
-            List<CheckoutSessionEntity.PaymentScheduleItem> schedule) {
+            List<ProductCheckoutSessionEntity.PaymentScheduleItem> schedule) {
         if (schedule == null) return null;
 
         return schedule.stream()

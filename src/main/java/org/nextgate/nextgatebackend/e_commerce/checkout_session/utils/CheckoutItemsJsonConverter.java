@@ -7,14 +7,18 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
 import lombok.extern.slf4j.Slf4j;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.CheckoutSessionEntity;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.ProductCheckoutSessionEntity;
 
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * JPA Converter for List<ProductCheckoutSessionEntity.CheckoutItem>
+ * Converts between Java list and JSONB array database column
+ */
 @Converter
 @Slf4j
-public class CheckoutItemsJsonConverter implements AttributeConverter<List<CheckoutSessionEntity.CheckoutItem>, String> {
+public class CheckoutItemsJsonConverter implements AttributeConverter<List<ProductCheckoutSessionEntity.CheckoutItem>, String> {
 
     private final ObjectMapper objectMapper;
 
@@ -24,7 +28,7 @@ public class CheckoutItemsJsonConverter implements AttributeConverter<List<Check
     }
 
     @Override
-    public String convertToDatabaseColumn(List<CheckoutSessionEntity.CheckoutItem> items) {
+    public String convertToDatabaseColumn(List<ProductCheckoutSessionEntity.CheckoutItem> items) {
         if (items == null || items.isEmpty()) {
             return "[]";
         }
@@ -37,16 +41,15 @@ public class CheckoutItemsJsonConverter implements AttributeConverter<List<Check
     }
 
     @Override
-    public List<CheckoutSessionEntity.CheckoutItem> convertToEntityAttribute(String dbData) {
+    public List<ProductCheckoutSessionEntity.CheckoutItem> convertToEntityAttribute(String dbData) {
         if (dbData == null || dbData.trim().isEmpty() || "[]".equals(dbData)) {
             return new ArrayList<>();
         }
         try {
-            return objectMapper.readValue(dbData, new TypeReference<List<CheckoutSessionEntity.CheckoutItem>>() {});
+            return objectMapper.readValue(dbData, new TypeReference<List<ProductCheckoutSessionEntity.CheckoutItem>>() {});
         } catch (JsonProcessingException e) {
-            log.error("Error converting JSON to checkout items", e);
+            log.error("Error converting JSON to checkout items: {}", dbData, e);
             return new ArrayList<>();
         }
     }
 }
-

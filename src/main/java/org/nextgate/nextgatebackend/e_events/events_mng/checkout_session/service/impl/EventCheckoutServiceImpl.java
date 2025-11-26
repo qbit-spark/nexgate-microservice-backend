@@ -126,7 +126,7 @@ public class EventCheckoutServiceImpl implements EventCheckoutService {
             throw new BadRequestException("Checkout session has expired");
         }
 
-        return paymentOrchestrator.processPayment(sessionId);
+        return paymentOrchestrator.processPayment(sessionId, "EVENT");
     }
 
     @Override

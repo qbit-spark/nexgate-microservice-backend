@@ -3,21 +3,20 @@ package org.nextgate.nextgatebackend.financial_system.payment_processing.service
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.coyote.BadRequestException;
+import com.qbitspark.jikoexpress.financial_system.payment_processing.contract.PayableCheckoutSession;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.CheckoutSessionEntity;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.enums.CheckoutSessionStatus;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.enums.CheckoutSessionType;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.events.PaymentCompletedEvent;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.repo.CheckoutSessionRepo;
 import org.nextgate.nextgatebackend.financial_system.escrow.entity.EscrowAccountEntity;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.callbacks.PaymentCallback;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.enums.PaymentMethod;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.enums.PaymentStatus;
+import org.nextgate.nextgatebackend.financial_system.payment_processing.events.PaymentCompletedEvent;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.payloads.PaymentRequest;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.payloads.PaymentResponse;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.payloads.PaymentResult;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.service.ExternalPaymentProcessor;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.service.PaymentOrchestrator;
+import org.nextgate.nextgatebackend.financial_system.payment_processing.service.UniversalCheckoutSessionService;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.service.WalletPaymentProcessor;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
@@ -28,8 +27,6 @@ import org.nextgate.nextgatebackend.notification_system.publisher.enums.Notifica
 import org.nextgate.nextgatebackend.notification_system.publisher.enums.NotificationPriority;
 import org.nextgate.nextgatebackend.notification_system.publisher.enums.NotificationType;
 import org.nextgate.nextgatebackend.notification_system.publisher.mapper.PaymentNotificationMapper;
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.repo.OrderRepository;
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.service.OrderService;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,22 +41,21 @@ import java.util.UUID;
 @Slf4j
 public class PaymentOrchestratorImpl implements PaymentOrchestrator {
 
-    private final CheckoutSessionRepo checkoutSessionRepo;
     private final WalletPaymentProcessor walletPaymentProcessor;
     private final ExternalPaymentProcessor externalPaymentProcessor;
-    private final OrderService orderService;
     private final PaymentCallback paymentCallback;
-    private final OrderRepository orderRepo;
     private final ApplicationEventPublisher eventPublisher;
     private final NotificationPublisher notificationPublisher;
+    private final UniversalCheckoutSessionService checkoutSessionService;
 
     @Override
     @Transactional
-    public PaymentResponse processPayment(UUID checkoutSessionId)
+    public PaymentResponse processPayment(UUID checkoutSessionId, String sessionDomain)
             throws ItemNotFoundException, RandomExceptions, BadRequestException {
 
         PaymentRequest request = PaymentRequest.builder()
                 .checkoutSessionId(checkoutSessionId)
+                .sessionDomain(sessionDomain)
                 .build();
 
         return processPayment(request);
@@ -70,175 +66,133 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
     public PaymentResponse processPayment(PaymentRequest request)
             throws ItemNotFoundException, RandomExceptions, BadRequestException {
 
-        log.info("Processing payment for checkout session: {}", request.getCheckoutSessionId());
+        log.info("Processing payment | Session: {} | Domain: {}",
+                request.getCheckoutSessionId(), request.getSessionDomain());
 
-        //Todo we need to be able to handle both and fetch based on which kind of sessions
-        // Fetch checkout session
-        CheckoutSessionEntity checkoutSession = checkoutSessionRepo
-                .findById(request.getCheckoutSessionId())
-                .orElseThrow(() -> new ItemNotFoundException("Checkout session not found"));
+        // Fetch checkout session (universal)
+        PayableCheckoutSession session = checkoutSessionService.findCheckoutSession(
+                request.getCheckoutSessionId(),
+                request.getSessionDomain()
+        );
 
-        // Validate checkout session status
-        if (checkoutSession.getStatus() != CheckoutSessionStatus.PENDING_PAYMENT) {
-            throw new RandomExceptions(
-                    "Cannot process payment - checkout session status: " + checkoutSession.getStatus()
-            );
+        // Validate session status
+        if (session.getStatus() != CheckoutSessionStatus.PENDING_PAYMENT) {
+            throw new RandomExceptions("Cannot process payment - session status: " + session.getStatus());
         }
 
-        //Todo: Before save we have to find the best session kind we are dealing with its either EVENT SESSION, OR PRODUCT SESSION
-        // Check if the session expired
-        if (checkoutSession.isExpired()) {
-            checkoutSession.setStatus(CheckoutSessionStatus.EXPIRED);
-            checkoutSessionRepo.save(checkoutSession);
+        // Check expiration
+        if (session.isExpired()) {
+            session.setStatus(CheckoutSessionStatus.EXPIRED);
+            checkoutSessionService.saveCheckoutSession(session);
             throw new RandomExceptions("Checkout session has expired");
         }
 
         try {
             // Determine payment method
-            PaymentMethod paymentMethod = determinePaymentMethod(checkoutSession, request);
+            PaymentMethod paymentMethod = determinePaymentMethod(session, request);
 
-            log.info("Payment method determined: {}", paymentMethod);
+            log.info("Payment method: {}", paymentMethod);
 
-            // Route to appropriate processor
-            PaymentResult result = routeToProcessor(checkoutSession, paymentMethod);
+            // Route to processor
+            PaymentResult result = routeToProcessor(session, paymentMethod);
 
-            // Handle payment result-- This is the heart of payment orchestration
+            // Handle result
             if (result.isSuccess()) {
-                return handleSuccessfulPayment(checkoutSession, result);
+                return handleSuccessfulPayment(session, result);
             } else if (result.isPending()) {
-                return handlePendingPayment(checkoutSession, result);
+                return handlePendingPayment(session, result);
             } else {
-                return handleFailedPayment(checkoutSession, result);
+                return handleFailedPayment(session, result);
             }
 
         } catch (Exception e) {
-            log.error("Payment processing failed for checkout session: {}",
-                    checkoutSession.getSessionId(), e);
+            log.error("Payment failed for session: {}", session.getSessionId(), e);
 
-            // Update checkout session to PAYMENT_FAILED
-            checkoutSession.setStatus(CheckoutSessionStatus.PAYMENT_FAILED);
-            checkoutSessionRepo.save(checkoutSession);
+            session.setStatus(CheckoutSessionStatus.PAYMENT_FAILED);
+            checkoutSessionService.saveCheckoutSession(session);
 
             throw e;
         }
     }
 
-
-    // Determines payment method from checkout session or request override
     private PaymentMethod determinePaymentMethod(
-            CheckoutSessionEntity checkoutSession,
+            PayableCheckoutSession session,
             PaymentRequest request) throws RandomExceptions {
 
-        // Override from request if provided
         if (request.getPaymentMethod() != null) {
             return request.getPaymentMethod();
         }
 
-        // Get from checkout session payment intent
-        if (checkoutSession.getPaymentIntent() != null) {
-            String provider = checkoutSession.getPaymentIntent().getProvider();
-
-            if (provider == null) {
-                throw new RandomExceptions("Payment method not specified");
-            }
-
-            return switch (provider.toUpperCase()) {
-                case "WALLET" -> PaymentMethod.WALLET;
-                case "MPESA", "MNO_PAYMENT" -> PaymentMethod.MPESA;
-                case "TIGO_PESA" -> PaymentMethod.TIGO_PESA;
-                case "AIRTEL_MONEY" -> PaymentMethod.AIRTEL_MONEY;
-                case "CREDIT_CARD" -> PaymentMethod.CREDIT_CARD;
-                case "DEBIT_CARD" -> PaymentMethod.DEBIT_CARD;
-                case "CASH_ON_DELIVERY" -> PaymentMethod.CASH_ON_DELIVERY;
-                default -> throw new RandomExceptions("Unsupported payment method: " + provider);
-            };
-        }
-
-        // Default to wallet if no payment intent
+        // Default to WALLET
         log.info("No payment method specified, defaulting to WALLET");
         return PaymentMethod.WALLET;
     }
 
-    // Routes to appropriate payment processor
     private PaymentResult routeToProcessor(
-            CheckoutSessionEntity checkoutSession,
+            PayableCheckoutSession session,
             PaymentMethod paymentMethod) throws ItemNotFoundException, RandomExceptions {
 
-        //Todo: Here is where we can add more payment methods in the future
         return switch (paymentMethod) {
-            case WALLET -> walletPaymentProcessor.processPayment(checkoutSession);
+            case WALLET -> walletPaymentProcessor.processPayment(session);
             case MPESA, TIGO_PESA, AIRTEL_MONEY, HALOPESA,
                  CREDIT_CARD, DEBIT_CARD, BANK_TRANSFER ->
-                    externalPaymentProcessor.processPayment(checkoutSession, paymentMethod);
-            case CASH_ON_DELIVERY -> throw new RandomExceptions("COD payments handled separately");
+                    externalPaymentProcessor.processPayment(session, paymentMethod);
+            case CASH_ON_DELIVERY -> throw new RandomExceptions("COD handled separately");
         };
     }
 
-    // Handles successful payment
     private PaymentResponse handleSuccessfulPayment(
-            CheckoutSessionEntity checkoutSession,
-            PaymentResult result) {
+            PayableCheckoutSession session,
+            PaymentResult result) throws RandomExceptions {
 
-        log.info("Payment successful for checkout session: {}",
-                checkoutSession.getSessionId());
+        log.info("✅ Payment successful | Session: {} | Domain: {}",
+                session.getSessionId(), session.getSessionDomain());
 
-        // Update checkout session status
-        checkoutSession.setStatus(CheckoutSessionStatus.PAYMENT_COMPLETED);
-        checkoutSession.setCompletedAt(LocalDateTime.now());
-        checkoutSession.setEscrowId(result.getEscrow().getId());
+        session.setStatus(CheckoutSessionStatus.PAYMENT_COMPLETED);
+        session.setCompletedAt(LocalDateTime.now());
+        session.setEscrowId(result.getEscrow().getId());
 
-        checkoutSessionRepo.save(checkoutSession);
+        checkoutSessionService.saveCheckoutSession(session);
 
-        //Todo: Publish notification event here to show payment success notification
+        sendPaymentSuccessNotification(session, result.getEscrow());
 
-        sendPaymentSuccessNotification(checkoutSession, result.getEscrow());
-
-        // ========================================
-        // INVOKE SUCCESS CALLBACK
-        // ========================================
+        // Invoke callback
         try {
-            paymentCallback.onPaymentSuccess(checkoutSession, result.getEscrow());
+            paymentCallback.onPaymentSuccess(session, result.getEscrow());
         } catch (Exception e) {
-            log.error("Payment callback failed, but payment was successful", e);
+            log.error("Payment callback failed", e);
         }
 
-        // ========================================
-        // PUBLISH EVENT FOR ORDER CREATION
-        // ========================================
+        // Publish event for async order/booking creation
         try {
             PaymentCompletedEvent event = new PaymentCompletedEvent(
                     this,
-                    checkoutSession.getSessionId(),
-                    checkoutSession,
-                    result.getEscrow().getId().toString(),  // or escrow ID
+                    session.getSessionId(),
+                    session.getSessionDomain(), // ← Domain identifier
+                    session,                     // ← Universal interface
+                    result.getEscrow(),
                     LocalDateTime.now()
             );
 
             eventPublisher.publishEvent(event);
 
             log.info("✓ PaymentCompletedEvent published");
-            log.info("  Order creation will be handled asynchronously");
 
         } catch (Exception e) {
             log.error("Failed to publish PaymentCompletedEvent", e);
-            // Don't throw - payment succeeded
         }
 
-        // Save session
-        checkoutSessionRepo.save(checkoutSession);
+        checkoutSessionService.saveCheckoutSession(session);
 
-        // ========================================
-        // BUILD RESPONSE (WITHOUT ORDER ID)
-        // ========================================
         return PaymentResponse.builder()
                 .success(true)
                 .status(PaymentStatus.SUCCESS)
-                .message(buildSuccessMessage(checkoutSession.getSessionType()))
-                .checkoutSessionId(checkoutSession.getSessionId())
+                .message(buildSuccessMessage(session.getSessionDomain()))
+                .checkoutSessionId(session.getSessionId())
                 .escrowId(result.getEscrow().getId())
                 .escrowNumber(result.getEscrow().getEscrowNumber())
-                .orderId(null)  // Will be set later by listener
-                .orderNumber(null)  // Will be set later
+                .orderId(null)
+                .orderNumber(null)
                 .paymentMethod(PaymentMethod.WALLET)
                 .amountPaid(result.getEscrow().getTotalAmount())
                 .platformFee(result.getEscrow().getPlatformFeeAmount())
@@ -247,38 +201,25 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
                 .build();
     }
 
-
-    // ========================================
-    // HELPER METHOD: BUILD SUCCESS MESSAGE
-    // ========================================
-
-    private String buildSuccessMessage(CheckoutSessionType sessionType) {
-
-        return switch (sessionType) {
-            case REGULAR_DIRECTLY, REGULAR_CART -> "Payment completed successfully. Your order is being processed.";
-
-            case INSTALLMENT -> "Down payment completed successfully. Order is being processed.";
-
-            case GROUP_PURCHASE -> "Payment completed. Order will be created when group completes.";
+    private String buildSuccessMessage(String sessionDomain) {
+        return switch (sessionDomain) {
+            case "PRODUCT" -> "Payment completed successfully. Your order is being processed.";
+            case "EVENT" -> "Payment completed successfully. Your booking is being processed.";
+            default -> "Payment completed successfully.";
         };
     }
 
-
-    // Handles pending payment (for external payments)
     private PaymentResponse handlePendingPayment(
-            CheckoutSessionEntity checkoutSession,
-            PaymentResult result) {
+            PayableCheckoutSession session,
+            PaymentResult result) throws RandomExceptions {
 
-        log.info("Payment pending for checkout session: {}", checkoutSession.getSessionId());
+        log.info("Payment pending | Session: {}", session.getSessionId());
 
-        checkoutSession.setStatus(CheckoutSessionStatus.PAYMENT_PROCESSING);
-        checkoutSessionRepo.save(checkoutSession);
+        session.setStatus(CheckoutSessionStatus.PAYMENT_PROCESSING);
+        checkoutSessionService.saveCheckoutSession(session);
 
-        // ========================================
-        // INVOKE PENDING CALLBACK
-        // ========================================
         try {
-            paymentCallback.onPaymentPending(checkoutSession, result);
+            paymentCallback.onPaymentPending(session, result);
         } catch (Exception e) {
             log.error("Payment pending callback failed", e);
         }
@@ -287,33 +228,25 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
                 .success(false)
                 .status(PaymentStatus.PENDING)
                 .message(result.getMessage())
-                .checkoutSessionId(checkoutSession.getSessionId())
+                .checkoutSessionId(session.getSessionId())
                 .paymentUrl(result.getPaymentUrl())
                 .ussdCode(result.getUssdCode())
                 .referenceNumber(result.getExternalReference())
                 .build();
     }
 
-    // Handles failed payment
     private PaymentResponse handleFailedPayment(
-            CheckoutSessionEntity checkoutSession,
-            PaymentResult result) {
+            PayableCheckoutSession session,
+            PaymentResult result) throws RandomExceptions {
 
-        log.warn("Payment failed for checkout session: {} - Reason: {}",
-                checkoutSession.getSessionId(), result.getMessage());
+        log.warn("Payment failed | Session: {} | Reason: {}",
+                session.getSessionId(), result.getMessage());
 
-        checkoutSession.setStatus(CheckoutSessionStatus.PAYMENT_FAILED);
-        checkoutSessionRepo.save(checkoutSession);
+        session.setStatus(CheckoutSessionStatus.PAYMENT_FAILED);
+        checkoutSessionService.saveCheckoutSession(session);
 
-        // ========================================
-        // INVOKE FAILURE CALLBACK
-        // ========================================
         try {
-            paymentCallback.onPaymentFailure(
-                    checkoutSession,
-                    result,
-                    result.getErrorMessage()
-            );
+            paymentCallback.onPaymentFailure(session, result, result.getErrorMessage());
         } catch (Exception e) {
             log.error("Payment failure callback failed", e);
         }
@@ -322,32 +255,27 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
                 .success(false)
                 .status(PaymentStatus.FAILED)
                 .message(result.getMessage())
-                .checkoutSessionId(checkoutSession.getSessionId())
+                .checkoutSessionId(session.getSessionId())
                 .build();
     }
 
-    /**
-     * Send payment success notification to customer
-     */
     private void sendPaymentSuccessNotification(
-            CheckoutSessionEntity checkoutSession,
+            PayableCheckoutSession session,
             EscrowAccountEntity escrow) {
 
-        AccountEntity customer = checkoutSession.getCustomer();
+        AccountEntity customer = session.getPayer();
 
-        // 1. Prepare notification data using EventCategoryMapper
         Map<String, Object> data = PaymentNotificationMapper.mapPaymentReceived(
                 customer.getFirstName(),
                 customer.getEmail(),
                 escrow.getTotalAmount(),
                 escrow.getCurrency(),
-                "WALLET",  // or checkoutSession.getPaymentMethod()
+                "WALLET",
                 escrow.getId().toString(),
                 escrow.getEscrowNumber(),
-                String.valueOf(checkoutSession.getSessionId())
+                String.valueOf(session.getSessionId())
         );
 
-        // 2. Build recipient
         Recipient recipient = Recipient.builder()
                 .userId(customer.getId().toString())
                 .email(customer.getEmail())
@@ -356,7 +284,6 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
                 .language("en")
                 .build();
 
-        // 3. Create notification event
         NotificationEvent event = NotificationEvent.builder()
                 .type(NotificationType.PAYMENT_RECEIVED)
                 .recipients(List.of(recipient))
@@ -370,11 +297,8 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
                 .data(data)
                 .build();
 
-        // 4. Publish notification
         notificationPublisher.publish(event);
 
-        log.info("📤 Payment success notification sent: user={}, amount={}, escrow={}",
-                customer.getUserName(), escrow.getTotalAmount(), escrow.getEscrowNumber());
-
+        log.info("📤 Payment success notification sent");
     }
 }

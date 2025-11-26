@@ -4,8 +4,8 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.CheckoutSessionEntity;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.repo.CheckoutSessionRepo;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.ProductCheckoutSessionEntity;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.repo.ProductCheckoutSessionRepo;
 import org.nextgate.nextgatebackend.financial_system.escrow.service.EscrowService;
 import org.nextgate.nextgatebackend.e_commerce.group_purchase_mng.entity.GroupParticipantEntity;
 import org.nextgate.nextgatebackend.e_commerce.group_purchase_mng.entity.GroupPurchaseInstanceEntity;
@@ -49,7 +49,7 @@ public class GroupFailureHandler {
     private final GroupPurchaseInstanceRepo groupPurchaseInstanceRepo;
     private final NotificationPublisher notificationPublisher;
      private final EscrowService escrowService;
-     private final CheckoutSessionRepo checkoutSessionRepo;
+     private final ProductCheckoutSessionRepo checkoutSessionRepo;
 
     private static final int MAX_RETRY_ATTEMPTS = 3;
     private static final long INITIAL_DELAY_MS = 500;
@@ -136,7 +136,7 @@ public class GroupFailureHandler {
         String userName = participant.getUser().getUserName();
         UUID checkoutSessionId = participant.getCheckoutSessionId();
 
-        CheckoutSessionEntity checkoutSession = checkoutSessionRepo.findBySessionId(checkoutSessionId).orElseThrow(
+        ProductCheckoutSessionEntity checkoutSession = checkoutSessionRepo.findBySessionId(checkoutSessionId).orElseThrow(
                 () -> new RuntimeException("From refund process group failed Checkout session not found: " + checkoutSessionId)
         );
 

@@ -1,7 +1,7 @@
 package org.nextgate.nextgatebackend.e_commerce.installment_purchase.utils;
 
 import lombok.extern.slf4j.Slf4j;
-import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.CheckoutSessionEntity;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.ProductCheckoutSessionEntity;
 import org.nextgate.nextgatebackend.e_commerce.installment_purchase.entity.InstallmentPlanEntity;
 import org.nextgate.nextgatebackend.e_commerce.installment_purchase.enums.PaymentFrequency;
 import org.springframework.stereotype.Component;
@@ -23,7 +23,7 @@ public class InstallmentCalculator {
     // MAIN CALCULATION METHOD
     // ========================================
 
-    public CheckoutSessionEntity.InstallmentConfiguration calculateInstallmentConfig(
+    public ProductCheckoutSessionEntity.InstallmentConfiguration calculateInstallmentConfig(
             InstallmentPlanEntity plan,
             BigDecimal productPrice,
             Integer quantity,
@@ -56,7 +56,7 @@ public class InstallmentCalculator {
                 .plusDays(plan.getPaymentStartDelayDays());
 
         // 6. Generate full payment schedule
-        List<CheckoutSessionEntity.PaymentScheduleItem> schedule =
+        List<ProductCheckoutSessionEntity.PaymentScheduleItem> schedule =
                 generatePaymentSchedule(
                         financedAmount,
                         monthlyPayment,
@@ -68,7 +68,7 @@ public class InstallmentCalculator {
                 );
 
         // 7. Build configuration object
-        return CheckoutSessionEntity.InstallmentConfiguration.builder()
+        return ProductCheckoutSessionEntity.InstallmentConfiguration.builder()
                 .planId(plan.getPlanId())
                 .planName(plan.getPlanName())
                 .termMonths(plan.getNumberOfPayments()) // Approximate
@@ -139,7 +139,7 @@ public class InstallmentCalculator {
         return numerator.divide(denominator, SCALE, ROUNDING);
     }
 
-    private List<CheckoutSessionEntity.PaymentScheduleItem> generatePaymentSchedule(
+    private List<ProductCheckoutSessionEntity.PaymentScheduleItem> generatePaymentSchedule(
             BigDecimal principal,
             BigDecimal paymentAmount,
             BigDecimal periodRate,
@@ -148,7 +148,7 @@ public class InstallmentCalculator {
             PaymentFrequency frequency,
             Integer customDays
     ) {
-        List<CheckoutSessionEntity.PaymentScheduleItem> schedule = new ArrayList<>();
+        List<ProductCheckoutSessionEntity.PaymentScheduleItem> schedule = new ArrayList<>();
         BigDecimal remainingBalance = principal;
 
         for (int i = 1; i <= numberOfPayments; i++) {
@@ -175,8 +175,8 @@ public class InstallmentCalculator {
             LocalDateTime dueDate = calculateDueDate(firstPaymentDate, i, frequency, customDays);
 
             // Create schedule item
-            CheckoutSessionEntity.PaymentScheduleItem item =
-                    CheckoutSessionEntity.PaymentScheduleItem.builder()
+            ProductCheckoutSessionEntity.PaymentScheduleItem item =
+                    ProductCheckoutSessionEntity.PaymentScheduleItem.builder()
                             .paymentNumber(i)
                             .dueDate(dueDate)
                             .amount(paymentAmount)
