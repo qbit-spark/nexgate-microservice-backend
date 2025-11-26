@@ -33,6 +33,7 @@ public class UniversalCheckoutSessionService {
 
             case EVENT -> eventCheckoutSessionRepo.findById(sessionId)
                     .orElseThrow(() -> new ItemNotFoundException("Event checkout session not found"));
+            default -> throw new ItemNotFoundException("Unknown session domain: ");
         };
     }
 

@@ -18,6 +18,7 @@ import org.nextgate.nextgatebackend.financial_system.payment_processing.service.
 import org.nextgate.nextgatebackend.financial_system.payment_processing.service.PaymentOrchestrator;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.service.UniversalCheckoutSessionService;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.service.WalletPaymentProcessor;
+import org.nextgate.nextgatebackend.globe_enums.CheckoutSessionsDomains;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
 import org.nextgate.nextgatebackend.notification_system.publisher.NotificationPublisher;
@@ -50,7 +51,7 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
 
     @Override
     @Transactional
-    public PaymentResponse processPayment(UUID checkoutSessionId, String sessionDomain)
+    public PaymentResponse processPayment(UUID checkoutSessionId, CheckoutSessionsDomains sessionDomain)
             throws ItemNotFoundException, RandomExceptions, BadRequestException {
 
         PaymentRequest request = PaymentRequest.builder()
@@ -201,10 +202,10 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
                 .build();
     }
 
-    private String buildSuccessMessage(String sessionDomain) {
+    private String buildSuccessMessage(CheckoutSessionsDomains sessionDomain) {
         return switch (sessionDomain) {
-            case "PRODUCT" -> "Payment completed successfully. Your order is being processed.";
-            case "EVENT" -> "Payment completed successfully. Your booking is being processed.";
+            case PRODUCT -> "Payment completed successfully. Your order is being processed.";
+            case EVENT -> "Payment completed successfully. Your booking is being processed.";
             default -> "Payment completed successfully.";
         };
     }

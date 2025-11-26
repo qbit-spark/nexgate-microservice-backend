@@ -10,6 +10,7 @@ import org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.entity.
 import org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.repo.EventCheckoutSessionRepo;
 import org.nextgate.nextgatebackend.financial_system.escrow.entity.EscrowAccountEntity;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.strategy.PostPaymentHandler;
+import org.nextgate.nextgatebackend.globe_enums.CheckoutSessionsDomains;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.springframework.stereotype.Component;
 
@@ -41,8 +42,8 @@ public class EventPostPaymentHandler implements PostPaymentHandler {
     }
 
     @Override
-    public String getSupportedDomain() {
-        return "EVENT";
+    public CheckoutSessionsDomains getSupportedDomain() {
+        return CheckoutSessionsDomains.EVENT;
     }
 
     private void handleEventBooking(EventCheckoutSessionEntity session) {

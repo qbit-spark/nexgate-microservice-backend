@@ -19,6 +19,7 @@ import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.entity.Ticket
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.repo.TicketRepo;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.payloads.PaymentResponse;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.service.PaymentOrchestrator;
+import org.nextgate.nextgatebackend.globe_enums.CheckoutSessionsDomains;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
 import org.springframework.security.core.Authentication;
@@ -126,7 +127,7 @@ public class EventCheckoutServiceImpl implements EventCheckoutService {
             throw new BadRequestException("Checkout session has expired");
         }
 
-        return paymentOrchestrator.processPayment(sessionId, "EVENT");
+        return paymentOrchestrator.processPayment(sessionId, CheckoutSessionsDomains.EVENT);
     }
 
     @Override

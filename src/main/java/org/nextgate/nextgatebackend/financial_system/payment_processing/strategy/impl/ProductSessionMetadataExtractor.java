@@ -33,7 +33,7 @@ public class ProductSessionMetadataExtractor implements SessionMetadataExtractor
             throw new RandomExceptions("No items in product checkout session");
         }
 
-        UUID shopId = productSession.getItems().get(0).getShopId();
+        UUID shopId = productSession.getItems().getFirst().getShopId();
 
         var shop = shopRepo.findById(shopId)
                 .orElseThrow(() -> new RandomExceptions("Shop not found: " + shopId));

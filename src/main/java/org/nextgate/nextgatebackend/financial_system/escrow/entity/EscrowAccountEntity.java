@@ -43,8 +43,9 @@ public class EscrowAccountEntity {
     @Column(name = "checkout_session_id", nullable = false)
     private UUID checkoutSessionId;
 
+    //Todo: this should be false later in production
     @Enumerated(EnumType.STRING)
-    @Column(name = "session_domain", nullable = false, length = 20)
+    @Column(name = "session_domain", nullable = true, length = 20)
     private CheckoutSessionsDomains sessionDomain;
 
     @Column(name = "order_id")

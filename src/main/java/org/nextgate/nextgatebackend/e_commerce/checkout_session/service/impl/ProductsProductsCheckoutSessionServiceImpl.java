@@ -22,6 +22,7 @@ import org.nextgate.nextgatebackend.financial_system.payment_processing.payloads
 import org.nextgate.nextgatebackend.financial_system.payment_processing.service.PaymentOrchestrator;
 import org.nextgate.nextgatebackend.financial_system.wallet.entity.WalletEntity;
 import org.nextgate.nextgatebackend.financial_system.wallet.service.WalletService;
+import org.nextgate.nextgatebackend.globe_enums.CheckoutSessionsDomains;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
 import org.nextgate.nextgatebackend.e_commerce.group_purchase_mng.entity.GroupPurchaseInstanceEntity;
@@ -497,7 +498,7 @@ public class ProductsProductsCheckoutSessionServiceImpl implements ProductsCheck
         log.info("Payment retry validated for session: {}. Attempt #{}", sessionId, attemptCount + 1);
 
         // Now process the payment
-        return paymentOrchestrator.processPayment(sessionId, "PRODUCT");
+        return paymentOrchestrator.processPayment(sessionId, CheckoutSessionsDomains.PRODUCT);
     }
 
 
@@ -578,7 +579,7 @@ public class ProductsProductsCheckoutSessionServiceImpl implements ProductsCheck
         }
 
         // Delegate to payment orchestrator
-        return paymentOrchestrator.processPayment(sessionId, "PRODUCT");
+        return paymentOrchestrator.processPayment(sessionId, CheckoutSessionsDomains.PRODUCT);
     }
 
 

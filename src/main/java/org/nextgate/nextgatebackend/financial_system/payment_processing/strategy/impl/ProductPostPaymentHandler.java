@@ -13,6 +13,7 @@ import org.nextgate.nextgatebackend.e_commerce.group_purchase_mng.service.GroupP
 import org.nextgate.nextgatebackend.e_commerce.installment_purchase.service.InstallmentService;
 import org.nextgate.nextgatebackend.financial_system.escrow.entity.EscrowAccountEntity;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.strategy.PostPaymentHandler;
+import org.nextgate.nextgatebackend.globe_enums.CheckoutSessionsDomains;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.springframework.stereotype.Component;
 
@@ -52,8 +53,8 @@ public class ProductPostPaymentHandler implements PostPaymentHandler {
     }
 
     @Override
-    public String getSupportedDomain() {
-        return "PRODUCT";
+    public CheckoutSessionsDomains getSupportedDomain() {
+        return CheckoutSessionsDomains.PRODUCT;
     }
 
     private void handleInstallmentPayment(ProductCheckoutSessionEntity session)
