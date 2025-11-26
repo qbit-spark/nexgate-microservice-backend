@@ -1,6 +1,7 @@
 package org.nextgate.nextgatebackend.financial_system.payment_processing.strategy;
 
 import lombok.extern.slf4j.Slf4j;
+import org.nextgate.nextgatebackend.globe_enums.CheckoutSessionsDomains;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
 import org.springframework.stereotype.Component;
 
@@ -13,7 +14,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class SessionMetadataExtractorRegistry {
 
-    private final Map<String, SessionMetadataExtractor> extractors;
+    private final Map<CheckoutSessionsDomains, SessionMetadataExtractor> extractors; // ← Enum key
 
     public SessionMetadataExtractorRegistry(List<SessionMetadataExtractor> extractorList) {
         this.extractors = extractorList.stream()
@@ -26,7 +27,9 @@ public class SessionMetadataExtractorRegistry {
                 extractors.size(), extractors.keySet());
     }
 
-    public SessionMetadataExtractor getExtractor(String domain) throws RandomExceptions {
+    public SessionMetadataExtractor getExtractor(CheckoutSessionsDomains domain)
+            throws RandomExceptions {
+
         SessionMetadataExtractor extractor = extractors.get(domain);
 
         if (extractor == null) {
@@ -36,7 +39,7 @@ public class SessionMetadataExtractorRegistry {
         return extractor;
     }
 
-    public boolean hasExtractor(String domain) {
+    public boolean hasExtractor(CheckoutSessionsDomains domain) {
         return extractors.containsKey(domain);
     }
 }

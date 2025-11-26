@@ -1,6 +1,7 @@
 package org.nextgate.nextgatebackend.financial_system.payment_processing.strategy;
 
 import lombok.extern.slf4j.Slf4j;
+import org.nextgate.nextgatebackend.globe_enums.CheckoutSessionsDomains;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
 import org.springframework.stereotype.Component;
 
@@ -13,7 +14,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class PostPaymentHandlerRegistry {
 
-    private final Map<String, PostPaymentHandler> handlers;
+    private final Map<CheckoutSessionsDomains, PostPaymentHandler> handlers; // ← Enum key
 
     public PostPaymentHandlerRegistry(List<PostPaymentHandler> handlerList) {
         this.handlers = handlerList.stream()
@@ -26,7 +27,9 @@ public class PostPaymentHandlerRegistry {
                 handlers.size(), handlers.keySet());
     }
 
-    public PostPaymentHandler getHandler(String domain) throws RandomExceptions {
+    public PostPaymentHandler getHandler(CheckoutSessionsDomains domain)
+            throws RandomExceptions {
+
         PostPaymentHandler handler = handlers.get(domain);
 
         if (handler == null) {
@@ -36,7 +39,7 @@ public class PostPaymentHandlerRegistry {
         return handler;
     }
 
-    public boolean hasHandler(String domain) {
+    public boolean hasHandler(CheckoutSessionsDomains domain) {
         return handlers.containsKey(domain);
     }
 }

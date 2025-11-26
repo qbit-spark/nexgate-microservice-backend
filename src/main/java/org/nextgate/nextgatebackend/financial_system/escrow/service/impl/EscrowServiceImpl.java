@@ -17,6 +17,7 @@ import org.nextgate.nextgatebackend.financial_system.transaction_history.enums.T
 import org.nextgate.nextgatebackend.financial_system.transaction_history.service.TransactionHistoryService;
 import org.nextgate.nextgatebackend.financial_system.wallet.entity.WalletEntity;
 import org.nextgate.nextgatebackend.financial_system.wallet.service.WalletService;
+import org.nextgate.nextgatebackend.globe_enums.CheckoutSessionsDomains;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
 import org.springframework.beans.factory.annotation.Value;
@@ -103,14 +104,14 @@ public class EscrowServiceImpl implements EscrowService {
 
         savedEscrow = escrowAccountRepo.save(savedEscrow);
 
-        // Create transaction history for PAYER
+        // Create a transaction history for PAYER
         transactionHistoryService.createTransaction(
                 payer,
                 TransactionType.PURCHASE,
                 TransactionDirection.DEBIT,
                 amount,
                 "Purchase Payment",
-                String.format("Payment for %s (Escrow: %s)", session.getSessionDomain().toLowerCase(), savedEscrow.getEscrowNumber()),
+                String.format("Payment for %s (Escrow: %s)", session.getSessionDomain().name().toLowerCase(), savedEscrow.getEscrowNumber()),
                 ledgerEntry.getId(),
                 "ESCROW",
                 savedEscrow.getId()
@@ -283,7 +284,7 @@ public class EscrowServiceImpl implements EscrowService {
     }
 
     @Override
-    public EscrowAccountEntity getEscrowBySessionId(UUID sessionId, String sessionDomain) throws ItemNotFoundException {
+    public EscrowAccountEntity getEscrowBySessionId(UUID sessionId, CheckoutSessionsDomains sessionDomain) throws ItemNotFoundException {
         return escrowAccountRepo.findByCheckoutSessionIdAndSessionDomain(sessionId, sessionDomain)
                 .orElseThrow(() -> new ItemNotFoundException("Escrow not found for session"));
     }
@@ -304,7 +305,7 @@ public class EscrowServiceImpl implements EscrowService {
     }
 
     @Override
-    public boolean escrowExistsForSession(UUID sessionId, String sessionDomain) {
+    public boolean escrowExistsForSession(UUID sessionId, CheckoutSessionsDomains sessionDomain) {
         return escrowAccountRepo.existsByCheckoutSessionIdAndSessionDomain(sessionId, sessionDomain);
     }
 

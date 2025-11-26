@@ -5,6 +5,7 @@ import com.qbitspark.jikoexpress.financial_system.payment_processing.contract.Pa
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.financial_system.escrow.entity.EscrowAccountEntity;
 import org.nextgate.nextgatebackend.financial_system.escrow.enums.EscrowStatus;
+import org.nextgate.nextgatebackend.globe_enums.CheckoutSessionsDomains;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
 
@@ -33,15 +34,14 @@ public interface EscrowService {
 
     EscrowAccountEntity getEscrowByNumber(String escrowNumber) throws ItemNotFoundException;
 
-    EscrowAccountEntity getEscrowBySessionId(UUID sessionId, String sessionDomain) throws ItemNotFoundException;
-
+    EscrowAccountEntity getEscrowBySessionId(UUID sessionId, CheckoutSessionsDomains sessionDomain)
+            throws ItemNotFoundException;
     List<EscrowAccountEntity> getBuyerEscrows(AccountEntity buyer);
 
     List<EscrowAccountEntity> getSellerEscrows(AccountEntity seller);
 
     List<EscrowAccountEntity> getEscrowsByStatus(EscrowStatus status);
 
-    boolean escrowExistsForSession(UUID sessionId, String sessionDomain);
-
+    boolean escrowExistsForSession(UUID sessionId, CheckoutSessionsDomains sessionDomain);
     String generateEscrowNumber();
 }

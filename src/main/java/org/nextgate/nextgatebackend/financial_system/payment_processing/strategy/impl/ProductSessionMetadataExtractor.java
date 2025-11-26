@@ -9,6 +9,7 @@ import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.ProductCheckoutSessionEntity;
 import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng.repo.ShopRepo;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.strategy.SessionMetadataExtractor;
+import org.nextgate.nextgatebackend.globe_enums.CheckoutSessionsDomains;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
 import org.springframework.stereotype.Component;
 
@@ -45,7 +46,7 @@ public class ProductSessionMetadataExtractor implements SessionMetadataExtractor
     }
 
     @Override
-    public String getSupportedDomain() {
-        return "PRODUCT";
+    public CheckoutSessionsDomains getSupportedDomain() {
+        return CheckoutSessionsDomains.PRODUCT;
     }
 }

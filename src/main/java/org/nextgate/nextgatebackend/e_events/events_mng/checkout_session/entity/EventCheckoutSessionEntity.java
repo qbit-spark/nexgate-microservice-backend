@@ -10,6 +10,7 @@ import org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.utils.T
 import org.nextgate.nextgatebackend.financial_system.payment_processing.utils.PaymentAttemptsJsonConverter;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.utils.PaymentIntentJsonConverter;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.utils.PricingDetailsJsonConverter;
+import org.nextgate.nextgatebackend.globe_enums.CheckoutSessionsDomains;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -154,8 +155,8 @@ public class EventCheckoutSessionEntity implements PayableCheckoutSession {
     }
 
     @Override
-    public String getSessionDomain() {
-        return "EVENT";
+    public CheckoutSessionsDomains getSessionDomain() {
+        return CheckoutSessionsDomains.EVENT;
     }
 
     @Override

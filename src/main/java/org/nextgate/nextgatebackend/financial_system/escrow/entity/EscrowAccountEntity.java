@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.financial_system.escrow.enums.EscrowStatus;
 import org.nextgate.nextgatebackend.financial_system.escrow.utils.JsonMetadataConverter;
+import org.nextgate.nextgatebackend.globe_enums.CheckoutSessionsDomains;
 
 
 import java.math.BigDecimal;
@@ -42,8 +43,9 @@ public class EscrowAccountEntity {
     @Column(name = "checkout_session_id", nullable = false)
     private UUID checkoutSessionId;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "session_domain", nullable = false, length = 20)
-    private String sessionDomain; // "PRODUCT" or "EVENT"
+    private CheckoutSessionsDomains sessionDomain;
 
     @Column(name = "order_id")
     private String orderId;

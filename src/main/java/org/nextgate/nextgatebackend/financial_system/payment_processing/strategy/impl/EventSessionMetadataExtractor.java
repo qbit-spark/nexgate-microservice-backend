@@ -8,6 +8,7 @@ import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.entity.EventCheckoutSessionEntity;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.repo.EventsRepo;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.strategy.SessionMetadataExtractor;
+import org.nextgate.nextgatebackend.globe_enums.CheckoutSessionsDomains;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
 import org.springframework.stereotype.Component;
 
@@ -36,7 +37,7 @@ public class EventSessionMetadataExtractor implements SessionMetadataExtractor {
     }
 
     @Override
-    public String getSupportedDomain() {
-        return "EVENT";
+    public CheckoutSessionsDomains getSupportedDomain() {
+        return CheckoutSessionsDomains.EVENT;
     }
 }

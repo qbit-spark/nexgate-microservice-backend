@@ -7,6 +7,7 @@ import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.ProductCh
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.repo.ProductCheckoutSessionRepo;
 import org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.entity.EventCheckoutSessionEntity;
 import org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.repo.EventCheckoutSessionRepo;
+import org.nextgate.nextgatebackend.globe_enums.CheckoutSessionsDomains;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
 import org.springframework.stereotype.Service;
@@ -21,17 +22,17 @@ public class UniversalCheckoutSessionService {
     private final ProductCheckoutSessionRepo productCheckoutSessionRepo;
     private final EventCheckoutSessionRepo eventCheckoutSessionRepo;
 
-    public PayableCheckoutSession findCheckoutSession(UUID sessionId, String sessionDomain)
-            throws ItemNotFoundException, RandomExceptions {
+    public PayableCheckoutSession findCheckoutSession(
+            UUID sessionId,
+            CheckoutSessionsDomains sessionDomain) // ← Enum
+            throws ItemNotFoundException {
 
         return switch (sessionDomain) {
-            case "PRODUCT" -> productCheckoutSessionRepo.findById(sessionId)
-                    .orElseThrow(() -> new ItemNotFoundException("Product checkout session not found: " + sessionId));
+            case PRODUCT -> productCheckoutSessionRepo.findById(sessionId)
+                    .orElseThrow(() -> new ItemNotFoundException("Product checkout session not found"));
 
-            case "EVENT" -> eventCheckoutSessionRepo.findById(sessionId)
-                    .orElseThrow(() -> new ItemNotFoundException("Event checkout session not found: " + sessionId));
-
-            default -> throw new RandomExceptions("Unknown session domain: " + sessionDomain);
+            case EVENT -> eventCheckoutSessionRepo.findById(sessionId)
+                    .orElseThrow(() -> new ItemNotFoundException("Event checkout session not found"));
         };
     }
 

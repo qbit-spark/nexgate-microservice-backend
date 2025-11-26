@@ -4,6 +4,7 @@ package com.qbitspark.jikoexpress.financial_system.payment_processing.contract;
 
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.enums.CheckoutSessionStatus;
+import org.nextgate.nextgatebackend.globe_enums.CheckoutSessionsDomains;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -30,7 +31,7 @@ public interface PayableCheckoutSession {
      * Domain identifier: "PRODUCT", "EVENT", "SUBSCRIPTION", etc.
      * Used by strategy pattern to route domain-specific logic
      */
-    String getSessionDomain();
+    CheckoutSessionsDomains getSessionDomain(); // ← Changed to enum
 
     // ========================================
     // PAYMENT PARTICIPANTS (Money Flow)

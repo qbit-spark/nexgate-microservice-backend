@@ -11,6 +11,7 @@ import org.nextgate.nextgatebackend.e_commerce.checkout_session.utils.*;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.utils.PaymentAttemptsJsonConverter;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.utils.PaymentIntentJsonConverter;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.utils.PricingDetailsJsonConverter;
+import org.nextgate.nextgatebackend.globe_enums.CheckoutSessionsDomains;
 import org.nextgate.nextgatebackend.payment_methods.entity.PaymentMethodsEntity;
 import org.nextgate.nextgatebackend.payment_methods.utils.BillingAddressJsonConverter;
 import org.nextgate.nextgatebackend.payment_methods.utils.MetadataJsonConverter;
@@ -341,8 +342,8 @@ public class ProductCheckoutSessionEntity implements PayableCheckoutSession {
      * Used by payment system to route domain-specific logic
      */
     @Override
-    public String getSessionDomain() {
-        return "PRODUCT";
+    public CheckoutSessionsDomains getSessionDomain() {
+        return CheckoutSessionsDomains.PRODUCT;
     }
 
     /**
