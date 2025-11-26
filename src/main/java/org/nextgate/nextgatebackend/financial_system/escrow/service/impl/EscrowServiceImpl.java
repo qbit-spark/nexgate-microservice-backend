@@ -41,7 +41,7 @@ public class EscrowServiceImpl implements EscrowService {
     private final WalletService walletService;
     private final TransactionHistoryService transactionHistoryService;
 
-    @Value("${app.platform.fee-percentage:5.0}")
+    @Value("${app.platform.fee-percentage}")
     private BigDecimal platformFeePercentage;
 
     @Override
