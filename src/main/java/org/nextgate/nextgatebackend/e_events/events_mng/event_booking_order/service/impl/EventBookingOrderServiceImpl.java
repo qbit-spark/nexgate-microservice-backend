@@ -82,9 +82,9 @@ public class EventBookingOrderServiceImpl implements EventBookingOrderService {
                 savedBooking.getBookingId(), bookingReference);
 
         publishBookingCreatedEvent(
-                savedBooking.getBookingId(),
-                savedBooking.getCustomer().getId(),
-                event.getId(),
+                savedBooking,           // ← Full EventBookingOrderEntity
+                event,                  // ← Full EventEntity
+                bookedTickets,          // ← List<EventBookingOrderEntity.BookedTicket>
                 checkoutSession.getTicketDetails().getSendTicketsToAttendees()
         );
 
@@ -262,23 +262,28 @@ public class EventBookingOrderServiceImpl implements EventBookingOrderService {
         return bookingOrderRepo.save(bookingOrder);
     }
 
-    public void publishBookingCreatedEvent(
-            UUID bookingId,
-            UUID customerId,
-            UUID eventId,
+    private void publishBookingCreatedEvent(
+            EventBookingOrderEntity bookingOrder,
+            EventEntity event,
+            List<EventBookingOrderEntity.BookedTicket> allTickets,
             Boolean sendTicketsToAttendees) {
 
-        log.debug("Publishing BookingCreatedEvent for booking: {}", bookingId);
+        log.debug("Publishing BookingCreatedEvent for booking: {}", bookingOrder.getBookingReference());
 
-        BookingCreatedEvent event = BookingCreatedEvent.builder()
-                .bookingId(bookingId)
-                .customerId(customerId)
-                .eventId(eventId)
+        BookingCreatedEvent bookingCreatedEvent = BookingCreatedEvent.builder()
+                .source(this)
+                .bookingOrder(bookingOrder)
+                .event(event)
+                .allTickets(allTickets)
                 .sendTicketsToAttendees(sendTicketsToAttendees)
                 .build();
 
-        eventPublisher.publishEvent(event);
-        log.info("Published BookingCreatedEvent for booking: {}", bookingId);
+        eventPublisher.publishEvent(bookingCreatedEvent);
+
+        log.info("✓ BookingCreatedEvent published | {} | {} tickets | SendToAttendees: {}",
+                bookingOrder.getBookingReference(),
+                allTickets.size(),
+                sendTicketsToAttendees);
     }
 
 
