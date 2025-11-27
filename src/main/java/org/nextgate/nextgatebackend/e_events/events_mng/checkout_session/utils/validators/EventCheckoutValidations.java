@@ -107,11 +107,15 @@ public class EventCheckoutValidations {
             throw new BadRequestException("Must purchase at least 1 ticket");
         }
 
-        if (ticket.getMinQuantityPerOrder() != null && totalQuantity < ticket.getMinQuantityPerOrder()) {
+        // ✅ minQuantityPerOrder: null or 0 = no minimum
+        if (ticket.getMinQuantityPerOrder() != null
+                && ticket.getMinQuantityPerOrder() > 0
+                && totalQuantity < ticket.getMinQuantityPerOrder()) {
             throw new BadRequestException(
                     String.format("Minimum %d tickets per order", ticket.getMinQuantityPerOrder()));
         }
 
+        // ✅ Check available quantity (if not unlimited)
         if (!ticket.getIsUnlimited()) {
             Integer available = ticket.getQuantityAvailable();
             if (available == null || available < totalQuantity) {
@@ -120,11 +124,15 @@ public class EventCheckoutValidations {
             }
         }
 
-        if (ticket.getMaxQuantityPerOrder() != null && totalQuantity > ticket.getMaxQuantityPerOrder()) {
+        // ✅ maxQuantityPerOrder: null or 0 = unlimited per order
+        if (ticket.getMaxQuantityPerOrder() != null
+                && ticket.getMaxQuantityPerOrder() > 0
+                && totalQuantity > ticket.getMaxQuantityPerOrder()) {
             throw new BadRequestException(
                     String.format("Maximum %d tickets per order", ticket.getMaxQuantityPerOrder()));
         }
 
+        // ✅ maxQuantityPerUser: already handles 0 as unlimited
         validateMaxQuantityPerUser(request, ticket, customer);
 
         log.debug("Quantity validated: {} tickets", totalQuantity);
