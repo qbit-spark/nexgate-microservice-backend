@@ -1,6 +1,5 @@
 package org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.listeners;
 
-
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.enums.CheckoutSessionStatus;
@@ -30,15 +29,23 @@ public class EventPaymentCompletedListener {
             return;
         }
 
-        if (event.getEscrow() == null) {
+        // Check if free or paid
+        boolean isFree = event.getEscrow() == null;
+
+        if (isFree) {
             log.info("🆓 FREE ticket booking detected - proceeding with booking creation");
         }
 
         log.info("╔════════════════════════════════════════════════════════════╗");
         log.info("║   EVENT PAYMENT COMPLETED - BOOKING CREATION               ║");
         log.info("╚════════════════════════════════════════════════════════════╝");
-        log.info("Session: {} | Escrow: {}",
-                event.getCheckoutSessionId(), event.getEscrow().getEscrowNumber());
+
+        if (isFree) {
+            log.info("Session: {} | FREE TICKET", event.getCheckoutSessionId());
+        } else {
+            log.info("Session: {} | Escrow: {}",
+                    event.getCheckoutSessionId(), event.getEscrow().getEscrowNumber());
+        }
 
         try {
             if (!(event.getSession() instanceof EventCheckoutSessionEntity eventSession)) {
@@ -56,6 +63,7 @@ public class EventPaymentCompletedListener {
             log.info("  Event: {}", eventSession.getEventId());
             log.info("  Total Tickets: {}", eventSession.getTicketDetails().getTotalQuantity());
             log.info("  Buyer Tickets: {}", eventSession.getTicketDetails().getTicketsForBuyer());
+            log.info("  Payment Type: {}", isFree ? "FREE" : "PAID");
 
             // TODO: Create booking order
             log.info("[TODO] Create booking order");
@@ -70,7 +78,11 @@ public class EventPaymentCompletedListener {
             eventSession.setStatus(CheckoutSessionStatus.COMPLETED);
             eventCheckoutSessionRepo.save(eventSession);
 
-            log.info("✓ Event payment handling complete");
+            if (isFree) {
+                log.info("✓ FREE event booking complete");
+            } else {
+                log.info("✓ PAID event payment handling complete");
+            }
 
         } catch (Exception e) {
             log.error("Error in event payment listener", e);

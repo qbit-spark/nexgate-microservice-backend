@@ -46,7 +46,7 @@ public class EventCheckoutController {
     }
 
     /**
-     * Get checkout session by ID
+     * Get a checkout session by ID
      */
     @GetMapping("/{sessionId}")
     public ResponseEntity<GlobeSuccessResponseBuilder> getCheckoutSession(
@@ -65,7 +65,7 @@ public class EventCheckoutController {
     }
 
     /**
-     * Process payment for checkout session
+     * Process payment for the checkout session
      */
     @PostMapping("/{sessionId}/payment")
     public ResponseEntity<GlobeSuccessResponseBuilder> processPayment(
@@ -84,7 +84,7 @@ public class EventCheckoutController {
     }
 
     /**
-     * Cancel checkout session and release held tickets
+     * Cancel the checkout session and release held tickets
      */
     @PostMapping("/{sessionId}/cancel")
     public ResponseEntity<GlobeSuccessResponseBuilder> cancelCheckoutSession(

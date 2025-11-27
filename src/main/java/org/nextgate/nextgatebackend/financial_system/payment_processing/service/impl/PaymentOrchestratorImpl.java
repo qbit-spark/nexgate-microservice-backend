@@ -6,6 +6,7 @@ import org.apache.coyote.BadRequestException;
 import com.qbitspark.jikoexpress.financial_system.payment_processing.contract.PayableCheckoutSession;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.enums.CheckoutSessionStatus;
+import org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.events.PaymentSuccessNotificationEvent;
 import org.nextgate.nextgatebackend.financial_system.escrow.entity.EscrowAccountEntity;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.callbacks.PaymentCallback;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.enums.PaymentMethod;
@@ -54,6 +55,7 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
     private final UniversalCheckoutSessionService checkoutSessionService;
     private final TransactionHistoryService transactionHistoryService;
 
+
     @Override
     @Transactional
     public PaymentResponse processPayment(UUID checkoutSessionId, CheckoutSessionsDomains sessionDomain)
@@ -93,11 +95,12 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
             throw new RandomExceptions("Checkout session has expired");
         }
 
-        // ⭐⭐⭐ ADD THIS FREE PAYMENT HERE ⭐⭐⭐
-        if (session.getTotalAmount().equals(BigDecimal.ZERO)) {
+        // ✅ FIXED: Use compareTo instead of equals
+        if (session.getTotalAmount().compareTo(BigDecimal.ZERO) == 0) {
+            log.info("🆓 Free checkout detected | Session: {} | Domain: {}",
+                    session.getSessionId(), session.getSessionDomain());
             return handleFreeCheckout(session);
         }
-
 
         try {
             // Determine payment method
@@ -166,8 +169,26 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
 
         checkoutSessionService.saveCheckoutSession(session);
 
-        sendPaymentSuccessNotification(session, result.getEscrow());
+        // Publish notification event (async)
+        try {
+            PaymentSuccessNotificationEvent notificationEvent = new PaymentSuccessNotificationEvent(
+                    this,
+                    session.getSessionId(),
+                    session.getPayer(),
+                    result.getEscrow()
+            );
+            eventPublisher.publishEvent(notificationEvent);
+            log.info("✓ Payment notification event published");
+        } catch (Exception e) {
+            log.error("Failed to publish payment notification event", e);
+        }
 
+        // Invoke callback
+        try {
+            paymentCallback.onPaymentSuccess(session, result.getEscrow());
+        } catch (Exception e) {
+            log.error("Payment callback failed", e);
+        }
         // Invoke callback
         try {
             paymentCallback.onPaymentSuccess(session, result.getEscrow());
