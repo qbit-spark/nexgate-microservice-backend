@@ -1,5 +1,6 @@
 package org.nextgate.nextgatebackend.e_events.events_mng.event_booking_order.service;
 
+import org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.entity.EventCheckoutSessionEntity;
 import org.nextgate.nextgatebackend.e_events.events_mng.event_booking_order.entity.EventBookingOrderEntity;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.AccessDeniedException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
@@ -14,14 +15,10 @@ import java.util.UUID;
 public interface EventBookingOrderService {
 
     /**
-     * Main orchestration method - creates complete booking order
+     * Main orchestration method - creates a complete booking order
      * Called by EventPaymentCompletedListener after payment success
-     *
-     * @param checkoutSessionId The checkout session ID that was completed
-     * @param escrowId Optional escrow ID (null for free tickets)
-     * @return The created booking order
      */
-    EventBookingOrderEntity createBookingOrder(UUID checkoutSessionId, UUID escrowId) throws ItemNotFoundException;
+    void createBookingOrder(EventCheckoutSessionEntity eventCheckoutSession) throws ItemNotFoundException;
 
 
     EventBookingOrderEntity getBookingById(UUID bookingId) throws ItemNotFoundException, AccessDeniedException;

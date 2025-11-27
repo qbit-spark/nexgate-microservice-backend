@@ -46,10 +46,14 @@ public class EventBookingOrderServiceImpl implements EventBookingOrderService {
 
     @Override
     @Transactional
-    public EventBookingOrderEntity createBookingOrder(UUID checkoutSessionId, UUID escrowId) throws ItemNotFoundException {
-        log.info("Creating booking order for checkout session: {}", checkoutSessionId);
+    public void createBookingOrder(EventCheckoutSessionEntity checkoutSession) throws ItemNotFoundException {
+        log.info("Creating booking order for checkout session: {}", checkoutSession.getEventId());
 
-        EventCheckoutSessionEntity checkoutSession = fetchCheckoutSession(checkoutSessionId);
+        // Validate required entities exist
+        if (checkoutSession.getEventId() == null || checkoutSession.getTicketDetails().getTicketTypeId() == null) {
+            throw new ItemNotFoundException(
+                    "Event or ticket type is missing in checkout session");
+        }
 
         EventEntity event = fetchEvent(checkoutSession.getEventId());
 
@@ -84,7 +88,6 @@ public class EventBookingOrderServiceImpl implements EventBookingOrderService {
                 checkoutSession.getTicketDetails().getSendTicketsToAttendees()
         );
 
-        return savedBooking;
     }
 
 

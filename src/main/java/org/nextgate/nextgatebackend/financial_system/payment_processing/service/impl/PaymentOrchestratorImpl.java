@@ -189,12 +189,6 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
         } catch (Exception e) {
             log.error("Payment callback failed", e);
         }
-        // Invoke callback
-        try {
-            paymentCallback.onPaymentSuccess(session, result.getEscrow());
-        } catch (Exception e) {
-            log.error("Payment callback failed", e);
-        }
 
         // Publish event for async order/booking creation
         try {

@@ -1,6 +1,5 @@
 package org.nextgate.nextgatebackend.financial_system.payment_processing.strategy.impl;
 
-
 import com.qbitspark.jikoexpress.financial_system.payment_processing.contract.PayableCheckoutSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +19,6 @@ import org.springframework.stereotype.Component;
 public class EventPostPaymentHandler implements PostPaymentHandler {
 
     private final EventCheckoutSessionRepo eventCheckoutSessionRepo;
-    // TODO: Inject BookingService when implemented
 
     @Override
     public void handlePostPayment(
@@ -28,46 +26,29 @@ public class EventPostPaymentHandler implements PostPaymentHandler {
             EscrowAccountEntity escrow) throws BadRequestException, ItemNotFoundException {
 
         log.info("╔════════════════════════════════════════════════════════════╗");
-        log.info("║     EVENT POST-PAYMENT HANDLER                             ║");
+        log.info("║     EVENT POST-PAYMENT HANDLER (Synchronous)              ║");
         log.info("╚════════════════════════════════════════════════════════════╝");
-        log.info("Session: {} | Escrow: {}", session.getSessionId(), escrow.getEscrowNumber());
+
+        if (escrow != null) {
+            log.info("Session: {} | Escrow: {}", session.getSessionId(), escrow.getEscrowNumber());
+        } else {
+            log.info("Session: {} | FREE TICKET", session.getSessionId());
+        }
 
         if (!(session instanceof EventCheckoutSessionEntity eventSession)) {
             throw new IllegalArgumentException("Invalid session type for EventPostPaymentHandler");
         }
 
-        handleEventBooking(eventSession);
+        // Only critical session status update (fast, synchronous)
+        eventSession.setStatus(CheckoutSessionStatus.PAYMENT_COMPLETED);
+        eventCheckoutSessionRepo.save(eventSession);
 
-        log.info("✓ Event post-payment completed");
+        log.info("✓ Session status updated to PAYMENT_COMPLETED");
+        log.info("✓ Booking creation will be handled asynchronously by EventPaymentCompletedListener");
     }
 
     @Override
     public CheckoutSessionsDomains getSupportedDomain() {
         return CheckoutSessionsDomains.EVENT;
-    }
-
-    private void handleEventBooking(EventCheckoutSessionEntity session) {
-        log.info("Processing event booking...");
-        log.info("  Event: {}", session.getEventId());
-        log.info("  Tickets: {}", session.getTicketDetails().getTotalQuantity());
-        log.info("  Buyer Tickets: {}", session.getTicketDetails().getTicketsForBuyer());
-
-        if (session.getTicketDetails().getOtherAttendees() != null) {
-            log.info("  Other Attendees: {}", session.getTicketDetails().getOtherAttendees().size());
-        }
-
-        session.setStatus(CheckoutSessionStatus.PAYMENT_COMPLETED);
-        eventCheckoutSessionRepo.save(session);
-
-        log.info("✓ Session status updated to PAYMENT_COMPLETED");
-
-        // TODO: Create booking order
-        log.info("[TODO] Create booking order");
-        log.info("[TODO] Reserve tickets");
-        log.info("[TODO] Generate QR codes");
-
-        if (session.getTicketDetails().getSendTicketsToAttendees()) {
-            log.info("[TODO] Send tickets to other attendees");
-        }
     }
 }

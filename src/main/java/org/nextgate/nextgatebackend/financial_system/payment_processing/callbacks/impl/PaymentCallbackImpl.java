@@ -36,7 +36,7 @@ public class PaymentCallbackImpl implements PaymentCallback {
                 escrow.getTotalAmount(), escrow.getCurrency(),
                 escrow.getPlatformFeeAmount(), escrow.getSellerAmount());
 
-        // Route to domain-specific handler using a strategy pattern
+        // Route to a domain-specific handler using a strategy pattern
         postPaymentHandlerRegistry
                 .getHandler(session.getSessionDomain())
                 .handlePostPayment(session, escrow);

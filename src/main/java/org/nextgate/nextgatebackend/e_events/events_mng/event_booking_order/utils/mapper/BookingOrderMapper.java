@@ -86,6 +86,7 @@ public class BookingOrderMapper {
                 .ticketTypeName(ticket.getTicketTypeName())
                 .ticketSeries(ticket.getTicketSeries())
                 .price(ticket.getPrice())
+                .attendanceMode(ticket.getAttendanceMode())
                 .qrCode(ticket.getQrCode())
                 .attendanceMode(ticket.getAttendanceMode())
                 .attendee(BookingOrderResponse.AttendeeInfo.builder()

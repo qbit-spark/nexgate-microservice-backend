@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.enums.CheckoutSessionStatus;
 import org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.entity.EventCheckoutSessionEntity;
 import org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.repo.EventCheckoutSessionRepo;
+import org.nextgate.nextgatebackend.e_events.events_mng.event_booking_order.service.EventBookingOrderService;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.events.PaymentCompletedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
@@ -17,7 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class EventPaymentCompletedListener {
 
     private final EventCheckoutSessionRepo eventCheckoutSessionRepo;
-    // TODO: Inject BookingService when implemented
+    private final EventBookingOrderService bookingOrderService;
+
 
     @EventListener
     @Async
@@ -69,6 +71,7 @@ public class EventPaymentCompletedListener {
             log.info("[TODO] Create booking order");
             log.info("[TODO] Reserve tickets");
             log.info("[TODO] Generate QR codes");
+            bookingOrderService.createBookingOrder(eventSession);
 
             if (eventSession.getTicketDetails().getSendTicketsToAttendees()) {
                 log.info("[TODO] Send tickets to other attendees");
