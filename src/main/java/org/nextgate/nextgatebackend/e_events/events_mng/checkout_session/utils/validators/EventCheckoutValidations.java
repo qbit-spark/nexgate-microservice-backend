@@ -4,7 +4,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.coyote.BadRequestException;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.enums.CheckoutSessionStatus;
+import org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.entity.EventCheckoutSessionEntity;
 import org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.payload.CreateEventCheckoutRequest;
+import org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.repo.EventCheckoutSessionRepo;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.EventEntity;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventStatus;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.repo.EventsRepo;
@@ -18,9 +21,7 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.regex.Pattern;
 
 @Component
@@ -31,6 +32,7 @@ public class EventCheckoutValidations {
     private final EventsRepo eventsRepo;
     private final TicketRepo ticketRepo;
     private final WalletService walletService;
+    private final EventCheckoutSessionRepo eventCheckoutSessionRepo;
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9+_.-]+@(.+)$");
     private static final Pattern PHONE_PATTERN = Pattern.compile("^\\+255[67]\\d{8}$");
@@ -128,39 +130,143 @@ public class EventCheckoutValidations {
         log.debug("Quantity validated: {} tickets", totalQuantity);
     }
 
-    private void validateMaxQuantityPerUser(CreateEventCheckoutRequest request, TicketEntity ticket, AccountEntity customer)
+
+    private void validateMaxQuantityPerUser(
+            CreateEventCheckoutRequest request,
+            TicketEntity ticket,
+            AccountEntity customer)
             throws BadRequestException {
 
-        if (ticket.getMaxQuantityPerUser() == null) {
-            return;
+        Integer maxPerUser = ticket.getMaxQuantityPerUser();
+
+        // ✅ Both null and 0 mean unlimited
+        if (maxPerUser == null || maxPerUser == 0) {
+            log.debug("No max quantity per user limit (unlimited purchases allowed)");
+            return;  // Skip validation - unlimited allowed
         }
 
-        int currentOrderQuantity = request.getTicketsForMe();
-        Set<String> uniqueAttendees = new HashSet<>();
+        // ❌ Negative values are invalid
+        if (maxPerUser < 0) {
+            log.error("Invalid maxQuantityPerUser value: {} for ticket: {}", maxPerUser, ticket.getId());
+            throw new BadRequestException("Invalid ticket configuration. Please contact support.");
+        }
 
-        uniqueAttendees.add(customer.getEmail().toLowerCase());
+        // Calculate current order quantity
+        int currentOrderQuantity = request.getTicketsForMe();
 
         if (request.getOtherAttendees() != null) {
-            for (CreateEventCheckoutRequest.OtherAttendeeRequest attendee : request.getOtherAttendees()) {
-                String email = attendee.getEmail().toLowerCase();
-                String phone = attendee.getPhone();
+            currentOrderQuantity += request.getOtherAttendees().stream()
+                    .mapToInt(CreateEventCheckoutRequest.OtherAttendeeRequest::getQuantity)
+                    .sum();
+        }
 
-                currentOrderQuantity += attendee.getQuantity();
-                uniqueAttendees.add(email);
-                uniqueAttendees.add(phone);
+        // Collect all identities to check (email, phone)
+        Set<String> identitiesToCheck = new HashSet<>();
+
+        // Add main buyer's identities
+        identitiesToCheck.add(customer.getEmail().toLowerCase());
+        if (customer.getPhoneNumber() != null) {
+            identitiesToCheck.add(customer.getPhoneNumber());
+        }
+
+        // Add current order's other attendees identities
+        if (request.getOtherAttendees() != null) {
+            for (CreateEventCheckoutRequest.OtherAttendeeRequest attendee : request.getOtherAttendees()) {
+                identitiesToCheck.add(attendee.getEmail().toLowerCase());
+                identitiesToCheck.add(attendee.getPhone());
             }
         }
 
-        int totalForAllAttendees = currentOrderQuantity;
+        // Get all completed sessions for this customer
+        List<CheckoutSessionStatus> completedStatuses = List.of(
+                CheckoutSessionStatus.PAYMENT_COMPLETED,
+                CheckoutSessionStatus.COMPLETED
+        );
 
-        if (totalForAllAttendees > ticket.getMaxQuantityPerUser()) {
-            throw new BadRequestException(
-                    String.format("Maximum %d tickets per user. This order exceeds the limit.",
-                            ticket.getMaxQuantityPerUser()));
+        List<EventCheckoutSessionEntity> sessions =
+                eventCheckoutSessionRepo.findByCustomerAndStatusIn(customer, completedStatuses);
+
+        // Check each identity's purchase history
+        Map<String, Integer> purchasesByIdentity = new HashMap<>();
+
+        for (EventCheckoutSessionEntity session : sessions) {
+            // Only check this ticket type
+            if (!ticket.getId().equals(session.getTicketDetails().getTicketTypeId())) {
+                continue;
+            }
+
+            // Check main buyer
+            String buyerEmail = session.getCustomer().getEmail().toLowerCase();
+            if (identitiesToCheck.contains(buyerEmail)) {
+                purchasesByIdentity.merge(buyerEmail, session.getTicketDetails().getTicketsForBuyer(), Integer::sum);
+            }
+
+            // Check other attendees in past orders
+            if (session.getTicketDetails().getOtherAttendees() != null) {
+                for (EventCheckoutSessionEntity.OtherAttendee attendee : session.getTicketDetails().getOtherAttendees()) {
+                    String attendeeEmail = attendee.getEmail().toLowerCase();
+                    String attendeePhone = attendee.getPhone();
+
+                    if (identitiesToCheck.contains(attendeeEmail)) {
+                        purchasesByIdentity.merge(attendeeEmail, attendee.getQuantity(), Integer::sum);
+                    }
+
+                    if (identitiesToCheck.contains(attendeePhone)) {
+                        purchasesByIdentity.merge(attendeePhone, attendee.getQuantity(), Integer::sum);
+                    }
+                }
+            }
         }
 
-        log.debug("Max quantity per user validated");
+        // Now check each identity in current order against the limit
+        for (String identity : identitiesToCheck) {
+            int previousForThisIdentity = purchasesByIdentity.getOrDefault(identity, 0);
+
+            // For the main buyer, add their current tickets
+            int currentForThisIdentity = 0;
+            if (identity.equals(customer.getEmail().toLowerCase()) ||
+                    identity.equals(customer.getPhoneNumber())) {
+                currentForThisIdentity = request.getTicketsForMe();
+            }
+
+            // For other attendees, add their quantity
+            if (request.getOtherAttendees() != null) {
+                for (CreateEventCheckoutRequest.OtherAttendeeRequest attendee : request.getOtherAttendees()) {
+                    if (identity.equals(attendee.getEmail().toLowerCase()) ||
+                            identity.equals(attendee.getPhone())) {
+                        currentForThisIdentity += attendee.getQuantity();
+                    }
+                }
+            }
+
+            int totalForThisIdentity = previousForThisIdentity + currentForThisIdentity;
+
+            log.debug("Identity check | {} | Previously: {} | Current: {} | Total: {} | Max: {}",
+                    maskIdentity(identity),
+                    previousForThisIdentity,
+                    currentForThisIdentity,
+                    totalForThisIdentity,
+                    maxPerUser);
+
+            if (totalForThisIdentity > maxPerUser) {
+                throw new BadRequestException(
+                        String.format(
+                                "Maximum %d tickets per user for '%s'. " +
+                                        "The email/phone '%s' has already purchased %d ticket(s). " +
+                                        "This order would add %d more ticket(s), exceeding the limit.",
+                                maxPerUser,
+                                ticket.getName(),
+                                maskIdentity(identity),
+                                previousForThisIdentity,
+                                currentForThisIdentity
+                        ));
+            }
+        }
+
+        log.debug("Max quantity per user validated - all identities within limits");
     }
+
+
 
     private void validateAttendeeData(CreateEventCheckoutRequest request) throws BadRequestException {
 
@@ -219,5 +325,17 @@ public class EventCheckoutValidations {
         }
 
         log.debug("Wallet validated: sufficient balance");
+    }
+
+    // Helper method to mask sensitive data in error messages
+    private String maskIdentity(String identity) {
+        if (identity.contains("@")) {
+            // Email: j***@example.com
+            int atIndex = identity.indexOf("@");
+            return identity.charAt(0) + "***" + identity.substring(atIndex);
+        } else {
+            // Phone: +255***8888
+            return identity.substring(0, 4) + "***" + identity.substring(identity.length() - 4);
+        }
     }
 }

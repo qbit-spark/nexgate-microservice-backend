@@ -33,4 +33,10 @@ public interface EventCheckoutSessionRepo extends JpaRepository<EventCheckoutSes
             CheckoutSessionStatus status,
             LocalDateTime expirationTime
     );
+
+    // In EventCheckoutSessionRepo
+    List<EventCheckoutSessionEntity> findByCustomerAndStatusIn(
+            AccountEntity customer,
+            List<CheckoutSessionStatus> statuses
+    );
 }
