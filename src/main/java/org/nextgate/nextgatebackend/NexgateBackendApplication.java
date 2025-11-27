@@ -14,7 +14,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 import static org.springframework.data.web.config.EnableSpringDataWebSupport.PageSerializationMode.VIA_DTO;
 
 @SpringBootApplication
-@EnableAsync
 @EnableSpringDataWebSupport(pageSerializationMode = VIA_DTO)
 public class NexgateBackendApplication implements CommandLineRunner {
 

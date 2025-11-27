@@ -35,7 +35,7 @@ public interface WalletService {
     void deactivateWallet(UUID walletId, String reason) throws ItemNotFoundException;
 
     // Adds money to wallet from external source (M-Pesa, card, etc.)
-    WalletEntity topupWallet(BigDecimal amount, String description) throws ItemNotFoundException, RandomExceptions;
+    void topupWallet(BigDecimal amount, String description) throws ItemNotFoundException, RandomExceptions;
 
     // Withdraws money from wallet to external destination (bank account)
     WalletEntity withdrawFromWallet(BigDecimal amount, String description) throws ItemNotFoundException, RandomExceptions;

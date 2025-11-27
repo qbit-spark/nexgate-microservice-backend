@@ -33,9 +33,6 @@ public class CreateTicketRequest {
     @Digits(integer = 8, fraction = 2, message = "Price must have at most 8 digits and 2 decimal places")
     private BigDecimal price;
 
-    @Size(max = 3, message = "Currency code must be 3 characters")
-    @Builder.Default
-    private String currency = "USD";
 
     // ========== QUANTITY MANAGEMENT ==========
     @Min(value = 0, message = "Total quantity cannot be negative")
