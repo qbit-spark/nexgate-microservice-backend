@@ -1,7 +1,7 @@
 package org.nextgate.nextgatebackend.notification_system.publisher.mapper;
 
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.entity.OrderEntity;
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.entity.OrderItemEntity;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.entity.ProductOrderEntity;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.entity.ProductOrderItemEntity;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -35,7 +35,7 @@ public class OrderNotificationMapper {
      * - {{shop.name}}
      * - {{shop.logo}}
      */
-    public static Map<String, Object> mapOrderConfirmationForBuyer(OrderEntity order) {
+    public static Map<String, Object> mapOrderConfirmationForBuyer(ProductOrderEntity order) {
         Map<String, Object> data = new HashMap<>();
 
         // Customer information
@@ -99,7 +99,7 @@ public class OrderNotificationMapper {
      * - {{platform.fee}}
      * - {{shipping.address}}
      */
-    public static Map<String, Object> mapNewOrderForSeller(OrderEntity order) {
+    public static Map<String, Object> mapNewOrderForSeller(ProductOrderEntity order) {
         Map<String, Object> data = new HashMap<>();
 
         // Shop information (recipient)
@@ -160,7 +160,7 @@ public class OrderNotificationMapper {
      * Map order shipped notification for BUYER
      */
     public static Map<String, Object> mapOrderShippedForBuyer(
-            OrderEntity order,
+            ProductOrderEntity order,
             String confirmationCode) {
 
         Map<String, Object> data = new HashMap<>();
@@ -199,7 +199,7 @@ public class OrderNotificationMapper {
     /**
      * Map order delivered notification for BUYER
      */
-    public static Map<String, Object> mapOrderDeliveredForBuyer(OrderEntity order) {
+    public static Map<String, Object> mapOrderDeliveredForBuyer(ProductOrderEntity order) {
         Map<String, Object> data = new HashMap<>();
 
         // Customer info
@@ -239,7 +239,7 @@ public class OrderNotificationMapper {
      * Map order delivered notification for SELLER
      * Tells seller that customer confirmed delivery
      */
-    public static Map<String, Object> mapOrderDeliveredForSeller(OrderEntity order) {
+    public static Map<String, Object> mapOrderDeliveredForSeller(ProductOrderEntity order) {
         Map<String, Object> data = new HashMap<>();
 
         // Shop info
@@ -281,7 +281,7 @@ public class OrderNotificationMapper {
      * This is like a wallet top-up notification but for seller earnings
      */
     public static Map<String, Object> mapEscrowReleasedForSeller(
-            OrderEntity order,
+            ProductOrderEntity order,
             BigDecimal previousBalance,
             BigDecimal newBalance) {
 
@@ -332,7 +332,7 @@ public class OrderNotificationMapper {
     /**
      * Map full order item details
      */
-    private static Map<String, Object> mapOrderItem(OrderItemEntity item) {
+    private static Map<String, Object> mapOrderItem(ProductOrderItemEntity item) {
         Map<String, Object> itemMap = new HashMap<>();
         itemMap.put("name", item.getProductName());
         itemMap.put("sku", item.getProductSlug());
@@ -346,7 +346,7 @@ public class OrderNotificationMapper {
     /**
      * Map simplified order item (for lists)
      */
-    private static Map<String, Object> mapOrderItemSimple(OrderItemEntity item) {
+    private static Map<String, Object> mapOrderItemSimple(ProductOrderItemEntity item) {
         Map<String, Object> itemMap = new HashMap<>();
         itemMap.put("name", item.getProductName());
         itemMap.put("quantity", item.getQuantity());

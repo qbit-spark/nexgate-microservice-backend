@@ -9,7 +9,7 @@ import org.nextgate.nextgatebackend.e_commerce.installment_purchase.entity.Insta
 import org.nextgate.nextgatebackend.e_commerce.installment_purchase.enums.FulfillmentTiming;
 import org.nextgate.nextgatebackend.e_commerce.installment_purchase.events.InstallmentAgreementCompletedEvent;
 import org.nextgate.nextgatebackend.e_commerce.installment_purchase.repo.InstallmentAgreementRepo;
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.service.OrderService;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.service.ProductOrderService;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -36,7 +36,7 @@ import java.util.UUID;
 @Slf4j
 public class InstallmentCompletionOrderListener {
 
-    private final OrderService orderService;
+    private final ProductOrderService productOrderService;
     private final InstallmentAgreementRepo agreementRepo;
     private final ProductCheckoutSessionRepo checkoutSessionRepo;
 
@@ -176,7 +176,7 @@ public class InstallmentCompletionOrderListener {
                 // ========================================
                 // CREATE ORDER VIA ORDER SERVICE
                 // ========================================
-                List<UUID> orderIds = orderService
+                List<UUID> orderIds = productOrderService
                         .createOrdersFromCheckoutSession(checkoutSessionId);
 
                 if (orderIds == null || orderIds.isEmpty()) {

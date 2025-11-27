@@ -21,7 +21,7 @@ import java.util.UUID;
 @AllArgsConstructor
 @NoArgsConstructor
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
-public class OrderItemEntity {
+public class ProductOrderItemEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
@@ -31,7 +31,7 @@ public class OrderItemEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", referencedColumnName = "orderId", nullable = false)
     @JsonIgnoreProperties({"items", "hibernateLazyInitializer", "handler"})
-    private OrderEntity order;
+    private ProductOrderEntity order;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", referencedColumnName = "productId", nullable = false)

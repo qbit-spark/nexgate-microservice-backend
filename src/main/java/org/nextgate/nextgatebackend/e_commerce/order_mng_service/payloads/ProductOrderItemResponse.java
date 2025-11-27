@@ -12,7 +12,7 @@ import java.util.UUID;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class OrderItemResponse {
+public class ProductOrderItemResponse {
 
     private UUID orderItemId;
     private UUID productId;

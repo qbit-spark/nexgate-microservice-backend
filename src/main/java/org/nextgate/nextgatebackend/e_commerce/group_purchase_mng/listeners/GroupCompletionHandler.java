@@ -12,7 +12,7 @@ import org.nextgate.nextgatebackend.e_commerce.group_purchase_mng.events.GroupCo
 import org.nextgate.nextgatebackend.e_commerce.group_purchase_mng.repo.GroupParticipantRepo;
 import org.nextgate.nextgatebackend.e_commerce.group_purchase_mng.repo.GroupPurchaseInstanceRepo;
 import org.nextgate.nextgatebackend.notification_system.publisher.NotificationPublisher;
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.service.OrderService;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.service.ProductOrderService;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
@@ -47,7 +47,7 @@ import java.util.UUID;
 @Slf4j
 public class GroupCompletionHandler {
 
-    private final OrderService orderService;
+    private final ProductOrderService productOrderService;
     private final GroupParticipantRepo participantRepo;
     private final GroupPurchaseInstanceRepo groupPurchaseInstanceRepo;
     private final NotificationPublisher notificationPublisher;
@@ -194,7 +194,7 @@ public class GroupCompletionHandler {
                         attempt, MAX_RETRY_ATTEMPTS, userName);
 
                 // Create order
-                List<UUID> orderIds = orderService.createOrdersFromCheckoutSession(checkoutSessionId);
+                List<UUID> orderIds = productOrderService.createOrdersFromCheckoutSession(checkoutSessionId);
                 UUID orderId = orderIds.get(0);
 
                 log.info("✓ Order created: {} for {}", orderId, userName);

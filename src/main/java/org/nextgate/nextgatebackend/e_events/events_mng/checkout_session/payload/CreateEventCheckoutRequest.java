@@ -33,7 +33,7 @@ public class CreateEventCheckoutRequest {
     private List<OtherAttendeeRequest> otherAttendees;  // Optional - can be empty/null
 
     @Builder.Default
-    private Boolean sendTicketsToAttendees = false;  // Default: all QRs to buyer
+    private Boolean sendTicketsToAttendees = true;  // Default: all QRs to buyer
 
     private UUID paymentMethodId;  // Optional - defaults to wallet
 

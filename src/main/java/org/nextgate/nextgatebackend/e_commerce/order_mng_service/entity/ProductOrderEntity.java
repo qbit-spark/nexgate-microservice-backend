@@ -5,8 +5,8 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.e_commerce.order_mng_service.enums.DeliveryStatus;
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.enums.OrderSource;
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.enums.OrderStatus;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.enums.ProductOrderSource;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.enums.ProductOrderStatus;
 import org.nextgate.nextgatebackend.payment_methods.utils.MetadataJsonConverter;
 import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng.entity.ShopEntity;
 
@@ -15,12 +15,12 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 @Entity
-@Table(name = "orders", indexes = {
+@Table(name = "products_orders", indexes = {
         @Index(name = "idx_order_buyer", columnList = "buyer_id"),
         @Index(name = "idx_order_seller", columnList = "seller_id"),
-        @Index(name = "idx_order_status", columnList = "orderStatus"),
+        @Index(name = "idx_order_status", columnList = "productOrderStatus"),
         @Index(name = "idx_order_number", columnList = "orderNumber"),
-        @Index(name = "idx_order_source", columnList = "orderSource")
+        @Index(name = "idx_order_source", columnList = "productOrderSource")
 })
 @Getter
 @Setter
@@ -28,7 +28,7 @@ import java.util.*;
 @AllArgsConstructor
 @NoArgsConstructor
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
-public class OrderEntity {
+public class ProductOrderEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
@@ -52,11 +52,11 @@ public class OrderEntity {
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default  // ← ADD THIS
-    private List<OrderItemEntity> items = new ArrayList<>();
+    private List<ProductOrderItemEntity> items = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private OrderSource orderSource;
+    private ProductOrderSource productOrderSource;
 
     @Column(name = "checkout_session_id")
     private UUID checkoutSessionId;
@@ -92,7 +92,7 @@ public class OrderEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private OrderStatus orderStatus;
+    private ProductOrderStatus productOrderStatus;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -183,8 +183,8 @@ public class OrderEntity {
         if (orderNumber == null) {
             orderNumber = generateOrderNumber();
         }
-        if (orderStatus == null) {
-            orderStatus = OrderStatus.PENDING_SHIPMENT;
+        if (productOrderStatus == null) {
+            productOrderStatus = ProductOrderStatus.PENDING_SHIPMENT;
         }
         if (deliveryStatus == null) {
             deliveryStatus = DeliveryStatus.PENDING;
@@ -202,7 +202,7 @@ public class OrderEntity {
 //        item.setOrder(this);
 //    }
 
-    public void removeItem(OrderItemEntity item) {
+    public void removeItem(ProductOrderItemEntity item) {
         items.remove(item);
         item.setOrder(null);
     }
@@ -210,28 +210,28 @@ public class OrderEntity {
    
 
     public boolean canBeCancelled() {
-        return orderStatus == OrderStatus.PENDING_SHIPMENT;
+        return productOrderStatus == ProductOrderStatus.PENDING_SHIPMENT;
     }
 
     public boolean canBeShipped() {
-        return orderStatus == OrderStatus.PENDING_SHIPMENT;
+        return productOrderStatus == ProductOrderStatus.PENDING_SHIPMENT;
     }
 
     public boolean canBeConfirmed() {
-        return orderStatus == OrderStatus.SHIPPED && !isDeliveryConfirmed;
+        return productOrderStatus == ProductOrderStatus.SHIPPED && !isDeliveryConfirmed;
     }
 
     public boolean isCompleted() {
-        return orderStatus == OrderStatus.COMPLETED;
+        return productOrderStatus == ProductOrderStatus.COMPLETED;
     }
 
     public boolean isCancelled() {
-        return orderStatus == OrderStatus.CANCELLED;
+        return productOrderStatus == ProductOrderStatus.CANCELLED;
     }
 
     public int getTotalItemCount() {
         return items.stream()
-                .mapToInt(OrderItemEntity::getQuantity)
+                .mapToInt(ProductOrderItemEntity::getQuantity)
                 .sum();
     }
 }

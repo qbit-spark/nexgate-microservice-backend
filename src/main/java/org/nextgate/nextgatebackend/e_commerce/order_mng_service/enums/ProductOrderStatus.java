@@ -1,6 +1,6 @@
 package org.nextgate.nextgatebackend.e_commerce.order_mng_service.enums;
 
-public enum OrderStatus {
+public enum ProductOrderStatus {
     PENDING_PAYMENT,    // Payment not yet completed
     PENDING_SHIPMENT,   // Paid, waiting for seller to ship
     SHIPPED,            // Seller marked as shipped

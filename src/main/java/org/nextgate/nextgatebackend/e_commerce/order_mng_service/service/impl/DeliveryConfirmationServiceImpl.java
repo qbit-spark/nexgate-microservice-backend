@@ -6,10 +6,10 @@ import org.apache.coyote.BadRequestException;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.e_commerce.order_mng_service.entity.DeliveryConfirmationEntity;
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.entity.OrderEntity;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.entity.ProductOrderEntity;
 import org.nextgate.nextgatebackend.e_commerce.order_mng_service.enums.ConfirmationStatus;
 import org.nextgate.nextgatebackend.e_commerce.order_mng_service.repo.DeliveryConfirmationRepo;
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.repo.OrderRepository;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.repo.ProductOrderRepository;
 import org.nextgate.nextgatebackend.e_commerce.order_mng_service.service.DeliveryConfirmationService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,7 +29,7 @@ import java.util.UUID;
 public class DeliveryConfirmationServiceImpl implements DeliveryConfirmationService {
 
     private final DeliveryConfirmationRepo confirmationRepo;
-    private final OrderRepository orderRepo;
+    private final ProductOrderRepository orderRepo;
 
     private static final int CODE_LENGTH = 6;
     private static final int CODE_VALIDITY_DAYS = 30;
@@ -41,7 +41,7 @@ public class DeliveryConfirmationServiceImpl implements DeliveryConfirmationServ
 
     @Override
     @Transactional
-    public String generateConfirmationCode(OrderEntity order) {
+    public String generateConfirmationCode(ProductOrderEntity order) {
 
         log.info("Generating delivery confirmation code for order: {}",
                 order.getOrderNumber());
@@ -120,7 +120,7 @@ public class DeliveryConfirmationServiceImpl implements DeliveryConfirmationServ
         // ========================================
         // 1. FETCH ORDER
         // ========================================
-        OrderEntity order = orderRepo.findById(orderId)
+        ProductOrderEntity order = orderRepo.findById(orderId)
                 .orElseThrow(() -> new ItemNotFoundException("Order not found"));
 
         log.info("Order Number: {}", order.getOrderNumber());
@@ -245,7 +245,7 @@ public class DeliveryConfirmationServiceImpl implements DeliveryConfirmationServ
     public DeliveryConfirmationEntity getActiveConfirmation(UUID orderId)
             throws ItemNotFoundException {
 
-        OrderEntity order = orderRepo.findById(orderId)
+        ProductOrderEntity order = orderRepo.findById(orderId)
                 .orElseThrow(() -> new ItemNotFoundException("Order not found"));
 
         return confirmationRepo
@@ -295,7 +295,7 @@ public class DeliveryConfirmationServiceImpl implements DeliveryConfirmationServ
 
         log.info("Regenerating confirmation code for order: {}", orderId);
 
-        OrderEntity order = orderRepo.findById(orderId)
+        ProductOrderEntity order = orderRepo.findById(orderId)
                 .orElseThrow(() -> new ItemNotFoundException("Order not found"));
 
         // Validate requester is buyer

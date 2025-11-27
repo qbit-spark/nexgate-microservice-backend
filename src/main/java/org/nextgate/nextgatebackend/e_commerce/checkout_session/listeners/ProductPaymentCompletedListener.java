@@ -8,7 +8,7 @@ import org.nextgate.nextgatebackend.e_commerce.checkout_session.enums.CheckoutSe
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.enums.CheckoutSessionType;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.repo.ProductCheckoutSessionRepo;
 import org.nextgate.nextgatebackend.e_commerce.group_purchase_mng.service.GroupPurchaseService;
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.service.OrderService;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.service.ProductOrderService;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.events.PaymentCompletedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
@@ -23,7 +23,7 @@ import java.util.UUID;
 @Slf4j
 public class ProductPaymentCompletedListener {
 
-    private final OrderService orderService;
+    private final ProductOrderService productOrderService;
     private final ProductCheckoutSessionRepo productCheckoutSessionRepo;
     private final GroupPurchaseService groupPurchaseService;
 
@@ -139,7 +139,7 @@ public class ProductPaymentCompletedListener {
             try {
                 log.info("Order creation attempt {}/{}", attempt, maxAttempts);
 
-                List<UUID> orderIds = orderService.createOrdersFromCheckoutSession(sessionId);
+                List<UUID> orderIds = productOrderService.createOrdersFromCheckoutSession(sessionId);
                 UUID orderId = orderIds.getFirst();
 
                 log.info("✓ Order created: {}", orderId);

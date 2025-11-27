@@ -8,10 +8,12 @@ import org.nextgate.nextgatebackend.e_events.events_mng.event_booking_order.enum
 import org.nextgate.nextgatebackend.e_events.events_mng.event_booking_order.enums.TicketInstanceStatus;
 import org.nextgate.nextgatebackend.e_events.events_mng.event_booking_order.utils.BookedTicketsJsonConverter;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.EventEntity;
+import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.embedded.VirtualDetails;
 import org.springframework.data.annotation.CreatedBy;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -78,8 +80,11 @@ public class EventBookingOrderEntity {
     @Column(name = "event_format", length = 20)
     private String eventFormat;  // IN_PERSON, ONLINE, HYBRID
 
-    @Column(name = "virtual_meeting_link", length = 500)
-    private String virtualMeetingLink;  // For ONLINE/HYBRID events
+    //@Column(name = "virtual_meeting_link", length = 500)
+    //private String virtualMeetingLink;  // For ONLINE/HYBRID events
+
+    @Embedded
+    private VirtualDetails virtualDetails;
 
     // ========================================
     // ORGANIZER SNAPSHOT (for PDF)
@@ -237,7 +242,7 @@ public class EventBookingOrderEntity {
         // ========================================
 
         private Boolean checkedIn;
-        private LocalDateTime checkedInAt;
+        private ZonedDateTime checkedInAt;
         private String checkedInBy;            // Staff username
         private String checkInLocation;        // Gate/entrance name
 
@@ -246,7 +251,7 @@ public class EventBookingOrderEntity {
         // ========================================
 
         private TicketInstanceStatus status;   // ACTIVE, USED, CANCELLED
-        private LocalDateTime validFrom;       // Ticket valid from this time
-        private LocalDateTime validUntil;      // Ticket valid until this time
+        private ZonedDateTime validFrom;       // Ticket valid from this time
+        private ZonedDateTime validUntil;      // Ticket valid until this time
     }
 }

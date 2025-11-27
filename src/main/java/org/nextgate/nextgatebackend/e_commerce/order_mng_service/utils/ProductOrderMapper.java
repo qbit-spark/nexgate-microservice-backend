@@ -1,10 +1,10 @@
 package org.nextgate.nextgatebackend.e_commerce.order_mng_service.utils;
 
 import org.nextgate.nextgatebackend.globeresponsebody.GlobeSuccessResponseBuilder;
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.entity.OrderEntity;
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.entity.OrderItemEntity;
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.payloads.OrderItemResponse;
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.payloads.OrderResponse;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.entity.ProductOrderEntity;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.entity.ProductOrderItemEntity;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.payloads.ProductOrderItemResponse;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.payloads.ProductOrderResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
 
@@ -12,13 +12,13 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Component
-public class OrderMapper {
+public class ProductOrderMapper {
 
     // ========================================
     // SINGLE ORDER MAPPING
     // ========================================
 
-    public GlobeSuccessResponseBuilder toOrderResponse(OrderEntity order) {
+    public GlobeSuccessResponseBuilder toOrderResponse(ProductOrderEntity order) {
 
         if (order == null) {
             return GlobeSuccessResponseBuilder.builder()
@@ -27,11 +27,11 @@ public class OrderMapper {
                     .build();
         }
 
-        OrderResponse orderResponse = mapToOrderResponse(order);
+        ProductOrderResponse productOrderResponse = mapToOrderResponse(order);
 
         return GlobeSuccessResponseBuilder.builder()
                 .message("Order retrieved successfully")
-                .data(orderResponse)
+                .data(productOrderResponse)
                 .build();
     }
 
@@ -40,17 +40,17 @@ public class OrderMapper {
     // LIST OF ORDERS MAPPING
     // ========================================
 
-    public GlobeSuccessResponseBuilder toOrderResponseList(List<OrderEntity> orders) {
+    public GlobeSuccessResponseBuilder toOrderResponseList(List<ProductOrderEntity> orders) {
 
-        List<OrderResponse> orderResponses = orders.stream()
+        List<ProductOrderResponse> productOrderRespons = orders.stream()
                 .map(this::mapToOrderResponse)
                 .collect(Collectors.toList());
 
         return GlobeSuccessResponseBuilder.builder()
-                .message(orderResponses.isEmpty()
+                .message(productOrderRespons.isEmpty()
                         ? "No orders found"
                         : "Orders retrieved successfully")
-                .data(orderResponses)
+                .data(productOrderRespons)
                 .build();
     }
 
@@ -59,8 +59,8 @@ public class OrderMapper {
     // HELPER: MAP SINGLE ORDER (WITHOUT WRAPPING)
     // ========================================
 
-    private OrderResponse mapToOrderResponse(OrderEntity order) {
-        return OrderResponse.builder()
+    private ProductOrderResponse mapToOrderResponse(ProductOrderEntity order) {
+        return ProductOrderResponse.builder()
                 // IDs
                 .orderId(order.getOrderId())
                 .orderNumber(order.getOrderNumber())
@@ -70,9 +70,9 @@ public class OrderMapper {
                 .seller(mapSellerInfo(order))
 
                 // Status
-                .orderStatus(order.getOrderStatus())
+                .productOrderStatus(order.getProductOrderStatus())
                 .deliveryStatus(order.getDeliveryStatus())
-                .orderSource(order.getOrderSource())
+                .productOrderSource(order.getProductOrderSource())
 
                 // Items
                 .items(mapOrderItems(order.getItems()))
@@ -117,12 +117,12 @@ public class OrderMapper {
     // HELPER: MAP BUYER INFO
     // ========================================
 
-    private OrderResponse.BuyerInfo mapBuyerInfo(OrderEntity order) {
+    private ProductOrderResponse.BuyerInfo mapBuyerInfo(ProductOrderEntity order) {
         if (order.getBuyer() == null) {
             return null;
         }
 
-        return OrderResponse.BuyerInfo.builder()
+        return ProductOrderResponse.BuyerInfo.builder()
                 .accountId(order.getBuyer().getAccountId())
                 .userName(order.getBuyer().getUserName())
                 .email(order.getBuyer().getEmail())
@@ -136,12 +136,12 @@ public class OrderMapper {
     // HELPER: MAP SELLER INFO
     // ========================================
 
-    private OrderResponse.SellerInfo mapSellerInfo(OrderEntity order) {
+    private ProductOrderResponse.SellerInfo mapSellerInfo(ProductOrderEntity order) {
         if (order.getSeller() == null) {
             return null;
         }
 
-        return OrderResponse.SellerInfo.builder()
+        return ProductOrderResponse.SellerInfo.builder()
                 .shopId(order.getSeller().getShopId())
                 .shopName(order.getSeller().getShopName())
                 .shopLogo(order.getSeller().getLogoUrl())
@@ -154,7 +154,7 @@ public class OrderMapper {
     // HELPER: MAP ORDER ITEMS
     // ========================================
 
-    private List<OrderItemResponse> mapOrderItems(List<OrderItemEntity> items) {
+    private List<ProductOrderItemResponse> mapOrderItems(List<ProductOrderItemEntity> items) {
         if (items == null) {
             return List.of();
         }
@@ -169,8 +169,8 @@ public class OrderMapper {
     // HELPER: MAP SINGLE ORDER ITEM
     // ========================================
 
-    private OrderItemResponse mapOrderItem(OrderItemEntity item) {
-        return OrderItemResponse.builder()
+    private ProductOrderItemResponse mapOrderItem(ProductOrderItemEntity item) {
+        return ProductOrderItemResponse.builder()
                 .orderItemId(item.getOrderItemId())
                 .productId(item.getProduct().getProductId())
                 .productName(item.getProductName())
@@ -185,14 +185,14 @@ public class OrderMapper {
     }
 
 
-    public GlobeSuccessResponseBuilder toOrderPageResponse(Page<OrderEntity> orderPage) {
+    public GlobeSuccessResponseBuilder toOrderPageResponse(Page<ProductOrderEntity> orderPage) {
 
-        List<OrderResponse> orderResponses = orderPage.getContent().stream()
+        List<ProductOrderResponse> productOrderRespons = orderPage.getContent().stream()
                 .map(this::mapToOrderResponse)
                 .collect(Collectors.toList());
 
         var responseData = new Object() {
-            public final List<OrderResponse> orders = orderResponses;
+            public final List<ProductOrderResponse> orders = productOrderRespons;
             public final int currentPage = orderPage.getNumber() + 1; // Convert back to 1-based
             public final int pageSize = orderPage.getSize();
             public final long totalElements = orderPage.getTotalElements();
@@ -204,7 +204,7 @@ public class OrderMapper {
         };
 
         return GlobeSuccessResponseBuilder.builder()
-                .message(orderResponses.isEmpty()
+                .message(productOrderRespons.isEmpty()
                         ? "No orders found"
                         : "Orders retrieved successfully")
                 .data(responseData)

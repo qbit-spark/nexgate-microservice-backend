@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -12,17 +13,14 @@ import java.util.UUID;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class OrderShippedResponse {
+public class ProductOrderCancelledResponse {
 
     private UUID orderId;
     private String orderNumber;
-    private String trackingNumber;
-    //private String carrier;
-    private LocalDateTime shippedAt;
+    private LocalDateTime cancelledAt;
+    private String reason;
+    private Boolean refundProcessed;
+    private BigDecimal refundAmount;
+    private String currency;
     private String message;
-
-    // Confirmation code info (DO NOT include actual code!)
-    private Boolean confirmationCodeSent;
-    private LocalDateTime codeExpiresAt;
-    private Integer maxVerificationAttempts;
 }

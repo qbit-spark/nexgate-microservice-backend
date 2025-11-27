@@ -23,14 +23,14 @@ import org.nextgate.nextgatebackend.notification_system.publisher.enums.Notifica
 import org.nextgate.nextgatebackend.notification_system.publisher.enums.NotificationPriority;
 import org.nextgate.nextgatebackend.notification_system.publisher.enums.NotificationType;
 import org.nextgate.nextgatebackend.notification_system.publisher.mapper.OrderNotificationMapper;
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.entity.OrderEntity;
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.entity.OrderItemEntity;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.entity.ProductOrderEntity;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.entity.ProductOrderItemEntity;
 import org.nextgate.nextgatebackend.e_commerce.order_mng_service.enums.DeliveryStatus;
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.enums.OrderSource;
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.enums.OrderStatus;
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.repo.OrderRepository;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.enums.ProductOrderSource;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.enums.ProductOrderStatus;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.repo.ProductOrderRepository;
 import org.nextgate.nextgatebackend.e_commerce.order_mng_service.service.DeliveryConfirmationService;
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.service.OrderService;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.service.ProductOrderService;
 import org.nextgate.nextgatebackend.e_commerce.products_mng_service.products.entity.ProductEntity;
 import org.nextgate.nextgatebackend.e_commerce.products_mng_service.products.repo.ProductRepo;
 import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng.entity.ShopEntity;
@@ -50,9 +50,9 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class OrderServiceImpl implements OrderService {
+public class ProductOrderServiceImpl implements ProductOrderService {
 
-    private final OrderRepository orderRepo;
+    private final ProductOrderRepository orderRepo;
     private final ProductCheckoutSessionRepo checkoutSessionRepo;
     private final GroupPurchaseInstanceRepo groupRepo;
     private final InstallmentAgreementRepo agreementRepo;
@@ -139,11 +139,11 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
-    public OrderEntity getOrderById(UUID orderId, AccountEntity requester)
+    public ProductOrderEntity getOrderById(UUID orderId, AccountEntity requester)
             throws ItemNotFoundException, BadRequestException {
 
 
-        OrderEntity order = orderRepo.findById(orderId)
+        ProductOrderEntity order = orderRepo.findById(orderId)
                 .orElseThrow(() -> new ItemNotFoundException(
                         "Order not found: " + orderId));
 
@@ -156,11 +156,11 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
-    public OrderEntity getOrderByNumber(String orderNumber, AccountEntity requester)
+    public ProductOrderEntity getOrderByNumber(String orderNumber, AccountEntity requester)
             throws ItemNotFoundException, BadRequestException {
 
 
-        OrderEntity order = orderRepo.findByOrderNumber(orderNumber)
+        ProductOrderEntity order = orderRepo.findByOrderNumber(orderNumber)
                 .orElseThrow(() -> new ItemNotFoundException(
                         "Order not found: " + orderNumber));
 
@@ -173,7 +173,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<OrderEntity> getMyOrders(AccountEntity customer) {
+    public List<ProductOrderEntity> getMyOrders(AccountEntity customer) {
 
         return orderRepo.findByBuyerOrderByOrderedAtDesc(customer);
     }
@@ -181,10 +181,10 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<OrderEntity> getMyOrdersByStatus(AccountEntity customer, OrderStatus status) {
+    public List<ProductOrderEntity> getMyOrdersByStatus(AccountEntity customer, ProductOrderStatus status) {
 
 
-        return orderRepo.findByBuyerAndOrderStatusOrderByOrderedAtDesc(
+        return orderRepo.findByBuyerAndProductOrderStatusOrderByOrderedAtDesc(
                 customer, status);
     }
 
@@ -195,7 +195,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<OrderEntity> getShopOrders(ShopEntity shop) {
+    public List<ProductOrderEntity> getShopOrders(ShopEntity shop) {
 
         return orderRepo.findBySellerOrderByOrderedAtDesc(shop);
     }
@@ -203,9 +203,9 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<OrderEntity> getShopOrdersByStatus(ShopEntity shop, OrderStatus status) {
+    public List<ProductOrderEntity> getShopOrdersByStatus(ShopEntity shop, ProductOrderStatus status) {
 
-        return orderRepo.findBySellerAndOrderStatusOrderByOrderedAtDesc(
+        return orderRepo.findBySellerAndProductOrderStatusOrderByOrderedAtDesc(
                 shop, status);
     }
 
@@ -222,7 +222,7 @@ public class OrderServiceImpl implements OrderService {
                 orderId, seller.getUserName());
 
         // Step 1: Validate order and seller
-        OrderEntity order = validateOrderForShipping(orderId, seller);
+        ProductOrderEntity order = validateOrderForShipping(orderId, seller);
 
         // Step 2: Generate confirmation code FIRST
         String confirmationCode;
@@ -239,7 +239,7 @@ public class OrderServiceImpl implements OrderService {
         String trackingNumber = "TRACK-" + orderId.toString().substring(0, 8).toUpperCase();
         String carrier = "NextGate Shipping";
 
-        order.setOrderStatus(OrderStatus.SHIPPED);
+        order.setProductOrderStatus(ProductOrderStatus.SHIPPED);
         order.setDeliveryStatus(DeliveryStatus.IN_TRANSIT);
         order.setTrackingNumber(trackingNumber);
         order.setCarrier(carrier);
@@ -262,7 +262,7 @@ public class OrderServiceImpl implements OrderService {
     public void confirmDelivery(UUID orderId, String confirmationCode, AccountEntity customer, String ipAddress, String deviceInfo) throws ItemNotFoundException, BadRequestException, RandomExceptions {
 
         // Step 1: Validate order and customer
-        OrderEntity order = validateOrderForConfirmation(orderId, customer);
+        ProductOrderEntity order = validateOrderForConfirmation(orderId, customer);
 
         // Step 2: Verify confirmation code
         verifyConfirmationCode(orderId, confirmationCode, customer, ipAddress, deviceInfo);
@@ -279,7 +279,7 @@ public class OrderServiceImpl implements OrderService {
         order.setDeliveryConfirmedAt(now);
         order.setDeliveredAt(now);
         order.setDeliveryStatus(DeliveryStatus.CONFIRMED);
-        order.setOrderStatus(OrderStatus.COMPLETED);
+        order.setProductOrderStatus(ProductOrderStatus.COMPLETED);
         order.setCompletedAt(now);
         order.setUpdatedAt(now);
 
@@ -296,7 +296,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<OrderEntity> getMyOrdersPaged(AccountEntity customer, int page, int size) {
+    public Page<ProductOrderEntity> getMyOrdersPaged(AccountEntity customer, int page, int size) {
 
         // Default page to 1 if less than 1
         if (page < 1) page = 1;
@@ -315,7 +315,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<OrderEntity> getMyOrdersByStatusPaged(AccountEntity customer, OrderStatus status, int page, int size) {
+    public Page<ProductOrderEntity> getMyOrdersByStatusPaged(AccountEntity customer, ProductOrderStatus status, int page, int size) {
 
         if (page < 1) page = 1;
         if (size <= 0) size = 10;
@@ -325,14 +325,14 @@ public class OrderServiceImpl implements OrderService {
 
         Pageable pageable = PageRequest.of(page - 1, size);
 
-        return orderRepo.findByBuyerAndOrderStatusOrderByOrderedAtDesc(
+        return orderRepo.findByBuyerAndProductOrderStatusOrderByOrderedAtDesc(
                 customer, status, pageable);
     }
 
 
     @Override
     @Transactional(readOnly = true)
-    public Page<OrderEntity> getShopOrdersPaged(ShopEntity shop, int page, int size) {
+    public Page<ProductOrderEntity> getShopOrdersPaged(ShopEntity shop, int page, int size) {
 
         if (page < 1) page = 1;
         if (size <= 0) size = 10;
@@ -348,7 +348,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<OrderEntity> getShopOrdersByStatusPaged(ShopEntity shop, OrderStatus status, int page, int size) {
+    public Page<ProductOrderEntity> getShopOrdersByStatusPaged(ShopEntity shop, ProductOrderStatus status, int page, int size) {
 
         if (page < 1) page = 1;
         if (size <= 0) size = 10;
@@ -358,7 +358,7 @@ public class OrderServiceImpl implements OrderService {
 
         Pageable pageable = PageRequest.of(page - 1, size);
 
-        return orderRepo.findBySellerAndOrderStatusOrderByOrderedAtDesc(
+        return orderRepo.findBySellerAndProductOrderStatusOrderByOrderedAtDesc(
                 shop, status, pageable);
     }
 
@@ -372,7 +372,7 @@ public class OrderServiceImpl implements OrderService {
                 orderId, customer.getUserName());
 
         // Step 1: Validate order and customer
-        OrderEntity order = validateOrderForCodeRegeneration(orderId, customer);
+        ProductOrderEntity order = validateOrderForCodeRegeneration(orderId, customer);
 
         // Step 2: Regenerate code via delivery confirmation service
 
@@ -395,7 +395,7 @@ public class OrderServiceImpl implements OrderService {
     // HELPER: VALIDATE ORDER ACCESS
     // ========================================
 
-    private void validateOrderAccess(OrderEntity order, AccountEntity requester)
+    private void validateOrderAccess(ProductOrderEntity order, AccountEntity requester)
             throws BadRequestException {
 
         boolean isBuyer = order.getBuyer().getAccountId()
@@ -440,7 +440,7 @@ public class OrderServiceImpl implements OrderService {
             );
         }
 
-        ProductCheckoutSessionEntity.CheckoutItem item = session.getItems().get(0);
+        ProductCheckoutSessionEntity.CheckoutItem item = session.getItems().getFirst();
 
         log.info("Product: {}", item.getProductName());
         log.info("Quantity: {}", item.getQuantity());
@@ -450,17 +450,17 @@ public class OrderServiceImpl implements OrderService {
         // ========================================
         // BUILD SINGLE ORDER
         // ========================================
-        OrderEntity order = buildSingleOrder(
+        ProductOrderEntity order = buildSingleOrder(
                 session,
                 item.getShopId(),
                 session.getItems(),  // All items (just 1 in this case)
-                OrderSource.DIRECT_PURCHASE
+                ProductOrderSource.DIRECT_PURCHASE
         );
 
         // ========================================
         // SAVE ORDER
         // ========================================
-        OrderEntity savedOrder = orderRepo.save(order);
+        ProductOrderEntity savedOrder = orderRepo.save(order);
 
         log.info("✓ Direct purchase order created");
         log.info("  Order Number: {}", savedOrder.getOrderNumber());
@@ -539,15 +539,15 @@ public class OrderServiceImpl implements OrderService {
             log.info("Items: {}", shopItems.size());
 
             // Build order for this shop
-            OrderEntity order = buildSingleOrder(
+            ProductOrderEntity order = buildSingleOrder(
                     session,
                     shopId,
                     shopItems,
-                    OrderSource.CART_PURCHASE
+                    ProductOrderSource.CART_PURCHASE
             );
 
             // Save order
-            OrderEntity savedOrder = orderRepo.save(order);
+            ProductOrderEntity savedOrder = orderRepo.save(order);
             orderIds.add(savedOrder.getOrderId());
 
             log.info("✓ Order created: {}", savedOrder.getOrderNumber());
@@ -618,15 +618,15 @@ public class OrderServiceImpl implements OrderService {
         // ========================================
         // 3. BUILD ORDER
         // ========================================
-        OrderEntity order = buildOrderFromCheckoutSession(
+        ProductOrderEntity order = buildOrderFromCheckoutSession(
                 session,
-                OrderSource.INSTALLMENT
+                ProductOrderSource.INSTALLMENT
         );
 
         // ========================================
         // 4. LINK TO AGREEMENT
         // ========================================
-        OrderItemEntity firstItem = order.getItems().getFirst();
+        ProductOrderItemEntity firstItem = order.getItems().getFirst();
         firstItem.setInstallmentAgreementId(agreement.getAgreementId());
         firstItem.setFulfillmentTiming(agreement.getFulfillmentTiming());
 
@@ -645,7 +645,7 @@ public class OrderServiceImpl implements OrderService {
         // ========================================
         // 6. SAVE ORDER
         // ========================================
-        OrderEntity savedOrder = orderRepo.save(order);
+        ProductOrderEntity savedOrder = orderRepo.save(order);
 
         // ========================================
         // 7. UPDATE AGREEMENT
@@ -720,9 +720,9 @@ public class OrderServiceImpl implements OrderService {
         // ========================================
         // 4. BUILD ORDER
         // ========================================
-        OrderEntity order = buildOrderFromCheckoutSession(
+        ProductOrderEntity order = buildOrderFromCheckoutSession(
                 session,
-                OrderSource.GROUP_PURCHASE
+                ProductOrderSource.GROUP_PURCHASE
         );
 
         // ========================================
@@ -744,7 +744,7 @@ public class OrderServiceImpl implements OrderService {
         // ========================================
         // 6. SAVE ORDER
         // ========================================
-        OrderEntity savedOrder = orderRepo.save(order);
+        ProductOrderEntity savedOrder = orderRepo.save(order);
 
         // ========================================
         // 7. UPDATE SESSION
@@ -767,7 +767,7 @@ public class OrderServiceImpl implements OrderService {
     // ORDER BUILDER
     // ========================================
 
-    private OrderEntity buildOrderFromCheckoutSession(ProductCheckoutSessionEntity session, OrderSource orderSource) throws ItemNotFoundException {
+    private ProductOrderEntity buildOrderFromCheckoutSession(ProductCheckoutSessionEntity session, ProductOrderSource productOrderSource) throws ItemNotFoundException {
 
         // Get shop from first item
         ProductCheckoutSessionEntity.CheckoutItem firstItem = session.getItems().getFirst();
@@ -783,13 +783,13 @@ public class OrderServiceImpl implements OrderService {
         BigDecimal sellerAmount = totalAmount.subtract(platformFee);
 
         // Build order
-        OrderEntity order = OrderEntity.builder()
+        ProductOrderEntity order = ProductOrderEntity.builder()
                 // Parties
                 .buyer(session.getCustomer())
                 .seller(shop)
 
                 // Source & Reference
-                .orderSource(orderSource)
+                .productOrderSource(productOrderSource)
                 .checkoutSessionId(session.getSessionId())
 
                 // Financial
@@ -810,7 +810,7 @@ public class OrderServiceImpl implements OrderService {
                 .isEscrowReleased(false)
 
                 // Status
-                .orderStatus(OrderStatus.PENDING_SHIPMENT)
+                .productOrderStatus(ProductOrderStatus.PENDING_SHIPMENT)
                 .deliveryStatus(DeliveryStatus.PENDING)
 
                 // Delivery
@@ -855,7 +855,7 @@ public class OrderServiceImpl implements OrderService {
                     .orElseThrow(() -> new ItemNotFoundException(
                             "Product not found: " + sessionItem.getProductId()));
 
-            OrderItemEntity orderItem = OrderItemEntity.builder()
+            ProductOrderItemEntity orderItem = ProductOrderItemEntity.builder()
                     .order(order)
                     .product(product)
                     .productName(sessionItem.getProductName())
@@ -927,11 +927,11 @@ public class OrderServiceImpl implements OrderService {
     }
 
 
-    private OrderEntity buildSingleOrder(
+    private ProductOrderEntity buildSingleOrder(
             ProductCheckoutSessionEntity session,
             UUID shopId,
             List<ProductCheckoutSessionEntity.CheckoutItem> items,
-            OrderSource orderSource
+            ProductOrderSource productOrderSource
     ) throws ItemNotFoundException {
 
         log.info("════════════════════════════════════════");
@@ -961,7 +961,7 @@ public class OrderServiceImpl implements OrderService {
         // ========================================
         BigDecimal shippingFee;
 
-        if (orderSource == OrderSource.DIRECT_PURCHASE) {
+        if (productOrderSource == ProductOrderSource.DIRECT_PURCHASE) {
             // Direct purchase: full shipping cost
             shippingFee = session.getPricing().getShippingCost();
             log.info("Shipping (direct): {} TZS", shippingFee);
@@ -1012,13 +1012,13 @@ public class OrderServiceImpl implements OrderService {
         // ========================================
         // 4. CREATE ORDER ENTITY
         // ========================================
-        OrderEntity order = OrderEntity.builder()
+        ProductOrderEntity order = ProductOrderEntity.builder()
                 // Parties
                 .buyer(session.getCustomer())
                 .seller(shop)
 
                 // Source & Reference
-                .orderSource(orderSource)
+                .productOrderSource(productOrderSource)
                 .checkoutSessionId(session.getSessionId())
 
                 // Financial
@@ -1039,7 +1039,7 @@ public class OrderServiceImpl implements OrderService {
                 .isEscrowReleased(false)
 
                 // Status
-                .orderStatus(OrderStatus.PENDING_SHIPMENT)
+                .productOrderStatus(ProductOrderStatus.PENDING_SHIPMENT)
                 .deliveryStatus(DeliveryStatus.PENDING)
 
                 // Delivery
@@ -1088,7 +1088,7 @@ public class OrderServiceImpl implements OrderService {
                     ));
 
             // Create order item
-            OrderItemEntity orderItem = OrderItemEntity.builder()
+            ProductOrderItemEntity orderItem = ProductOrderItemEntity.builder()
                     .order(order)
                     .product(product)
                     .productName(sessionItem.getProductName())
@@ -1109,10 +1109,10 @@ public class OrderServiceImpl implements OrderService {
         return order;
     }
 
-    private OrderEntity validateOrderForShipping(UUID orderId, AccountEntity seller)
+    private ProductOrderEntity validateOrderForShipping(UUID orderId, AccountEntity seller)
             throws ItemNotFoundException, BadRequestException {
 
-        OrderEntity order = orderRepo.findById(orderId)
+        ProductOrderEntity order = orderRepo.findById(orderId)
                 .orElseThrow(() -> new ItemNotFoundException("Order not found: " + orderId));
 
         // Validate seller ownership
@@ -1122,10 +1122,10 @@ public class OrderServiceImpl implements OrderService {
         }
 
         // Validate order status
-        if (order.getOrderStatus() != OrderStatus.PENDING_SHIPMENT) {
+        if (order.getProductOrderStatus() != ProductOrderStatus.PENDING_SHIPMENT) {
             throw new BadRequestException(
                     String.format("Cannot ship order with status: %s. Order must be PENDING_SHIPMENT",
-                            order.getOrderStatus()));
+                            order.getProductOrderStatus()));
         }
 
         return order;
@@ -1168,7 +1168,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     // Release escrow to seller
-    private void releaseEscrow(OrderEntity order) throws ItemNotFoundException, BadRequestException, RandomExceptions {
+    private void releaseEscrow(ProductOrderEntity order) throws ItemNotFoundException, BadRequestException, RandomExceptions {
 
         if (order.getEscrowId() == null) {
             throw new BadRequestException("No escrow found for this order");
@@ -1192,10 +1192,10 @@ public class OrderServiceImpl implements OrderService {
     }
 
     // Validate order for confirmation
-    private OrderEntity validateOrderForConfirmation(UUID orderId, AccountEntity customer)
+    private ProductOrderEntity validateOrderForConfirmation(UUID orderId, AccountEntity customer)
             throws ItemNotFoundException, BadRequestException {
 
-        OrderEntity order = orderRepo.findById(orderId)
+        ProductOrderEntity order = orderRepo.findById(orderId)
                 .orElseThrow(() -> new ItemNotFoundException("Order not found: " + orderId));
 
         // Validate customer is the buyer
@@ -1204,10 +1204,10 @@ public class OrderServiceImpl implements OrderService {
         }
 
         // Validate order status - must be SHIPPED
-        if (order.getOrderStatus() != OrderStatus.SHIPPED) {
+        if (order.getProductOrderStatus() != ProductOrderStatus.SHIPPED) {
             throw new BadRequestException(
                     String.format("Cannot confirm delivery. Order status: %s. Order must be SHIPPED first.",
-                            order.getOrderStatus()));
+                            order.getProductOrderStatus()));
         }
 
         // Check if already confirmed
@@ -1218,10 +1218,10 @@ public class OrderServiceImpl implements OrderService {
         return order;
     }
 
-    private OrderEntity validateOrderForCodeRegeneration(UUID orderId, AccountEntity customer)
+    private ProductOrderEntity validateOrderForCodeRegeneration(UUID orderId, AccountEntity customer)
             throws ItemNotFoundException, BadRequestException {
 
-        OrderEntity order = orderRepo.findById(orderId)
+        ProductOrderEntity order = orderRepo.findById(orderId)
                 .orElseThrow(() -> new ItemNotFoundException("Order not found: " + orderId));
 
         // Validate customer is the buyer
@@ -1230,10 +1230,10 @@ public class OrderServiceImpl implements OrderService {
         }
 
         // Validate order status - must be SHIPPED
-        if (order.getOrderStatus() != OrderStatus.SHIPPED) {
+        if (order.getProductOrderStatus() != ProductOrderStatus.SHIPPED) {
             throw new BadRequestException(
                     String.format("Cannot regenerate code. Order status: %s. Order must be SHIPPED.",
-                            order.getOrderStatus()));
+                            order.getProductOrderStatus()));
         }
 
         // Check if already confirmed
@@ -1249,7 +1249,7 @@ public class OrderServiceImpl implements OrderService {
      * Send order confirmation to BUYER
      * Called after order is created
      */
-    private void sendOrderConfirmationToBuyer(OrderEntity order) {
+    private void sendOrderConfirmationToBuyer(ProductOrderEntity order) {
         try {
             log.info("📧 Sending order confirmation to buyer: {}", order.getBuyer().getUserName());
 
@@ -1296,7 +1296,7 @@ public class OrderServiceImpl implements OrderService {
      * Send new order notification to SELLER
      * Called after order is created
      */
-    private void sendNewOrderNotificationToSeller(OrderEntity order) {
+    private void sendNewOrderNotificationToSeller(ProductOrderEntity order) {
         try {
             log.info("📧 Sending new order notification to seller: {}", order.getSeller().getShopName());
 
@@ -1353,7 +1353,7 @@ public class OrderServiceImpl implements OrderService {
      * Called after seller marks order as shipped
      * INCLUDES CONFIRMATION CODE for delivery verification
      */
-    private void sendOrderShippedNotification(OrderEntity order, String confirmationCode) {
+    private void sendOrderShippedNotification(ProductOrderEntity order, String confirmationCode) {
         try {
             log.info("📧 Sending order shipped notification to buyer: {}", order.getBuyer().getUserName());
 
@@ -1403,7 +1403,7 @@ public class OrderServiceImpl implements OrderService {
      * Send order delivered notification to SELLER
      * Tells seller that customer confirmed delivery
      */
-    private void sendOrderDeliveredNotificationToSeller(OrderEntity order) {
+    private void sendOrderDeliveredNotificationToSeller(ProductOrderEntity order) {
         try {
             log.info("📧 Sending order delivered notification to seller: {}", order.getSeller().getShopName());
 
@@ -1456,7 +1456,7 @@ public class OrderServiceImpl implements OrderService {
      * Send order delivered notification to BUYER
      * Called after buyer confirms delivery
      */
-    private void sendOrderDeliveredNotificationToBuyer(OrderEntity order) {
+    private void sendOrderDeliveredNotificationToBuyer(ProductOrderEntity order) {
         try {
             log.info("📧 Sending order delivered notification to buyer: {}", order.getBuyer().getUserName());
 

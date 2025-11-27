@@ -5,8 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.nextgate.nextgatebackend.e_commerce.order_mng_service.enums.DeliveryStatus;
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.enums.OrderSource;
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.enums.OrderStatus;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.enums.ProductOrderSource;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.enums.ProductOrderStatus;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -17,7 +17,7 @@ import java.util.UUID;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class OrderResponse {
+public class ProductOrderResponse {
 
     // IDs
     private UUID orderId;
@@ -28,12 +28,12 @@ public class OrderResponse {
     private SellerInfo seller;
 
     // Status
-    private OrderStatus orderStatus;
+    private ProductOrderStatus productOrderStatus;
     private DeliveryStatus deliveryStatus;
-    private OrderSource orderSource;
+    private ProductOrderSource productOrderSource;
 
     // Items
-    private List<OrderItemResponse> items;
+    private List<ProductOrderItemResponse> items;
 
     // Financial
     private BigDecimal subtotal;

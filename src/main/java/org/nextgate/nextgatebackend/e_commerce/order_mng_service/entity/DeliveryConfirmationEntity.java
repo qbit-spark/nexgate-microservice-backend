@@ -31,7 +31,7 @@ public class DeliveryConfirmationEntity {
     // Link to order
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", referencedColumnName = "orderId", nullable = false)
-    private OrderEntity order;
+    private ProductOrderEntity order;
 
     // Hashed confirmation code (NEVER store plain text!)
     @Column(nullable = false, length = 255)

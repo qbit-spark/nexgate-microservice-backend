@@ -8,7 +8,7 @@ import org.nextgate.nextgatebackend.e_commerce.checkout_session.repo.ProductChec
 import org.nextgate.nextgatebackend.e_commerce.installment_purchase.entity.InstallmentAgreementEntity;
 import org.nextgate.nextgatebackend.e_commerce.installment_purchase.events.InstallmentAgreementCreatedEvent;
 import org.nextgate.nextgatebackend.e_commerce.installment_purchase.repo.InstallmentAgreementRepo;
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.service.OrderService;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.service.ProductOrderService;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -28,7 +28,7 @@ import java.util.UUID;
 @Slf4j
 public class InstallmentImmediateOrderListener {
 
-    private final OrderService orderService;
+    private final ProductOrderService productOrderService;
     private final InstallmentAgreementRepo agreementRepo;
     private final ProductCheckoutSessionRepo checkoutSessionRepo;
 
@@ -117,7 +117,7 @@ public class InstallmentImmediateOrderListener {
             try {
                 log.info("Order creation attempt {}/{}", attempt, maxAttempts);
 
-                List<UUID> orderIds = orderService
+                List<UUID> orderIds = productOrderService
                         .createOrdersFromCheckoutSession(checkoutSessionId);
 
                 UUID orderId = orderIds.getFirst();

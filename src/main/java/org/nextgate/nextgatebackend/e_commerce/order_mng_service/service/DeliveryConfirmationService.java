@@ -4,7 +4,7 @@ import org.apache.coyote.BadRequestException;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.e_commerce.order_mng_service.entity.DeliveryConfirmationEntity;
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.entity.OrderEntity;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.entity.ProductOrderEntity;
 
 import java.util.UUID;
 
@@ -15,7 +15,7 @@ public interface DeliveryConfirmationService {
      * Returns the PLAIN TEXT code (to send to customer).
      * Code is hashed before storing in database.
      */
-    String generateConfirmationCode(OrderEntity order);
+    String generateConfirmationCode(ProductOrderEntity order);
 
     /**
      * Verify confirmation code.

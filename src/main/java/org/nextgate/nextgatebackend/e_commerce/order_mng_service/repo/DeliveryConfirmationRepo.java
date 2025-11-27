@@ -1,7 +1,7 @@
 package org.nextgate.nextgatebackend.e_commerce.order_mng_service.repo;
 
 import org.nextgate.nextgatebackend.e_commerce.order_mng_service.entity.DeliveryConfirmationEntity;
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.entity.OrderEntity;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.entity.ProductOrderEntity;
 import org.nextgate.nextgatebackend.e_commerce.order_mng_service.enums.ConfirmationStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -16,12 +16,12 @@ public interface DeliveryConfirmationRepo extends JpaRepository<DeliveryConfirma
 
     // Find active confirmation for order
     Optional<DeliveryConfirmationEntity> findByOrderAndStatusAndIsRevokedFalse(
-            OrderEntity order,
+            ProductOrderEntity order,
             ConfirmationStatus status
     );
 
     // Find all confirmations for order (audit trail)
-    List<DeliveryConfirmationEntity> findByOrderOrderByGeneratedAtDesc(OrderEntity order);
+    List<DeliveryConfirmationEntity> findByOrderOrderByGeneratedAtDesc(ProductOrderEntity order);
 
     // Find pending confirmations that are expired (for cleanup job)
     List<DeliveryConfirmationEntity> findByStatusAndExpiresAtBefore(

@@ -31,7 +31,7 @@ import org.nextgate.nextgatebackend.e_commerce.installment_purchase.repo.Install
 import org.nextgate.nextgatebackend.e_commerce.installment_purchase.repo.InstallmentPlanRepo;
 import org.nextgate.nextgatebackend.e_commerce.installment_purchase.service.InstallmentService;
 import org.nextgate.nextgatebackend.e_commerce.installment_purchase.utils.InstallmentValidator;
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.service.OrderService;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.service.ProductOrderService;
 import org.nextgate.nextgatebackend.e_commerce.products_mng_service.products.entity.ProductEntity;
 import org.nextgate.nextgatebackend.e_commerce.products_mng_service.products.repo.ProductRepo;
 import org.springframework.context.ApplicationEventPublisher;
@@ -65,7 +65,7 @@ public class InstallmentServiceImpl implements InstallmentService {
     private final TransactionHistoryService transactionHistoryService;
     private final ApplicationEventPublisher eventPublisher;
     private final ProductCheckoutSessionRepo checkoutSessionRepo;
-    private final OrderService orderService;
+    private final ProductOrderService productOrderService;
 
 
     // private final OrderService orderService;

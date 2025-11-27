@@ -7,6 +7,7 @@ import lombok.*;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.enums.CheckoutSessionStatus;
 import org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.utils.TicketCheckoutDetailsJsonConverter;
+import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.EventEntity;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.utils.PaymentAttemptsJsonConverter;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.utils.PaymentIntentJsonConverter;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.utils.PricingDetailsJsonConverter;
@@ -47,6 +48,7 @@ public class EventCheckoutSessionEntity implements PayableCheckoutSession {
 
     @Column(name = "event_id", nullable = false)
     private UUID eventId;
+
 
     // ========================================
     // SESSION STATUS

@@ -11,16 +11,16 @@ import org.nextgate.nextgatebackend.authentication_service.service.AccountServic
 import org.nextgate.nextgatebackend.e_commerce.order_mng_service.payloads.ConfirmDeliveryRequest;
 import org.nextgate.nextgatebackend.e_commerce.order_mng_service.payloads.ConfirmationCodeRegeneratedResponse;
 import org.nextgate.nextgatebackend.e_commerce.order_mng_service.payloads.DeliveryConfirmedResponse;
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.payloads.OrderShippedResponse;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.payloads.ProductOrderShippedResponse;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
 import org.nextgate.nextgatebackend.globeresponsebody.GlobeSuccessResponseBuilder;
 import org.nextgate.nextgatebackend.e_commerce.order_mng_service.entity.DeliveryConfirmationEntity;
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.entity.OrderEntity;
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.enums.OrderStatus;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.entity.ProductOrderEntity;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.enums.ProductOrderStatus;
 import org.nextgate.nextgatebackend.e_commerce.order_mng_service.service.DeliveryConfirmationService;
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.service.OrderService;
-import org.nextgate.nextgatebackend.e_commerce.order_mng_service.utils.OrderMapper;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.service.ProductOrderService;
+import org.nextgate.nextgatebackend.e_commerce.order_mng_service.utils.ProductOrderMapper;
 import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng.entity.ShopEntity;
 import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng.repo.ShopRepo;
 import org.springframework.data.domain.Page;
@@ -37,12 +37,12 @@ import java.util.UUID;
 @RequestMapping("/api/v1/orders")
 @RequiredArgsConstructor
 @Slf4j
-public class OrderController {
+public class ProductOrderController {
 
-    private final OrderService orderService;
+    private final ProductOrderService productOrderService;
     private final DeliveryConfirmationService deliveryConfirmationService;
     private final AccountService accountService;
-    private final OrderMapper orderMapper;
+    private final ProductOrderMapper productOrderMapper;
     private final AccountRepo accountRepo;
     private final ShopRepo shopRepo;
 
@@ -56,9 +56,9 @@ public class OrderController {
 
         AccountEntity requester = getAuthenticatedAccount();
 
-        OrderEntity order = orderService.getOrderById(orderId, requester);
+        ProductOrderEntity order = productOrderService.getOrderById(orderId, requester);
 
-        return ResponseEntity.ok(orderMapper.toOrderResponse(order));
+        return ResponseEntity.ok(productOrderMapper.toOrderResponse(order));
     }
 
 
@@ -72,9 +72,9 @@ public class OrderController {
 
         AccountEntity requester = getAuthenticatedAccount();
 
-        OrderEntity order = orderService.getOrderByNumber(orderNumber, requester);
+        ProductOrderEntity order = productOrderService.getOrderByNumber(orderNumber, requester);
 
-        return ResponseEntity.ok(orderMapper.toOrderResponse(order));
+        return ResponseEntity.ok(productOrderMapper.toOrderResponse(order));
     }
 
 
@@ -85,9 +85,9 @@ public class OrderController {
 
         AccountEntity customer = getAuthenticatedAccount();
 
-        List<OrderEntity> orders = orderService.getMyOrders(customer);
+        List<ProductOrderEntity> orders = productOrderService.getMyOrders(customer);
 
-        return ResponseEntity.ok(orderMapper.toOrderResponseList(orders));
+        return ResponseEntity.ok(productOrderMapper.toOrderResponseList(orders));
     }
 
 
@@ -96,14 +96,14 @@ public class OrderController {
      */
     @GetMapping("/my-orders/status/{status}")
     public ResponseEntity<GlobeSuccessResponseBuilder> getMyOrdersByStatus(
-            @PathVariable OrderStatus status
+            @PathVariable ProductOrderStatus status
     ) throws ItemNotFoundException {
 
         AccountEntity customer = getAuthenticatedAccount();
 
-        List<OrderEntity> orders = orderService.getMyOrdersByStatus(customer, status);
+        List<ProductOrderEntity> orders = productOrderService.getMyOrdersByStatus(customer, status);
 
-        return ResponseEntity.ok(orderMapper.toOrderResponseList(orders));
+        return ResponseEntity.ok(productOrderMapper.toOrderResponseList(orders));
     }
 
 
@@ -118,12 +118,12 @@ public class OrderController {
 
         AccountEntity seller = getAuthenticatedAccount();
 
-        orderService.markOrderAsShipped(orderId, seller);
+        productOrderService.markOrderAsShipped(orderId, seller);
 
         // Get active confirmation to include in response
         DeliveryConfirmationEntity confirmation = deliveryConfirmationService.getActiveConfirmation(orderId);
 
-        OrderShippedResponse response = OrderShippedResponse.builder()
+        ProductOrderShippedResponse response = ProductOrderShippedResponse.builder()
                 .orderId(orderId)
                 .orderNumber(confirmation.getOrder().getOrderNumber())
                 .shippedAt(confirmation.getOrder().getShippedAt())
@@ -166,7 +166,7 @@ public class OrderController {
         // Get device info (User-Agent)
         String deviceInfo = httpRequest.getHeader("User-Agent");
 
-        orderService.confirmDelivery(
+        productOrderService.confirmDelivery(
                 orderId,
                 request.getConfirmationCode(),
                 customer,
@@ -175,7 +175,7 @@ public class OrderController {
         );
 
         // Get order to build response
-        OrderEntity order = orderService.getOrderById(orderId, customer);
+        ProductOrderEntity order = productOrderService.getOrderById(orderId, customer);
 
         DeliveryConfirmedResponse response = DeliveryConfirmedResponse.builder()
                 .orderId(orderId)
@@ -203,7 +203,7 @@ public class OrderController {
         AccountEntity customer = getAuthenticatedAccount();
 
         // Service handles everything
-        orderService.regenerateDeliveryConfirmationCode(orderId, customer);
+        productOrderService.regenerateDeliveryConfirmationCode(orderId, customer);
 
         // Get confirmation details for response
         DeliveryConfirmationEntity confirmation =
@@ -241,9 +241,9 @@ public class OrderController {
 
         AccountEntity customer = getAuthenticatedAccount();
 
-        Page<OrderEntity> orderPage = orderService.getMyOrdersPaged(customer, page, size);
+        Page<ProductOrderEntity> orderPage = productOrderService.getMyOrdersPaged(customer, page, size);
 
-        return ResponseEntity.ok(orderMapper.toOrderPageResponse(orderPage));
+        return ResponseEntity.ok(productOrderMapper.toOrderPageResponse(orderPage));
     }
 
 
@@ -252,17 +252,17 @@ public class OrderController {
      */
     @GetMapping("/my-orders/status/{status}/paged")
     public ResponseEntity<GlobeSuccessResponseBuilder> getMyOrdersByStatusPaged(
-            @PathVariable OrderStatus status,
+            @PathVariable ProductOrderStatus status,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size
     ) throws ItemNotFoundException {
 
         AccountEntity customer = getAuthenticatedAccount();
 
-        Page<OrderEntity> orderPage = orderService.getMyOrdersByStatusPaged(
+        Page<ProductOrderEntity> orderPage = productOrderService.getMyOrdersByStatusPaged(
                 customer, status, page, size);
 
-        return ResponseEntity.ok(orderMapper.toOrderPageResponse(orderPage));
+        return ResponseEntity.ok(productOrderMapper.toOrderPageResponse(orderPage));
     }
 
 
@@ -281,9 +281,9 @@ public class OrderController {
         // Get shop and verify ownership
         ShopEntity shop = validateShopOwnership(shopId, authenticatedUser);
 
-        Page<OrderEntity> orderPage = orderService.getShopOrdersPaged(shop, page, size);
+        Page<ProductOrderEntity> orderPage = productOrderService.getShopOrdersPaged(shop, page, size);
 
-        return ResponseEntity.ok(orderMapper.toOrderPageResponse(orderPage));
+        return ResponseEntity.ok(productOrderMapper.toOrderPageResponse(orderPage));
     }
 
 
@@ -293,7 +293,7 @@ public class OrderController {
     @GetMapping("/shop/{shopId}/orders/status/{status}/paged")
     public ResponseEntity<GlobeSuccessResponseBuilder> getShopOrdersByStatusPaged(
             @PathVariable UUID shopId,
-            @PathVariable OrderStatus status,
+            @PathVariable ProductOrderStatus status,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size
     ) throws ItemNotFoundException, BadRequestException {
@@ -303,10 +303,10 @@ public class OrderController {
         // Get shop and verify ownership
         ShopEntity shop = validateShopOwnership(shopId, authenticatedUser);
 
-        Page<OrderEntity> orderPage = orderService.getShopOrdersByStatusPaged(
+        Page<ProductOrderEntity> orderPage = productOrderService.getShopOrdersByStatusPaged(
                 shop, status, page, size);
 
-        return ResponseEntity.ok(orderMapper.toOrderPageResponse(orderPage));
+        return ResponseEntity.ok(productOrderMapper.toOrderPageResponse(orderPage));
     }
 
 
@@ -323,9 +323,9 @@ public class OrderController {
         // Get shop and verify ownership
         ShopEntity shop = validateShopOwnership(shopId, authenticatedUser);
 
-        List<OrderEntity> orders = orderService.getShopOrders(shop);
+        List<ProductOrderEntity> orders = productOrderService.getShopOrders(shop);
 
-        return ResponseEntity.ok(orderMapper.toOrderResponseList(orders));
+        return ResponseEntity.ok(productOrderMapper.toOrderResponseList(orders));
     }
 
 
@@ -335,7 +335,7 @@ public class OrderController {
     @GetMapping("/shop/{shopId}/orders/status/{status}")
     public ResponseEntity<GlobeSuccessResponseBuilder> getShopOrdersByStatus(
             @PathVariable UUID shopId,
-            @PathVariable OrderStatus status
+            @PathVariable ProductOrderStatus status
     ) throws ItemNotFoundException, BadRequestException {
 
         AccountEntity authenticatedUser = getAuthenticatedAccount();
@@ -343,9 +343,9 @@ public class OrderController {
         // Get shop and verify ownership
         ShopEntity shop = validateShopOwnership(shopId, authenticatedUser);
 
-        List<OrderEntity> orders = orderService.getShopOrdersByStatus(shop, status);
+        List<ProductOrderEntity> orders = productOrderService.getShopOrdersByStatus(shop, status);
 
-        return ResponseEntity.ok(orderMapper.toOrderResponseList(orders));
+        return ResponseEntity.ok(productOrderMapper.toOrderResponseList(orders));
     }
 
 
