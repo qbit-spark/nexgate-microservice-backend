@@ -62,7 +62,7 @@ public class TicketEntity {
 
     @Column(name = "currency", nullable = false, length = 3)
     @Builder.Default
-    private String currency = "USD";
+    private String currency = "TZS";
 
     // ========== QUANTITY MANAGEMENT ==========
     @Column(name = "total_quantity")

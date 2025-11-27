@@ -18,6 +18,9 @@ import org.nextgate.nextgatebackend.financial_system.payment_processing.service.
 import org.nextgate.nextgatebackend.financial_system.payment_processing.service.PaymentOrchestrator;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.service.UniversalCheckoutSessionService;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.service.WalletPaymentProcessor;
+import org.nextgate.nextgatebackend.financial_system.transaction_history.enums.TransactionDirection;
+import org.nextgate.nextgatebackend.financial_system.transaction_history.enums.TransactionType;
+import org.nextgate.nextgatebackend.financial_system.transaction_history.service.TransactionHistoryService;
 import org.nextgate.nextgatebackend.globe_enums.CheckoutSessionsDomains;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
@@ -32,6 +35,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +52,7 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
     private final ApplicationEventPublisher eventPublisher;
     private final NotificationPublisher notificationPublisher;
     private final UniversalCheckoutSessionService checkoutSessionService;
+    private final TransactionHistoryService transactionHistoryService;
 
     @Override
     @Transactional
@@ -87,6 +92,12 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
             checkoutSessionService.saveCheckoutSession(session);
             throw new RandomExceptions("Checkout session has expired");
         }
+
+        // ⭐⭐⭐ ADD THIS FREE PAYMENT HERE ⭐⭐⭐
+        if (session.getTotalAmount().equals(BigDecimal.ZERO)) {
+            return handleFreeCheckout(session);
+        }
+
 
         try {
             // Determine payment method
@@ -301,5 +312,110 @@ public class PaymentOrchestratorImpl implements PaymentOrchestrator {
         notificationPublisher.publish(event);
 
         log.info("📤 Payment success notification sent");
+    }
+
+    private PaymentResponse handleFreeCheckout(PayableCheckoutSession session) throws RandomExceptions {
+
+        log.info("🆓 Processing FREE checkout | Session: {} | Domain: {}",
+                session.getSessionId(), session.getSessionDomain());
+
+        session.setStatus(CheckoutSessionStatus.COMPLETED);
+        session.setCompletedAt(LocalDateTime.now());
+        checkoutSessionService.saveCheckoutSession(session);
+
+        // Optional: Track in transaction history
+        trackFreeTransaction(session);
+
+        // Publish event (same as paid, but escrow = null)
+        try {
+            PaymentCompletedEvent event = new PaymentCompletedEvent(
+                    this,
+                    session.getSessionId(),
+                    session.getSessionDomain(),
+                    session,
+                    null,  // ← No escrow for free
+                    LocalDateTime.now()
+            );
+
+            eventPublisher.publishEvent(event);
+            log.info("✓ FREE checkout event published");
+
+        } catch (Exception e) {
+            log.error("Failed to publish FREE checkout event", e);
+        }
+
+        return buildFreeResponse(session);
+    }
+
+    private void trackFreeTransaction(PayableCheckoutSession session) {
+        try {
+            TransactionType type = switch (session.getSessionDomain()) {
+                case PRODUCT -> TransactionType.FREE_PRODUCT_ORDER;
+                case EVENT -> TransactionType.FREE_EVENT_BOOKING_ORDER;
+                // ⭐ When you add new domains, compiler will force you to handle them!
+                // case SUBSCRIPTION -> TransactionType.FREE_SUBSCRIPTION;
+                // case DONATION -> TransactionType.FREE_DONATION;
+                default -> throw new IllegalArgumentException("Unknown session domain: " + session.getSessionDomain());
+            };
+
+            transactionHistoryService.createTransaction(
+                    session.getPayer(),
+                    type,
+                    TransactionDirection.NEUTRAL,
+                    BigDecimal.ZERO,
+                    getFreeTitle(session.getSessionDomain()),
+                    getFreeDescription(session),
+                    null,
+                    session.getSessionDomain().toString(),
+                    session.getSessionId()
+            );
+
+            log.info("✓ Free transaction tracked in history");
+
+        } catch (Exception e) {
+            log.error("Failed to track free transaction", e);
+        }
+    }
+    private String getFreeTitle(CheckoutSessionsDomains domain) {
+        return switch (domain) {
+            case PRODUCT -> "Free Product Order";
+            case EVENT -> "Free Ticket Booking";
+            // Future:
+            // case SUBSCRIPTION -> "Free Subscription";
+            // case DONATION -> "Free Donation";
+            default -> throw new IllegalArgumentException("Unknown session domain: " + domain);
+        };
+    }
+
+    private String getFreeDescription(PayableCheckoutSession session) {
+        String domainName = switch (session.getSessionDomain()) {
+            case PRODUCT -> "product order";
+            case EVENT -> "ticket booking";
+            // Future cases here
+            default -> throw new IllegalArgumentException("Unknown session domain: " + session.getSessionDomain());
+        };
+
+
+        return String.format("Free %s (Session: %s)", domainName, session.getSessionId());
+    }
+
+    private PaymentResponse buildFreeResponse(PayableCheckoutSession session) {
+        String message = switch (session.getSessionDomain()) {
+            case PRODUCT -> "Free product order confirmed!";
+            case EVENT -> "Free ticket booking confirmed!";
+            // Future cases here
+            default -> throw new IllegalArgumentException("Unknown session domain: " + session.getSessionDomain());
+        };
+
+        return PaymentResponse.builder()
+                .success(true)
+                .status(PaymentStatus.SUCCESS)
+                .message(message)
+                .checkoutSessionId(session.getSessionId())
+                .amountPaid(BigDecimal.ZERO)
+                .escrowId(null)
+                .escrowNumber(null)
+                .currency("TZS")
+                .build();
     }
 }

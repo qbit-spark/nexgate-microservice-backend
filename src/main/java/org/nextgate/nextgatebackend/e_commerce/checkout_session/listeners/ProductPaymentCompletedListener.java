@@ -37,6 +37,10 @@ public class ProductPaymentCompletedListener {
             return;
         }
 
+        if (event.getEscrow() == null) {
+            log.info("🆓 FREE product order detected - proceeding with order creation");
+        }
+
         log.info("╔════════════════════════════════════════════════════════════╗");
         log.info("║   PRODUCT PAYMENT COMPLETED - ORDER CREATION               ║");
         log.info("╚════════════════════════════════════════════════════════════╝");

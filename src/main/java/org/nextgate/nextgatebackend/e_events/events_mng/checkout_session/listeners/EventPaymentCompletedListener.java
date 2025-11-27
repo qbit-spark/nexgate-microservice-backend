@@ -30,6 +30,10 @@ public class EventPaymentCompletedListener {
             return;
         }
 
+        if (event.getEscrow() == null) {
+            log.info("🆓 FREE ticket booking detected - proceeding with booking creation");
+        }
+
         log.info("╔════════════════════════════════════════════════════════════╗");
         log.info("║   EVENT PAYMENT COMPLETED - BOOKING CREATION               ║");
         log.info("╚════════════════════════════════════════════════════════════╝");
