@@ -254,14 +254,7 @@ public class TicketValidations {
                         "Attendance mode (IN_PERSON or ONLINE) is required for HYBRID events"
                 );
             }
-        } else {
-            // ONE_TIME/MULTI_DAY with IN_PERSON or ONLINE format should NOT have attendance mode
-            if (attendanceMode != null) {
-                throw new EventValidationException(
-                        "Attendance mode should only be specified for HYBRID events. " +
-                                "Current event format: " + eventFormat
-                );
-            }
+
         }
     }
 

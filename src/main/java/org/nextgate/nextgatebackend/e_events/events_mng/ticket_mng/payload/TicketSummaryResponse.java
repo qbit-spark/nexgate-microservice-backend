@@ -23,7 +23,6 @@ public class TicketSummaryResponse {
     private UUID id;
     private String name;
     private BigDecimal price;
-    private String currency;
 
     // Quantity info
     private Integer totalTickets;

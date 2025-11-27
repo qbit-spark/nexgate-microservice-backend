@@ -15,4 +15,5 @@ public class UpdateTicketStatusRequest {
 
     @NotNull(message = "Ticket status is required")
     private TicketStatus status; // ACTIVE, INACTIVE, CLOSED
+
 }

@@ -79,9 +79,20 @@ public class EventValidations {
             return; // Schedule isn't provided yet, that's fine for draft
         }
 
+        LocalDate today = LocalDate.now();
+
         // Validate days array if provided
         if (request.getSchedule().getDays() != null && !request.getSchedule().getDays().isEmpty()) {
             for (EventDayRequest day : request.getSchedule().getDays()) {
+
+                // Validate date is not in the past
+                if (day.getDate() != null && day.getDate().isBefore(today)) {
+                    throw new EventValidationException(
+                            "Event date cannot be in the past: " + day.getDate(),
+                            EventCreationStage.SCHEDULE
+                    );
+                }
+
                 // Validate date logic for each day
                 if (day.getStartTime() != null && day.getEndTime() != null) {
                     if (day.getEndTime().isBefore(day.getStartTime())) {
