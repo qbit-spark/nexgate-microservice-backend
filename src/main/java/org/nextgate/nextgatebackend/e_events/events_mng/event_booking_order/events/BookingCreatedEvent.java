@@ -17,4 +17,5 @@ public class BookingCreatedEvent {
     private UUID customerId;
     private UUID eventId;
     private Boolean sendTicketsToAttendees;
+
 }
