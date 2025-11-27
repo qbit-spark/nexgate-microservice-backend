@@ -84,10 +84,22 @@ public class EventCheckoutServiceImpl implements EventCheckoutService {
                 .expiresAt(sessionExpiration)
                 .build();
 
-        EventCheckoutSessionEntity savedSession = checkoutSessionRepo.save(session);
-        log.info("Checkout session created: {}", savedSession.getSessionId());
+        log.info("=== ABOUT TO SAVE SESSION ===");
+        log.info("Session object: {}", session);
+        log.info("TicketDetails in session: {}", session.getTicketDetails());
 
-        return mapToResponse(savedSession, event, ticket, customer);
+        try {
+            EventCheckoutSessionEntity savedSession = checkoutSessionRepo.save(session);
+            log.info("=== SESSION SAVED SUCCESSFULLY ===");
+            log.info("Saved session ID: {}", savedSession.getSessionId());
+            return mapToResponse(savedSession, event, ticket, customer);
+        } catch (Exception e) {
+            log.error("=== ERROR DURING SAVE ===");
+            log.error("Exception type: {}", e.getClass().getName());
+            log.error("Exception message: {}", e.getMessage());
+            log.error("Full stack trace:", e);
+            throw e;
+        }
     }
 
     @Override
@@ -179,7 +191,7 @@ public class EventCheckoutServiceImpl implements EventCheckoutService {
 
         BigDecimal subtotal = ticket.getPrice().multiply(BigDecimal.valueOf(totalQuantity));
 
-        return EventCheckoutSessionEntity.TicketCheckoutDetails.builder()
+        EventCheckoutSessionEntity.TicketCheckoutDetails details = EventCheckoutSessionEntity.TicketCheckoutDetails.builder()
                 .ticketTypeId(ticket.getId())
                 .ticketTypeName(ticket.getName())
                 .unitPrice(ticket.getPrice())
@@ -189,6 +201,9 @@ public class EventCheckoutServiceImpl implements EventCheckoutService {
                 .totalQuantity(totalQuantity)
                 .subtotal(subtotal)
                 .build();
+
+        log.info("Built ticket details: {}", details);
+        return details;
     }
 
     private EventCheckoutSessionEntity.PricingSummary calculatePricing(

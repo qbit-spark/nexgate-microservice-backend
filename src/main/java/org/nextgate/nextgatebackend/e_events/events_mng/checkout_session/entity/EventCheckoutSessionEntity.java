@@ -1,6 +1,7 @@
 package org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.entity;
 
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.qbitspark.jikoexpress.financial_system.payment_processing.contract.PayableCheckoutSession;
 import jakarta.persistence.*;
 import lombok.*;
@@ -8,9 +9,10 @@ import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.enums.CheckoutSessionStatus;
 import org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.utils.TicketCheckoutDetailsJsonConverter;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.EventEntity;
-import org.nextgate.nextgatebackend.financial_system.payment_processing.utils.PaymentAttemptsJsonConverter;
-import org.nextgate.nextgatebackend.financial_system.payment_processing.utils.PaymentIntentJsonConverter;
-import org.nextgate.nextgatebackend.financial_system.payment_processing.utils.PricingDetailsJsonConverter;
+import org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.utils.TicketCheckoutDetailsJsonConverter;
+import org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.utils.converters.PricingSummaryJsonConverter;
+import org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.utils.converters.EventPaymentIntentJsonConverter;
+import org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.utils.converters.EventPaymentAttemptsJsonConverter;
 import org.nextgate.nextgatebackend.globe_enums.CheckoutSessionsDomains;
 
 import java.math.BigDecimal;
@@ -72,7 +74,7 @@ public class EventCheckoutSessionEntity implements PayableCheckoutSession {
     // ========================================
 
     @Column(name = "pricing", columnDefinition = "jsonb", nullable = false)
-    @Convert(converter = PricingDetailsJsonConverter.class)
+    @Convert(converter = PricingSummaryJsonConverter.class)
     private PricingSummary pricing;
 
     // ========================================
@@ -80,7 +82,7 @@ public class EventCheckoutSessionEntity implements PayableCheckoutSession {
     // ========================================
 
     @Column(name = "payment_intent", columnDefinition = "jsonb")
-    @Convert(converter = PaymentIntentJsonConverter.class)
+    @Convert(converter = EventPaymentIntentJsonConverter.class)
     private PaymentIntent paymentIntent;
 
     // ========================================
@@ -88,7 +90,7 @@ public class EventCheckoutSessionEntity implements PayableCheckoutSession {
     // ========================================
 
     @Column(name = "payment_attempts", columnDefinition = "jsonb")
-    @Convert(converter = PaymentAttemptsJsonConverter.class)
+    @Convert(converter = EventPaymentAttemptsJsonConverter.class)
     @Builder.Default
     private List<PaymentAttempt> paymentAttempts = new ArrayList<>();
 
@@ -246,6 +248,7 @@ public class EventCheckoutSessionEntity implements PayableCheckoutSession {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class OtherAttendee {
         private String name;
         private String email;

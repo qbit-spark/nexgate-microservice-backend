@@ -2,15 +2,13 @@ package org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
 import lombok.extern.slf4j.Slf4j;
 import org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.entity.EventCheckoutSessionEntity;
 
-/**
- * Converts TicketCheckoutDetails to/from JSON for database storage
- */
-@Converter
+@Converter(autoApply = false)
 @Slf4j
 public class TicketCheckoutDetailsJsonConverter
         implements AttributeConverter<EventCheckoutSessionEntity.TicketCheckoutDetails, String> {
@@ -19,35 +17,47 @@ public class TicketCheckoutDetailsJsonConverter
 
     @Override
     public String convertToDatabaseColumn(EventCheckoutSessionEntity.TicketCheckoutDetails ticketDetails) {
+        log.info("=== CONVERTER: convertToDatabaseColumn CALLED ===");
+        log.info("Input ticketDetails: {}", ticketDetails);
+
         if (ticketDetails == null) {
-            log.warn("Attempting to convert null TicketCheckoutDetails to JSON");
+            log.info("ticketDetails is null, returning null");
             return null;
         }
 
         try {
             String json = objectMapper.writeValueAsString(ticketDetails);
-            log.debug("Successfully converted TicketCheckoutDetails to JSON");
+            log.info("Successfully converted to JSON: {}", json);
             return json;
         } catch (JsonProcessingException e) {
-            log.error("Error converting TicketCheckoutDetails to JSON: {}", e.getMessage(), e);
+            log.error("=== CONVERTER ERROR ===");
+            log.error("Error type: {}", e.getClass().getName());
+            log.error("Error message: {}", e.getMessage());
+            log.error("Full stack trace:", e);
             throw new RuntimeException("Failed to convert TicketCheckoutDetails to JSON", e);
         }
     }
 
     @Override
     public EventCheckoutSessionEntity.TicketCheckoutDetails convertToEntityAttribute(String json) {
+        log.info("=== CONVERTER: convertToEntityAttribute CALLED ===");
+        log.info("Input JSON: {}", json);
+
         if (json == null || json.isBlank()) {
-            log.debug("Converting null/empty JSON to null TicketCheckoutDetails");
+            log.info("JSON is null/blank, returning null");
             return null;
         }
 
         try {
             EventCheckoutSessionEntity.TicketCheckoutDetails ticketDetails =
                     objectMapper.readValue(json, EventCheckoutSessionEntity.TicketCheckoutDetails.class);
-            log.debug("Successfully converted JSON to TicketCheckoutDetails");
+            log.info("Successfully converted from JSON to object");
             return ticketDetails;
         } catch (JsonProcessingException e) {
-            log.error("Error converting JSON to TicketCheckoutDetails: {}", e.getMessage(), e);
+            log.error("=== CONVERTER ERROR ===");
+            log.error("Error type: {}", e.getClass().getName());
+            log.error("Error message: {}", e.getMessage());
+            log.error("Full stack trace:", e);
             throw new RuntimeException("Failed to convert JSON to TicketCheckoutDetails", e);
         }
     }

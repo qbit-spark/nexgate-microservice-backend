@@ -1,4 +1,4 @@
-package org.nextgate.nextgatebackend.financial_system.payment_processing.utils;
+package org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.utils.converters;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -9,8 +9,8 @@ import org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.entity.
 
 @Converter(autoApply = false)
 @Slf4j
-public class PaymentIntentJsonConverter
-        implements AttributeConverter<EventCheckoutSessionEntity.PaymentIntent, String> {  // ← Use the nested class!
+public class EventPaymentIntentJsonConverter
+        implements AttributeConverter<EventCheckoutSessionEntity.PaymentIntent, String> {
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
