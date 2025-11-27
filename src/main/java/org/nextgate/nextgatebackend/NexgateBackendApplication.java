@@ -46,12 +46,4 @@ public class NexgateBackendApplication implements CommandLineRunner {
     }
 
 
-    /**
-     *
-     * 
-     *
-     *
-     *
-     */
-
 }

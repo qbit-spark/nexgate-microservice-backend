@@ -1,9 +1,7 @@
 package org.nextgate.nextgatebackend.e_events.events_mng.event_booking_order.service;
 
-import org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.entity.EventCheckoutSessionEntity;
 import org.nextgate.nextgatebackend.e_events.events_mng.event_booking_order.entity.EventBookingOrderEntity;
-import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.EventEntity;
-import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.entity.TicketEntity;
+import org.nextgate.nextgatebackend.globeadvice.exceptions.AccessDeniedException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 
 import java.util.List;
@@ -26,4 +24,7 @@ public interface EventBookingOrderService {
     EventBookingOrderEntity createBookingOrder(UUID checkoutSessionId, UUID escrowId) throws ItemNotFoundException;
 
 
+    EventBookingOrderEntity getBookingById(UUID bookingId) throws ItemNotFoundException, AccessDeniedException;
+
+    List<EventBookingOrderEntity> getMyBookings() throws ItemNotFoundException;
 }

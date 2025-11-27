@@ -3,6 +3,8 @@ package org.nextgate.nextgatebackend.e_events.events_mng.event_booking_order.ser
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
+import org.nextgate.nextgatebackend.authentication_service.entity.Roles;
+import org.nextgate.nextgatebackend.authentication_service.repo.AccountRepo;
 import org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.entity.EventCheckoutSessionEntity;
 import org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.repo.EventCheckoutSessionRepo;
 import org.nextgate.nextgatebackend.e_events.events_mng.event_booking_order.entity.EventBookingOrderEntity;
@@ -16,14 +18,17 @@ import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.Event
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.repo.EventsRepo;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.entity.TicketEntity;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.repo.TicketRepo;
+import org.nextgate.nextgatebackend.globeadvice.exceptions.AccessDeniedException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Implementation of EventBookingOrderService
@@ -40,6 +45,7 @@ public class EventBookingOrderServiceImpl implements EventBookingOrderService {
     private final ApplicationEventPublisher eventPublisher;
     private final EventsRepo eventsRepo;
     private final TicketRepo ticketRepo;
+    private final AccountRepo accountRepo;
 
     @Override
     @Transactional
@@ -83,6 +89,37 @@ public class EventBookingOrderServiceImpl implements EventBookingOrderService {
 
         return savedBooking;
     }
+
+
+    @Override
+    public EventBookingOrderEntity getBookingById(UUID bookingId) throws ItemNotFoundException, AccessDeniedException {
+        log.debug("Fetching booking: {}", bookingId);
+
+        AccountEntity currentUser = getAuthenticatedAccount();
+
+        EventBookingOrderEntity booking = bookingOrderRepo.findById(bookingId)
+                .orElseThrow(() -> new ItemNotFoundException("Booking not found: " + bookingId));
+
+        // Check if the user can view this booking
+        boolean isCustomer = booking.getCustomer().getId().equals(currentUser.getId());
+        boolean isOrganizer = booking.getEvent().getCreatedBy().getId().equals(currentUser.getId());
+        boolean haveAmongTheRoles = validateRole(currentUser, "ROLE_SUPER_ADMIN", "ROLE_STAFF_ADMIN");
+
+        if (!isCustomer && !isOrganizer && !haveAmongTheRoles) {
+            throw new AccessDeniedException("You don't have permission to view this booking");
+        }
+
+        return booking;
+    }
+
+    @Override
+    public List<EventBookingOrderEntity> getMyBookings() throws ItemNotFoundException {
+
+        AccountEntity currentUser = getAuthenticatedAccount();
+
+        return bookingOrderRepo.findByCustomerOrderByBookedAtDesc(currentUser);
+    }
+
 
     public EventCheckoutSessionEntity fetchCheckoutSession(UUID checkoutSessionId) throws ItemNotFoundException {
         log.debug("Fetching checkout session: {}", checkoutSessionId);
@@ -369,5 +406,42 @@ public class EventBookingOrderServiceImpl implements EventBookingOrderService {
         }
 
         return tickets;
+    }
+
+    private AccountEntity getAuthenticatedAccount() throws ItemNotFoundException {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated()) {
+            UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+            String userName = userDetails.getUsername();
+            return accountRepo.findByUserName(userName)
+                    .orElseThrow(() -> new ItemNotFoundException("User not found"));
+        }
+        throw new ItemNotFoundException("User not authenticated");
+    }
+
+    public boolean validateRole(AccountEntity account, String... requiredRoles) throws AccessDeniedException {
+        if (account == null) {
+            throw new AccessDeniedException("Account not found");
+        }
+
+        if (account.getRoles() == null || account.getRoles().isEmpty()) {
+            throw new AccessDeniedException("Account has no roles assigned");
+        }
+
+        // Get account's role names
+        Set<String> accountRoleNames = account.getRoles().stream()
+                .map(Roles::getRoleName)
+                .collect(Collectors.toSet());
+
+        // Check if account has any of the required roles
+        boolean hasRequiredRole = Arrays.stream(requiredRoles)
+                .anyMatch(accountRoleNames::contains);
+
+        if (!hasRequiredRole) {
+            log.warn("Access denied for user: {}. Required roles: {}, User roles: {}",
+                    account.getUserName(), Arrays.toString(requiredRoles), accountRoleNames);
+            throw new AccessDeniedException("Access denied. Required roles: " + Arrays.toString(requiredRoles));
+        }
+        return hasRequiredRole;
     }
 }
