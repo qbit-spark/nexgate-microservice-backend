@@ -30,10 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
 import java.util.stream.Collectors;
 
-/**
- * Implementation of EventBookingOrderService
- * Handles creation of booking orders from completed checkout sessions
- */
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -119,7 +116,6 @@ public class EventBookingOrderServiceImpl implements EventBookingOrderService {
 
         return bookingOrderRepo.findByCustomerOrderByBookedAtDesc(currentUser);
     }
-
 
     public EventCheckoutSessionEntity fetchCheckoutSession(UUID checkoutSessionId) throws ItemNotFoundException {
         log.debug("Fetching checkout session: {}", checkoutSessionId);

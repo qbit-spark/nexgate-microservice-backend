@@ -7,6 +7,7 @@ import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.e_events.events_mng.event_booking_order.enums.BookingStatus;
 import org.nextgate.nextgatebackend.e_events.events_mng.event_booking_order.enums.TicketInstanceStatus;
 import org.nextgate.nextgatebackend.e_events.events_mng.event_booking_order.utils.BookedTicketsJsonConverter;
+import org.nextgate.nextgatebackend.e_events.events_mng.event_booking_order.utils.VirtualDetailsJsonConverter;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.EventEntity;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.embedded.VirtualDetails;
 import org.springframework.data.annotation.CreatedBy;
@@ -80,10 +81,9 @@ public class EventBookingOrderEntity {
     @Column(name = "event_format", length = 20)
     private String eventFormat;  // IN_PERSON, ONLINE, HYBRID
 
-    //@Column(name = "virtual_meeting_link", length = 500)
-    //private String virtualMeetingLink;  // For ONLINE/HYBRID events
 
-    @Embedded
+    @Column(name = "virtual_details", columnDefinition = "jsonb")
+    @Convert(converter = VirtualDetailsJsonConverter.class)
     private VirtualDetails virtualDetails;
 
     // ========================================
