@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/v1/e-event/check-in/tokens")
+@RequestMapping("/api/v1/e-events/check-in/tokens")
 @RequiredArgsConstructor
 public class RegistrationTokenController {
 

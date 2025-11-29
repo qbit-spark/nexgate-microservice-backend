@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/v1/e-event/check-in/scanners")
+@RequestMapping("/api/v1/e-events/check-in/scanners")
 @RequiredArgsConstructor
 public class ScannerController {
 
