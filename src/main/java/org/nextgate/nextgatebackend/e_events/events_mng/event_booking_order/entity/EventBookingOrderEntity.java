@@ -219,7 +219,9 @@ public class EventBookingOrderEntity {
         private String ticketTypeName;         // e.g., "VIP", "General Admission"
         private String ticketSeries;           // e.g., "VIP-0001", "GENER-0042"
         private BigDecimal price;
-        private String qrCode;                 // Unique QR code for check-in
+
+        private String jwtToken;        // ✅ Signed JWT for validation
+        private String qrCode;          // ✅ Backward compatibility / simple reference
         private String attendanceMode;         // IN_PERSON, ONLINE (from ticket type)
 
         // ========================================

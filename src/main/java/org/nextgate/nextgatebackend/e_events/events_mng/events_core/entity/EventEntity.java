@@ -1,11 +1,13 @@
 package org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity;
 
+import io.hypersistence.utils.hibernate.type.json.JsonBinaryType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.Type;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.authentication_service.utils.StringListJsonConverter;
@@ -16,6 +18,7 @@ import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.embed
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.*;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.utils.MediaJsonConverter;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.entity.TicketEntity;
+import org.nextgate.nextgatebackend.globe_crypto.RSAKeys;
 
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -156,6 +159,10 @@ public class EventEntity {
     @Builder.Default
     private List<String> completedStages = new ArrayList<>();
 
+    @Type(JsonBinaryType.class)  // ← This does ALL the work!
+    @Column(name = "rsa_keys", columnDefinition = "jsonb")
+    private RSAKeys rsaKeys;
+
     // Helper methods
     public boolean isStageCompleted(EventCreationStage stage) {
         return completedStages.contains(stage.name());
@@ -187,6 +194,13 @@ public class EventEntity {
         long completed = completedStages.stream().map(EventCreationStage::valueOf).filter(EventCreationStage::isRequired).count();
 
         return (int) ((completed * 100) / totalRequired);
+    }
+
+    /**
+     * Check if event has active RSA keys
+     */
+    public boolean hasActiveKeys() {
+        return rsaKeys != null && rsaKeys.isActive();
     }
 
 }

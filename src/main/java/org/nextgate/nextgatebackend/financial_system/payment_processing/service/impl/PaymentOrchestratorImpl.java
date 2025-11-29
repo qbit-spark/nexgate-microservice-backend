@@ -3,7 +3,7 @@ package org.nextgate.nextgatebackend.financial_system.payment_processing.service
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.coyote.BadRequestException;
-import com.qbitspark.jikoexpress.financial_system.payment_processing.contract.PayableCheckoutSession;
+import org.nextgate.nextgatebackend.financial_system.payment_processing.contract.PayableCheckoutSession;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.enums.CheckoutSessionStatus;
 import org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.events.PaymentSuccessNotificationEvent;

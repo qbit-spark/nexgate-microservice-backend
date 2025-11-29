@@ -14,10 +14,12 @@ import org.nextgate.nextgatebackend.e_events.events_mng.event_booking_order.even
 import org.nextgate.nextgatebackend.e_events.events_mng.event_booking_order.repo.EventBookingOrderRepo;
 import org.nextgate.nextgatebackend.e_events.events_mng.event_booking_order.repo.TicketSeriesCounterRepo;
 import org.nextgate.nextgatebackend.e_events.events_mng.event_booking_order.service.EventBookingOrderService;
+import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.EventDayEntity;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.EventEntity;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.repo.EventsRepo;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.entity.TicketEntity;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.repo.TicketRepo;
+import org.nextgate.nextgatebackend.globe_crypto.TicketJWTService;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.AccessDeniedException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.springframework.context.ApplicationEventPublisher;
@@ -27,6 +29,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -43,6 +46,8 @@ public class EventBookingOrderServiceImpl implements EventBookingOrderService {
     private final EventsRepo eventsRepo;
     private final TicketRepo ticketRepo;
     private final AccountRepo accountRepo;
+    private final TicketJWTService ticketJWTService;
+
 
     @Override
     @Transactional
@@ -65,7 +70,7 @@ public class EventBookingOrderServiceImpl implements EventBookingOrderService {
         String bookingReference = generateBookingReference();
 
         List<EventBookingOrderEntity.BookedTicket> bookedTickets =
-                createTicketInstances(checkoutSession, ticketType, event);
+                createTicketInstances(checkoutSession, ticketType, event, bookingReference);
 
         log.info("Created {} ticket instances for booking", bookedTickets.size());
 
@@ -177,7 +182,7 @@ public class EventBookingOrderServiceImpl implements EventBookingOrderService {
                 .total(checkoutSession.getTotalAmount())
                 .build();
     }
-    
+
 
     public EventBookingOrderEntity.BookedTicket createSingleTicketInstance(
             TicketEntity ticketType,
@@ -190,7 +195,6 @@ public class EventBookingOrderServiceImpl implements EventBookingOrderService {
 
         UUID ticketInstanceId = UUID.randomUUID();
         String ticketSeries = generateTicketSeries(ticketType.getId(), ticketType.getName());
-        String qrCode = generateQRCode(ticketInstanceId);
 
         log.debug("Created ticket instance: {} with series: {}", ticketInstanceId, ticketSeries);
 
@@ -200,7 +204,6 @@ public class EventBookingOrderServiceImpl implements EventBookingOrderService {
                 .ticketTypeName(ticketType.getName())
                 .ticketSeries(ticketSeries)
                 .price(ticketType.getPrice())
-                .qrCode(qrCode)
                 .attendanceMode(ticketType.getAttendanceMode() != null
                         ? ticketType.getAttendanceMode().name()
                         : null)
@@ -245,16 +248,72 @@ public class EventBookingOrderServiceImpl implements EventBookingOrderService {
         return series;
     }
 
-    public String generateQRCode(UUID ticketInstanceId) {
-        // PLACEHOLDER: Simple UUID-based QR code
-        // TODO: Implement secure QR code generation with encryption/signing
-        // Options for future:
-        // 1. JWT with ticketInstanceId + eventId + signature
-        // 2. AES encrypted payload
-        // 3. HMAC-signed token
 
-        log.debug("Generating QR code for ticket instance: {} (using simple UUID)", ticketInstanceId);
-        return ticketInstanceId.toString();
+    /**
+     * Generate secure JWT-based QR code for a ticket
+     * The JWT contains ticket data and is signed with the event's RSA private key
+     *
+     * @param bookedTicket The ticket to generate QR code for
+     * @param event The event this ticket belongs to
+     * @param bookingReference The booking reference number
+     * @return Signed JWT token (to be used as QR code content)
+     */
+    public String generateQRCode(
+            EventBookingOrderEntity.BookedTicket bookedTicket,
+            EventEntity event,
+            String bookingReference
+    ) {
+        log.debug("Generating secure JWT QR code for ticket instance: {}", bookedTicket.getTicketInstanceId());
+
+        // Build event schedules
+        List<TicketJWTService.EventSchedule> schedules = new ArrayList<>();
+
+        if (event.getDays() != null && !event.getDays().isEmpty()) {
+            // Multi-day event - use EventDayEntity list
+            for (EventDayEntity day : event.getDays()) {
+                schedules.add(TicketJWTService.EventSchedule.builder()
+                        .dayName(day.getDescription())
+                        .startDateTime(ZonedDateTime.from(day.getStartTime()))
+                        .endDateTime(ZonedDateTime.from(day.getEndTime()))
+                        .description(day.getDescription())
+                        .build());
+            }
+        } else {
+            // Single day event - create single schedule
+            schedules.add(TicketJWTService.EventSchedule.builder()
+                    .dayName("Day 1")
+                    .startDateTime(event.getStartDateTime())
+                    .endDateTime(event.getEndDateTime())
+                    .description(event.getTitle())
+                    .build());
+        }
+
+        // Build JWT data
+        TicketJWTService.TicketJWTData jwtData = TicketJWTService.TicketJWTData.builder()
+                .ticketInstanceId(bookedTicket.getTicketInstanceId())
+                .ticketTypeId(bookedTicket.getTicketTypeId())
+                .ticketTypeName(bookedTicket.getTicketTypeName())
+                .ticketSeries(bookedTicket.getTicketSeries())
+                .eventId(event.getId())
+                .eventName(event.getTitle())
+                .eventStartDateTime(event.getStartDateTime())
+                .attendeeName(bookedTicket.getAttendeeName())
+                .attendeeEmail(bookedTicket.getAttendeeEmail())
+                .attendeePhone(bookedTicket.getAttendeePhone())
+                .attendanceMode(bookedTicket.getAttendanceMode())
+                .bookingReference(bookingReference)
+                .eventSchedules(schedules)
+                .validFrom(bookedTicket.getValidFrom())
+                .validUntil(bookedTicket.getValidUntil())
+                .build();
+
+        // Generate signed JWT
+        String jwt = ticketJWTService.generateTicketJWT(jwtData, event.getRsaKeys());
+
+        log.info("Generated secure JWT QR code for ticket: {} (length: {} chars)",
+                bookedTicket.getTicketInstanceId(), jwt.length());
+
+        return jwt;
     }
 
     public EventBookingOrderEntity saveBookingOrder(EventBookingOrderEntity bookingOrder) {
@@ -363,12 +422,15 @@ public class EventBookingOrderServiceImpl implements EventBookingOrderService {
     }
 
 
-
-    // Update createTicketInstances to use JSONB fields:
+    /**
+     * Create ticket instances with JWT generation
+     * Updated to generate JWT for each ticket after creation
+     */
     public List<EventBookingOrderEntity.BookedTicket> createTicketInstances(
             EventCheckoutSessionEntity checkoutSession,
             TicketEntity ticketType,
-            EventEntity event) {
+            EventEntity event,
+            String bookingReference) {
 
         List<EventBookingOrderEntity.BookedTicket> tickets = new ArrayList<>();
         AccountEntity buyer = checkoutSession.getCustomer();
@@ -379,8 +441,9 @@ public class EventBookingOrderServiceImpl implements EventBookingOrderService {
                 ? details.getTicketsForBuyer()
                 : 0;
 
+        // Create tickets for buyer
         for (int i = 0; i < ticketsForBuyer; i++) {
-            tickets.add(createSingleTicketInstance(
+            EventBookingOrderEntity.BookedTicket ticket = createSingleTicketInstance(
                     ticketType,
                     buyer.getUserName(),
                     buyer.getEmail(),
@@ -388,15 +451,23 @@ public class EventBookingOrderServiceImpl implements EventBookingOrderService {
                     buyer.getUserName(),
                     buyer.getEmail(),
                     event
-            ));
+            );
+
+            // Generate JWT after a ticket is created
+            String jwt = generateQRCode(ticket, event, bookingReference);
+            ticket.setJwtToken(jwt);
+            ticket.setQrCode(jwt);
+
+            tickets.add(ticket);
         }
 
+        // Create tickets for other attendees
         if (details.getOtherAttendees() != null) {
             for (EventCheckoutSessionEntity.OtherAttendee attendee : details.getOtherAttendees()) {
                 int quantity = attendee.getQuantity() != null ? attendee.getQuantity() : 0;
 
                 for (int i = 0; i < quantity; i++) {
-                    tickets.add(createSingleTicketInstance(
+                    EventBookingOrderEntity.BookedTicket ticket = createSingleTicketInstance(
                             ticketType,
                             attendee.getName(),
                             attendee.getEmail(),
@@ -404,7 +475,14 @@ public class EventBookingOrderServiceImpl implements EventBookingOrderService {
                             buyer.getUserName(),
                             buyer.getEmail(),
                             event
-                    ));
+                    );
+
+                    // Generate JWT after ticket is created
+                    String jwt = generateQRCode(ticket, event, bookingReference);
+                    ticket.setJwtToken(jwt);
+                    ticket.setQrCode(jwt);
+
+                    tickets.add(ticket);
                 }
             }
         }

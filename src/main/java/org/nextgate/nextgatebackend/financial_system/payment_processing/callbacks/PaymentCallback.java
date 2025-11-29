@@ -1,6 +1,6 @@
 package org.nextgate.nextgatebackend.financial_system.payment_processing.callbacks;
 
-import com.qbitspark.jikoexpress.financial_system.payment_processing.contract.PayableCheckoutSession;
+import org.nextgate.nextgatebackend.financial_system.payment_processing.contract.PayableCheckoutSession;
 import org.apache.coyote.BadRequestException;
 import org.nextgate.nextgatebackend.financial_system.escrow.entity.EscrowAccountEntity;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.payloads.PaymentResult;

@@ -1,7 +1,7 @@
 package org.nextgate.nextgatebackend.e_commerce.checkout_session.entity;
 
 
-import com.qbitspark.jikoexpress.financial_system.payment_processing.contract.PayableCheckoutSession;
+import org.nextgate.nextgatebackend.financial_system.payment_processing.contract.PayableCheckoutSession;
 import jakarta.persistence.*;
 import lombok.*;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
@@ -12,7 +12,6 @@ import org.nextgate.nextgatebackend.financial_system.payment_processing.utils.Pa
 import org.nextgate.nextgatebackend.financial_system.payment_processing.utils.PaymentIntentJsonConverter;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.utils.PricingDetailsJsonConverter;
 import org.nextgate.nextgatebackend.globe_enums.CheckoutSessionsDomains;
-import org.nextgate.nextgatebackend.payment_methods.entity.PaymentMethodsEntity;
 import org.nextgate.nextgatebackend.payment_methods.utils.BillingAddressJsonConverter;
 import org.nextgate.nextgatebackend.payment_methods.utils.MetadataJsonConverter;
 

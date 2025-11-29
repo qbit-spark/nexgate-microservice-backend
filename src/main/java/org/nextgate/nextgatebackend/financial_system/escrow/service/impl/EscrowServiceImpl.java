@@ -1,6 +1,6 @@
 package org.nextgate.nextgatebackend.financial_system.escrow.service.impl;
 
-import com.qbitspark.jikoexpress.financial_system.payment_processing.contract.PayableCheckoutSession;
+import org.nextgate.nextgatebackend.financial_system.payment_processing.contract.PayableCheckoutSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;

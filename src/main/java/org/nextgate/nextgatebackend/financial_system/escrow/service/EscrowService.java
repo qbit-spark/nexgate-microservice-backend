@@ -1,6 +1,6 @@
 package org.nextgate.nextgatebackend.financial_system.escrow.service;
 
-import com.qbitspark.jikoexpress.financial_system.payment_processing.contract.PayableCheckoutSession;
+import org.nextgate.nextgatebackend.financial_system.payment_processing.contract.PayableCheckoutSession;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.financial_system.escrow.entity.EscrowAccountEntity;
 import org.nextgate.nextgatebackend.financial_system.escrow.enums.EscrowStatus;

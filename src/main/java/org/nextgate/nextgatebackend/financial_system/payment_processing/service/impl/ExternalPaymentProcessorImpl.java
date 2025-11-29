@@ -1,7 +1,7 @@
 package org.nextgate.nextgatebackend.financial_system.payment_processing.service.impl;
 
 import lombok.extern.slf4j.Slf4j;
-import com.qbitspark.jikoexpress.financial_system.payment_processing.contract.PayableCheckoutSession;
+import org.nextgate.nextgatebackend.financial_system.payment_processing.contract.PayableCheckoutSession;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.enums.PaymentMethod;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.payloads.PaymentResult;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.service.ExternalPaymentProcessor;

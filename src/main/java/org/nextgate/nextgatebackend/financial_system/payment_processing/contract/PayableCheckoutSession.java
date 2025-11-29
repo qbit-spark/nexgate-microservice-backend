@@ -1,4 +1,4 @@
-package com.qbitspark.jikoexpress.financial_system.payment_processing.contract;
+package org.nextgate.nextgatebackend.financial_system.payment_processing.contract;
 
 
 

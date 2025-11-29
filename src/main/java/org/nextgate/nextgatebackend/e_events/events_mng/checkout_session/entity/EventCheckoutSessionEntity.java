@@ -2,13 +2,11 @@ package org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.entity
 
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.qbitspark.jikoexpress.financial_system.payment_processing.contract.PayableCheckoutSession;
+import org.nextgate.nextgatebackend.financial_system.payment_processing.contract.PayableCheckoutSession;
 import jakarta.persistence.*;
 import lombok.*;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.enums.CheckoutSessionStatus;
-import org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.utils.TicketCheckoutDetailsJsonConverter;
-import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.EventEntity;
 import org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.utils.TicketCheckoutDetailsJsonConverter;
 import org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.utils.converters.PricingSummaryJsonConverter;
 import org.nextgate.nextgatebackend.e_events.events_mng.checkout_session.utils.converters.EventPaymentIntentJsonConverter;

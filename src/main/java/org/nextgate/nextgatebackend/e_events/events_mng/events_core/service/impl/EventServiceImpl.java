@@ -26,6 +26,8 @@ import org.nextgate.nextgatebackend.e_events.events_mng.events_core.service.Even
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.utils.validations.DuplicateValidationResult;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.utils.validations.EventDuplicateValidator;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.utils.validations.EventValidations;
+import org.nextgate.nextgatebackend.globe_crypto.RSAKeyService;
+import org.nextgate.nextgatebackend.globe_crypto.RSAKeys;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.AccessDeniedException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.EventValidationException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
@@ -52,6 +54,7 @@ public class EventServiceImpl implements EventsService {
     private final EventDuplicateValidator duplicateValidator;
     private final ShopRepo shopRepo;
     private final ProductRepo productRepo;
+    private final RSAKeyService rsaKeyService;
 
     @Override
     @Transactional
@@ -119,6 +122,16 @@ public class EventServiceImpl implements EventsService {
                     duplicateCheck.getMessage(),
                     EventCreationStage.BASIC_INFO
             );
+        }
+
+        // 🎯 GENERATE RSA KEYS FOR EVENT (NEW CODE)
+        if (event.getRsaKeys() == null) {
+            log.info("Generating RSA key pair for event: {}", eventId);
+            RSAKeys rsaKeys = rsaKeyService.generateKeys();
+            event.setRsaKeys(rsaKeys);
+            log.info("RSA keys generated successfully for event: {}", eventId);
+        } else {
+            log.info("Event already has RSA keys, skipping generation");
         }
 
         event.setStatus(EventStatus.PUBLISHED);
