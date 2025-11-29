@@ -120,9 +120,7 @@ public class ScannerEntity {
     /**
      * Scanner status
      * ACTIVE - Currently active and scanning
-     * CLOSED - Session closed (scanner switched to different event)
      * REVOKED - Blocked due to security violation
-     * EXPIRED - Credentials expired
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
@@ -197,6 +195,7 @@ public class ScannerEntity {
     @Builder.Default
     private Integer failedScans = 0;
 
+
     // ========================================
     // NETWORK & LOCATION
     // ========================================
@@ -239,23 +238,11 @@ public class ScannerEntity {
         return ScannerStatus.ACTIVE.equals(status);
     }
 
-    public boolean isClosed() {
-        return ScannerStatus.CLOSED.equals(status);
-    }
 
     public boolean isRevoked() {
         return ScannerStatus.REVOKED.equals(status);
     }
 
-    public boolean isExpired() {
-        return ScannerStatus.EXPIRED.equals(status);
-    }
-
-    public void close(AccountEntity closedBy) {
-        this.status = ScannerStatus.CLOSED;
-        this.closedAt = Instant.now();
-        this.closedBy = closedBy;
-    }
 
     public void revoke(String reason, AccountEntity revokedBy) {
         this.status = ScannerStatus.REVOKED;
@@ -293,4 +280,5 @@ public class ScannerEntity {
         }
         return (successfulScans * 100.0) / totalScans;
     }
+
 }

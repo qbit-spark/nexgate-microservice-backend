@@ -7,9 +7,11 @@ import org.nextgate.nextgatebackend.authentication_service.repo.AccountRepo;
 import org.nextgate.nextgatebackend.e_events.events_mng.check_in_system.entity.RegistrationTokenEntity;
 import org.nextgate.nextgatebackend.e_events.events_mng.check_in_system.entity.ScannerEntity;
 import org.nextgate.nextgatebackend.e_events.events_mng.check_in_system.enums.ScannerStatus;
+import org.nextgate.nextgatebackend.e_events.events_mng.check_in_system.payloads.RegisterScannerRequest;
 import org.nextgate.nextgatebackend.e_events.events_mng.check_in_system.repo.ScannerRepository;
 import org.nextgate.nextgatebackend.e_events.events_mng.check_in_system.service.RegistrationTokenService;
 import org.nextgate.nextgatebackend.e_events.events_mng.check_in_system.service.ScannerService;
+import org.nextgate.nextgatebackend.e_events.events_mng.check_in_system.utils.DeviceFingerprintValidator;
 import org.nextgate.nextgatebackend.e_events.events_mng.check_in_system.utils.RegistrationTokenValidator;
 import org.nextgate.nextgatebackend.e_events.events_mng.check_in_system.utils.ScannerValidator;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.EventEntity;
@@ -49,7 +51,7 @@ public class ScannerServiceImpl implements ScannerService {
     @Override
     @Transactional
     public ScannerEntity registerScanner(RegisterScannerRequest request)
-            throws IllegalStateException {
+            throws IllegalStateException, ItemNotFoundException {
 
         log.info("Registering scanner with token: {}", request.getRegistrationToken());
 
@@ -77,7 +79,7 @@ public class ScannerServiceImpl implements ScannerService {
                 ? token.getScannerName()
                 : request.getScannerName();
 
-        // 7. Create scanner entity
+        // 7. Create a scanner entity
         ScannerEntity scanner = ScannerEntity.builder()
                 .scannerId(scannerId)
                 .name(scannerName)
@@ -121,38 +123,6 @@ public class ScannerServiceImpl implements ScannerService {
         return scannerRepo.findByEvent(event);
     }
 
-    @Override
-    public List<ScannerEntity> getActiveScannersForEvent(UUID eventId) throws AccessDeniedException, ItemNotFoundException {
-        log.debug("Fetching active scanners for event: {}", eventId);
-
-        AccountEntity currentUser = getAuthenticatedAccount();
-
-        EventEntity event = eventsRepo.findByIdAndIsDeletedFalse(eventId)
-                .orElseThrow(() -> new ItemNotFoundException("Event not found: " + eventId));
-
-        validateEventOwnership(event, currentUser);
-
-        return scannerRepo.findByEventAndStatus(event, ScannerStatus.ACTIVE);
-    }
-
-    @Override
-    @Transactional
-    public void closeScanner(String scannerId) throws ItemNotFoundException, AccessDeniedException {
-        log.info("Closing scanner: {}", scannerId);
-
-        AccountEntity currentUser = getAuthenticatedAccount();
-
-        ScannerEntity scanner = getByScannerId(scannerId);
-
-        // Validate user owns the event
-        validateEventOwnership(scanner.getEvent(), currentUser);
-
-        // Close scanner
-        scanner.close(currentUser);
-        scannerRepo.save(scanner);
-
-        log.info("Scanner closed: {}", scannerId);
-    }
 
     @Override
     @Transactional
@@ -178,60 +148,41 @@ public class ScannerServiceImpl implements ScannerService {
     // ========================================
 
     /**
-     * Handle duplicate device registration scenarios
-     *
-     * Scenarios:
-     * 1. Device has NO scanner for this event → Allow (new registration)
-     * 2. Device has ACTIVE scanner for this event → ERROR (already registered)
-     * 3. Device has CLOSED scanner for this event → Allow (re-registration)
-     * 4. Device has REVOKED scanner for this event → ERROR (blocked)
-     * 5. Device has EXPIRED scanner for this event → Allow (re-registration)
+     * New Rule: One device → Only ONE ACTIVE scanner at a time (across all events)
+     * If a device tries to register again → revoke any existing ACTIVE scanner it owns
      */
     private void handleDuplicateDeviceScenarios(EventEntity event, String deviceFingerprint)
             throws IllegalStateException {
 
-        log.debug("Checking for existing scanner with fingerprint: {} for event: {}",
-                deviceFingerprint, event.getId());
+        log.debug("Checking for existing ACTIVE scanners with fingerprint: {}", deviceFingerprint);
 
-        // Check if device already has scanner for this event
-        var existingScanner = scannerRepo.findByEventAndDeviceFingerprint(event, deviceFingerprint);
+        // Find ANY active scanner with this device fingerprint (across all events)
+        List<ScannerEntity> activeScanners = scannerRepo.findByDeviceFingerprintAndStatus(
+                deviceFingerprint, ScannerStatus.ACTIVE);
 
-        if (existingScanner.isEmpty()) {
-            // Scenario 1: No existing scanner - allow registration
-            log.debug("No existing scanner found - allowing registration");
+        if (activeScanners.isEmpty()) {
+            log.debug("No active scanner found for this device - allowing registration");
             return;
         }
 
-        ScannerEntity scanner = existingScanner.get();
+        // Revoke ALL previously active scanners for this device
+        for (ScannerEntity oldScanner : activeScanners) {
+            String oldEventTitle = oldScanner.getEvent() != null ? oldScanner.getEvent().getTitle() : "Unknown";
 
-        switch (scanner.getStatus()) {
-            case ACTIVE:
-                // Scenario 2: Device already has ACTIVE scanner for this event
-                log.error("Device already has active scanner for event. Scanner: {}, Event: {}",
-                        scanner.getScannerId(), event.getId());
-                throw new IllegalStateException(
-                        "This device already has an active scanner for this event. " +
-                                "Please close the existing session before registering again."
-                );
+            log.warn("Device already has ACTIVE scanner: {} for event: {}. Revoking it automatically.",
+                    oldScanner.getScannerId(), oldEventTitle);
 
-            case REVOKED:
-                // Scenario 4: Device was REVOKED - block registration
-                log.error("Device has revoked scanner for event. Scanner: {}, Reason: {}",
-                        scanner.getScannerId(), scanner.getRevocationReason());
-                throw new IllegalStateException(
-                        "This device has been revoked for this event. Reason: " +
-                                scanner.getRevocationReason()
-                );
+            oldScanner.revoke(
+                    "Automatically revoked: Device registered as new scanner for event '" + event.getTitle() + "'",
+                    null // or pass the current user if available
+            );
+            scannerRepo.save(oldScanner);
 
-            case CLOSED:
-            case EXPIRED:
-                // Scenario 3 & 5: Device has CLOSED or EXPIRED scanner - allow re-registration
-                log.info("Device has {} scanner - allowing re-registration. Old scanner: {}",
-                        scanner.getStatus(), scanner.getScannerId());
-                // Continue with registration (new scanner entity will be created)
-                break;
+            log.info("Previous scanner revoked: {}", oldScanner.getScannerId());
         }
+
     }
+
 
     /**
      * Generate scanner credentials (JWT token)
@@ -251,12 +202,11 @@ public class ScannerServiceImpl implements ScannerService {
         // Sign with event's private key
         // Note: For scanner credentials, we could use a separate signing key
         // For now, using event's key for simplicity
-        String jwt = ticketJWTService.generateTicketJWT(
+
+        return ticketJWTService.generateTicketJWT(
                 buildScannerJWTData(scannerId, event),
                 event.getRsaKeys()
         );
-
-        return jwt;
     }
 
     /**

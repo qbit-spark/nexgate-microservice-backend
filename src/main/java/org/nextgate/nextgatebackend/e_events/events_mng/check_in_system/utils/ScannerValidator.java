@@ -2,6 +2,7 @@ package org.nextgate.nextgatebackend.e_events.events_mng.check_in_system.utils;
 
 import lombok.extern.slf4j.Slf4j;
 import org.nextgate.nextgatebackend.e_events.events_mng.check_in_system.entity.ScannerEntity;
+import org.nextgate.nextgatebackend.e_events.events_mng.check_in_system.enums.ScannerStatus;
 import org.springframework.stereotype.Component;
 
 /**
@@ -23,22 +24,15 @@ public class ScannerValidator {
             throw new IllegalArgumentException("Scanner not found");
         }
 
-        if (!scanner.isActive()) {
-            log.warn("Scanner is not active: {} (status: {})",
-                    scanner.getScannerId(), scanner.getStatus());
-
-            String message = switch (scanner.getStatus()) {
-                case CLOSED -> "Scanner session has been closed";
-                case REVOKED -> "Scanner has been revoked: " + scanner.getRevocationReason();
-                case EXPIRED -> "Scanner credentials have expired";
-                default -> "Scanner is not active";
-            };
-
-            throw new IllegalStateException(message);
+        if (scanner.getStatus() == ScannerStatus.REVOKED) {
+            String reason = scanner.getRevocationReason() != null
+                    ? scanner.getRevocationReason()
+                    : "Unknown reason";
+            log.warn("Scanner is revoked: {} - Reason: {}", scanner.getScannerId(), reason);
+            throw new IllegalStateException("Scanner has been revoked: " + reason);
         }
 
         if (scanner.getEvent() == null) {
-            log.error("Scanner has no associated event: {}", scanner.getScannerId());
             throw new IllegalStateException("Scanner has no associated event");
         }
 

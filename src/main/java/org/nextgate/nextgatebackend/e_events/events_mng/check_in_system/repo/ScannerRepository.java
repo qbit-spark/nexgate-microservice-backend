@@ -12,7 +12,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 
-@
+
 public interface ScannerRepository extends JpaRepository<ScannerEntity, UUID> {
 
     /**
@@ -43,4 +43,6 @@ public interface ScannerRepository extends JpaRepository<ScannerEntity, UUID> {
      * Used by: Allowing the same device to re-register after closing session
      */
     Optional<ScannerEntity> findByEventAndDeviceFingerprint(EventEntity event, String deviceFingerprint);
+
+    List<ScannerEntity> findByDeviceFingerprintAndStatus(String deviceFingerprint, ScannerStatus status);
 }

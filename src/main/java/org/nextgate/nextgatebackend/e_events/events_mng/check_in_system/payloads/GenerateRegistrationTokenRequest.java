@@ -18,14 +18,13 @@ import java.util.UUID;
 @AllArgsConstructor
 public class GenerateRegistrationTokenRequest {
 
-
     @NotNull(message = "Event ID is required")
     private UUID eventId;
 
     /**
      * Optional scanner name/description
      * Example: "Gate A - Main Entrance", "VIP Section"
-     * If provided, will be used as default scanner name during registration
+     * If provided, will be used as the default scanner name during registration
      */
     private String scannerName;
 
