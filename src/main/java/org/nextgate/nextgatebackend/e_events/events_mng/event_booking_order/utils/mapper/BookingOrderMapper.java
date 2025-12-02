@@ -4,6 +4,7 @@ import org.nextgate.nextgatebackend.e_events.events_mng.event_booking_order.enti
 import org.nextgate.nextgatebackend.e_events.events_mng.event_booking_order.payload.BookingOrderResponse;
 import org.nextgate.nextgatebackend.e_events.events_mng.event_booking_order.payload.BookingOrderSummaryResponse;
 
+import java.util.List;
 import java.util.stream.Collectors;
 
 public class BookingOrderMapper {
@@ -24,7 +25,7 @@ public class BookingOrderMapper {
                         .map(BookingOrderMapper::mapTicket)
                         .collect(Collectors.toList()))
                 .totalTickets(entity.getTotalTicketCount())
-                .checkedInTickets((int) entity.getCheckedInCount())
+                .checkedInTicketsCount((int) entity.getCheckedInCount())
                 .subtotal(entity.getSubtotal())
                 .total(entity.getTotal())
                 .bookedAt(entity.getBookedAt())
@@ -80,7 +81,32 @@ public class BookingOrderMapper {
                 .build();
     }
 
-    private static BookingOrderResponse.BookedTicketResponse mapTicket(EventBookingOrderEntity.BookedTicket ticket) {
+    private static BookingOrderResponse.BookedTicketResponse mapTicket(
+            EventBookingOrderEntity.BookedTicket ticket) {
+
+        // Safely get check-ins list (never null)
+        List<EventBookingOrderEntity.BookedTicket.CheckInRecord> checkInRecords =
+                ticket.getCheckIns() != null ? ticket.getCheckIns() : List.of();
+
+        boolean hasAnyCheckIn = !checkInRecords.isEmpty();
+
+        // Get the most recent check-in (null if none)
+        EventBookingOrderEntity.BookedTicket.CheckInRecord lastCheckIn = ticket.getLastCheckIn();
+
+        // Map each CheckInRecord → DTO
+        List<BookingOrderResponse.BookedTicketResponse.CheckInRecordDto> checkInDtos = checkInRecords.stream()
+                .map(rec -> BookingOrderResponse.BookedTicketResponse.CheckInRecordDto.builder()
+                        .checkInTime(rec.getCheckInTime())
+                        .checkInLocation(rec.getCheckInLocation())
+                        .checkedInBy(rec.getCheckedInBy())
+                        .dayName(rec.getDayName())
+                        .scannerId(rec.getScannerId())
+                        .checkInMethod(rec.getCheckInMethod() != null ? rec.getCheckInMethod() : "QR_SCAN")
+                        .build())
+                // Sort newest first (optional, but nice for frontend)
+                .sorted((a, b) -> b.getCheckInTime().compareTo(a.getCheckInTime()))
+                .toList();
+
         return BookingOrderResponse.BookedTicketResponse.builder()
                 .ticketInstanceId(ticket.getTicketInstanceId())
                 .ticketTypeName(ticket.getTicketTypeName())
@@ -88,7 +114,7 @@ public class BookingOrderMapper {
                 .price(ticket.getPrice())
                 .attendanceMode(ticket.getAttendanceMode())
                 .qrCode(ticket.getQrCode())
-                .attendanceMode(ticket.getAttendanceMode())
+
                 .attendee(BookingOrderResponse.AttendeeInfo.builder()
                         .name(ticket.getAttendeeName())
                         .email(ticket.getAttendeeEmail())
@@ -98,10 +124,15 @@ public class BookingOrderMapper {
                         .name(ticket.getBuyerName())
                         .email(ticket.getBuyerEmail())
                         .build())
-                .checkedIn(ticket.getCheckedIn())
-                .checkedInAt(ticket.getCheckedInAt())
-                .checkedInBy(ticket.getCheckedInBy())
-                .checkInLocation(ticket.getCheckInLocation())
+
+                // === Multi-day check-in mapping ===
+                .checkIns(checkInDtos)
+                .hasBeenCheckedIn(hasAnyCheckIn)
+                .lastCheckedInAt(lastCheckIn != null ? lastCheckIn.getCheckInTime() : null)
+                .lastCheckedInBy(lastCheckIn != null ? lastCheckIn.getCheckedInBy() : null)
+                .lastCheckInLocation(lastCheckIn != null ? lastCheckIn.getCheckInLocation() : null)
+                .lastCheckInDayName(lastCheckIn != null ? lastCheckIn.getDayName() : null)
+
                 .status(ticket.getStatus())
                 .validFrom(ticket.getValidFrom())
                 .validUntil(ticket.getValidUntil())

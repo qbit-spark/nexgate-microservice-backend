@@ -13,6 +13,7 @@ import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.embed
 import org.springframework.data.annotation.CreatedBy;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -23,6 +24,8 @@ import java.util.UUID;
  * Entity representing a confirmed event booking order
  * Created after successful payment of an EventCheckoutSession
  * Contains booked tickets with QR codes for event entry
+ *
+ * Supports multi-day events with per-day check-in tracking
  */
 @Entity
 @Table(name = "event_booking_orders", indexes = {
@@ -167,33 +170,56 @@ public class EventBookingOrderEntity {
     // ========================================
 
     /**
-     * Get total number of tickets in this booking
+     * Get the total number of tickets in this booking
      */
     public int getTotalTicketCount() {
         return bookedTickets != null ? bookedTickets.size() : 0;
     }
 
     /**
-     * Check if all tickets have been used (checked in)
+     * Check if all tickets have been used (checked in at least once)
      */
     public boolean areAllTicketsUsed() {
         if (bookedTickets == null || bookedTickets.isEmpty()) {
             return false;
         }
         return bookedTickets.stream()
-                .allMatch(ticket -> ticket.getCheckedIn() != null && ticket.getCheckedIn());
+                .allMatch(BookedTicket::hasAnyCheckIn);
     }
 
     /**
-     * Get count of checked-in tickets
+     * Get count of tickets with at least one check-in
      */
     public long getCheckedInCount() {
         if (bookedTickets == null) {
             return 0;
         }
         return bookedTickets.stream()
-                .filter(ticket -> ticket.getCheckedIn() != null && ticket.getCheckedIn())
+                .filter(BookedTicket::hasAnyCheckIn)
                 .count();
+    }
+
+    /**
+     * Get total number of check-ins across all tickets
+     */
+    public long getTotalCheckInCount() {
+        if (bookedTickets == null) {
+            return 0;
+        }
+        return bookedTickets.stream()
+                .mapToLong(BookedTicket::getCheckInCount)
+                .sum();
+    }
+
+    /**
+     * Get attendance rate (percentage of tickets with check-ins)
+     */
+    public double getAttendanceRate() {
+        int total = getTotalTicketCount();
+        if (total == 0) {
+            return 0.0;
+        }
+        return (getCheckedInCount() * 100.0) / total;
     }
 
     // ========================================
@@ -203,6 +229,7 @@ public class EventBookingOrderEntity {
     /**
      * Represents an individual booked ticket with complete details
      * Contains all information needed for PDF ticket generation
+     * Supports multi-day events with multiple check-ins
      */
     @Data
     @Builder
@@ -220,8 +247,8 @@ public class EventBookingOrderEntity {
         private String ticketSeries;           // e.g., "VIP-0001", "GENER-0042"
         private BigDecimal price;
 
-        private String jwtToken;        // ✅ Signed JWT for validation
-        private String qrCode;          // ✅ Backward compatibility / simple reference
+        private String jwtToken;               // ✅ Signed JWT for validation
+        private String qrCode;                 // ✅ Backward compatibility / simple reference
         private String attendanceMode;         // IN_PERSON, ONLINE (from ticket type)
 
         // ========================================
@@ -240,13 +267,20 @@ public class EventBookingOrderEntity {
         private String buyerEmail;
 
         // ========================================
-        // CHECK-IN DETAILS
+        // CHECK-IN DETAILS (MULTI-DAY SUPPORT)
         // ========================================
 
-        private Boolean checkedIn;
-        private ZonedDateTime checkedInAt;
-        private String checkedInBy;            // Staff username
-        private String checkInLocation;        // Gate/entrance name
+        /**
+         * List of check-in records
+         * Supports multiple check-ins for multi-day events
+         *
+         * Example for 3-day festival:
+         * - Day 1: Check-in at 18:00
+         * - Day 2: Check-in at 14:00
+         * - Day 3: Check-in at 15:00
+         */
+        @Builder.Default
+        private List<CheckInRecord> checkIns = new ArrayList<>();
 
         // ========================================
         // TICKET STATUS & VALIDITY
@@ -255,5 +289,131 @@ public class EventBookingOrderEntity {
         private TicketInstanceStatus status;   // ACTIVE, USED, CANCELLED
         private ZonedDateTime validFrom;       // Ticket valid from this time
         private ZonedDateTime validUntil;      // Ticket valid until this time
+
+        // ========================================
+        // HELPER METHODS FOR CHECK-IN
+        // ========================================
+
+        /**
+         * Check if ticket has been checked in for a specific day
+         *
+         * @param dayName The day name (e.g., "Day 1", "Day 2 - Saturday")
+         * @return true if checked in for this day
+         */
+        public boolean isCheckedInForDay(String dayName) {
+            if (checkIns == null || dayName == null) {
+                return false;
+            }
+            return checkIns.stream()
+                    .anyMatch(checkIn -> dayName.equals(checkIn.getDayName()));
+        }
+
+        /**
+         * Check if ticket has any check-in records
+         *
+         * @return true if ticket has been checked in at least once
+         */
+        public boolean hasAnyCheckIn() {
+            return checkIns != null && !checkIns.isEmpty();
+        }
+
+        /**
+         * Get the most recent check-in record
+         *
+         * @return Last check-in record or null if none
+         */
+        public CheckInRecord getLastCheckIn() {
+            if (checkIns == null || checkIns.isEmpty()) {
+                return null;
+            }
+            return checkIns.getLast();
+        }
+
+        /**
+         * Get total number of check-ins
+         *
+         * @return Count of check-ins
+         */
+        public int getCheckInCount() {
+            return checkIns != null ? checkIns.size() : 0;
+        }
+
+        /**
+         * Get all check-ins for a specific day
+         *
+         * @param dayName The day name
+         * @return List of check-ins for this day
+         */
+        public List<CheckInRecord> getCheckInsForDay(String dayName) {
+            if (checkIns == null || dayName == null) {
+                return new ArrayList<>();
+            }
+            return checkIns.stream()
+                    .filter(checkIn -> dayName.equals(checkIn.getDayName()))
+                    .toList();
+        }
+
+        /**
+         * Check if checked in today (by date, not by day name)
+         * Useful for same-day re-entry prevention
+         *
+         * @return true if checked in today
+         */
+        public boolean isCheckedInToday() {
+            if (checkIns == null) {
+                return false;
+            }
+            LocalDate today = LocalDate.now();
+            return checkIns.stream()
+                    .anyMatch(checkIn -> checkIn.getCheckInTime().toLocalDate().equals(today));
+        }
+
+        // ========================================
+        // NESTED CLASS: CHECK-IN RECORD
+        // ========================================
+
+        /**
+         * Represents a single check-in event
+         * Multiple check-ins allowed for multi-day events
+         */
+        @Data
+        @Builder
+        @NoArgsConstructor
+        @AllArgsConstructor
+        public static class CheckInRecord {
+
+            /**
+             * When check-in occurred
+             */
+            private ZonedDateTime checkInTime;
+
+            /**
+             * Where check-in occurred (e.g., "Gate A", "VIP Entrance")
+             */
+            private String checkInLocation;
+
+            /**
+             * Who processed the check-in (scanner name)
+             */
+            private String checkedInBy;
+
+            /**
+             * Which event day this check-in is for
+             * Example: "Day 1", "Day 2 - Saturday"
+             * Must match dayName from eventSchedules in JWT
+             */
+            private String dayName;
+
+            /**
+             * Scanner ID that performed the check-in
+             */
+            private String scannerId;
+
+            /**
+             * Check-in method (default: QR_SCAN)
+             */
+            @Builder.Default
+            private String checkInMethod = "QR_SCAN";
+        }
     }
 }

@@ -27,6 +27,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import static org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.CheckInWindowStrategy.HOURS_BEFORE;
+
 @Entity
 @Table(name = "events", indexes = {
         @Index(name = "idx_event_slug", columnList = "slug"), @Index(name = "idx_event_status", columnList = "status"), @Index(name = "idx_event_format", columnList = "event_format"), @Index(name = "idx_event_visibility", columnList = "eventVisibility"), @Index(name = "idx_event_organizer", columnList = "organizer_id"), @Index(name = "idx_event_category", columnList = "category_id"), @Index(name = "idx_event_dates", columnList = "start_date_time, end_date_time"), @Index(name = "idx_event_start_date", columnList = "start_date_time"), @Index(name = "idx_event_is_deleted", columnList = "is_deleted"), @Index(name = "idx_event_duplicate_check", columnList = "status, is_deleted, start_date_time"), @Index(name = "idx_event_organizer_status", columnList = "organizer_id, status, is_deleted, start_date_time"), @Index(name = "idx_event_public_listing", columnList = "status, eventVisibility, is_deleted, start_date_time"), @Index(name = "idx_event_category_status", columnList = "category_id, status, is_deleted, start_date_time")})
@@ -91,6 +93,64 @@ public class EventEntity {
     @OneToMany(mappedBy = "eventEntity", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<EventDayEntity> days = new ArrayList<>();
+
+
+     // CHECK-IN WINDOW CONFIGURATION
+
+    /**
+     * Check-in window strategy
+     * Determines when attendees can check in
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "checkin_strategy", length = 20)
+    @Builder.Default
+    private CheckInWindowStrategy checkInStrategy = CheckInWindowStrategy.HOURS_BEFORE;
+
+
+    // For HOURS_BEFORE strategy
+
+
+    /**
+     * Hours before event to allow check-in
+     * Used when checkInStrategy = HOURS_BEFORE
+     * Default: 2 hours
+     */
+    @Column(name = "early_checkin_hours")
+    @Builder.Default
+    private Integer earlyCheckInHours = 3;
+
+    /**
+     * Minutes after event end to allow check-in (grace period)
+     * Used when checkInStrategy = HOURS_BEFORE
+     * Default: 30 minutes
+     */
+    @Column(name = "late_checkin_minutes")
+    @Builder.Default
+    private Integer lateCheckInMinutes = 30;
+
+
+    // For SPECIFIC_TIME strategy
+
+
+    /**
+     * Specific time when check-in opens each day
+     * Used when checkInStrategy = SPECIFIC_TIME
+     * Format: "HH:mm" (24-hour format)
+     * Example: "08:00" means gates open at 8 AM
+     */
+    @Column(name = "checkin_opens_at", length = 5)
+    private String checkInOpensAt;
+
+    /**
+     * Specific time when check-in closes each day
+     * Used when checkInStrategy = SPECIFIC_TIME
+     * Format: "HH:mm" (24-hour format)
+     * Example: "23:00" means gates close at 11 PM
+     */
+    @Column(name = "checkin_closes_at", length = 5)
+    private String checkInClosesAt;
+
+    // Note: ALL_DAY and EXACT_TIME strategies don't need additional fields
 
     // Organizer
     @ManyToOne(fetch = FetchType.LAZY)
@@ -162,6 +222,8 @@ public class EventEntity {
     @Type(JsonBinaryType.class)  // ← This does ALL the work!
     @Column(name = "rsa_keys", columnDefinition = "jsonb")
     private RSAKeys rsaKeys;
+
+
 
     // Helper methods
     public boolean isStageCompleted(EventCreationStage stage) {

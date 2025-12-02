@@ -216,7 +216,6 @@ public class EventBookingOrderServiceImpl implements EventBookingOrderService {
                 .buyerEmail(buyerEmail)
                 // Status and validity
                 .status(TicketInstanceStatus.ACTIVE)
-                .checkedIn(false)
                 .validFrom(event.getStartDateTime())
                 .validUntil(event.getEndDateTime())
                 .build();

@@ -60,4 +60,5 @@ public class ValidateTicketResponse {
 
     private String validationMode;  // ONLINE, OFFLINE
     private String scannerName;
+    private String dayName;
 }
