@@ -6,6 +6,8 @@ import org.nextgate.nextgatebackend.e_events.events_mng.event_booking_order.enti
 import org.nextgate.nextgatebackend.e_events.events_mng.event_booking_order.enums.BookingStatus;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.EventEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -33,4 +35,13 @@ public interface EventBookingOrderRepo extends JpaRepository<EventBookingOrderEn
 
     // Find booking by checkout session
     Optional<EventBookingOrderEntity> findByCheckoutSessionId(UUID checkoutSessionId);
+
+    // In EventBookingOrderRepo:
+
+    @Query(value = """
+        SELECT * FROM event_booking_orders 
+        WHERE booked_tickets::text LIKE CONCAT('%"ticketInstanceId":"', :ticketInstanceId, '"%')
+        LIMIT 1
+        """, nativeQuery = true)
+    Optional<EventBookingOrderEntity> findByTicketInstanceId(@Param("ticketInstanceId") String ticketInstanceId);
 }

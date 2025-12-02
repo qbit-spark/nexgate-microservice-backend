@@ -145,8 +145,6 @@ public class TicketValidationServiceImpl implements TicketValidationService {
         // Update scanner stats (successful scan)
         scanner.recordScan(true);
 
-        // TODO: Update attendance analytics (placeholder)
-        // updateAttendance(booking, ticket, currentDay);
 
         log.info("✅ Ticket checked in successfully for {}: {} - {}",
                 currentDay.getDayName(), ticketInstanceId, ticket.getAttendeeName());
@@ -245,18 +243,12 @@ public class TicketValidationServiceImpl implements TicketValidationService {
 
     /**
      * Find booking order containing this ticket
-     *
-     * NOTE: This is a simple implementation for MVP
-     * For production with large data, consider adding a custom query:
-     * @Query("SELECT b FROM EventBookingOrderEntity b JOIN b.bookedTickets t WHERE t.ticketInstanceId = :ticketId")
      */
     private EventBookingOrderEntity findBookingWithTicket(UUID ticketInstanceId) {
-        return bookingOrderRepo.findAll().stream()
-                .filter(booking -> booking.getBookedTickets().stream()
-                        .anyMatch(ticket -> ticket.getTicketInstanceId().equals(ticketInstanceId)))
-                .findFirst()
+        return bookingOrderRepo.findByTicketInstanceId(ticketInstanceId.toString())
                 .orElse(null);
     }
+
 
     /**
      * Find specific ticket instance within booking
