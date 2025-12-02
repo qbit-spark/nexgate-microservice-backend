@@ -13,4 +13,6 @@ public interface ScannerService {
     ScannerEntity getByScannerId(String scannerId) throws ItemNotFoundException;
     List<ScannerEntity> getScannersForEvent(UUID eventId) throws ItemNotFoundException, AccessDeniedException;
     void revokeScanner(String scannerId, String reason) throws ItemNotFoundException, AccessDeniedException;
+
+    List<ScannerEntity> getActiveScannersForEvent(UUID eventId) throws ItemNotFoundException, AccessDeniedException;
 }

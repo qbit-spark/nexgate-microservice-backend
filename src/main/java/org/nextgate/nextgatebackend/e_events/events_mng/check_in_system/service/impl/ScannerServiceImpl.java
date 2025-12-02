@@ -143,6 +143,20 @@ public class ScannerServiceImpl implements ScannerService {
         log.info("Scanner revoked: {}", scannerId);
     }
 
+    @Override
+    public List<ScannerEntity> getActiveScannersForEvent(UUID eventId) throws ItemNotFoundException, AccessDeniedException {
+        log.debug("Fetching active scanners for event: {}", eventId);
+
+        AccountEntity currentUser = getAuthenticatedAccount();
+
+        EventEntity event = eventsRepo.findByIdAndIsDeletedFalse(eventId)
+                .orElseThrow(() -> new ItemNotFoundException("Event not found: " + eventId));
+
+        validateEventOwnership(event, currentUser);
+
+        return scannerRepo.findByEventAndStatus(event, ScannerStatus.ACTIVE);
+    }
+
     // ========================================
     // PRIVATE HELPER METHODS
     // ========================================

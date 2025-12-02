@@ -22,5 +22,6 @@ public class ScannerResponse {
     private String deviceFingerprint;
     private Instant createdAt;
     private String credentials; // Only populated on initial registration
+    private String publicKey;  // Event's public key for ticket verification
     private String revocationReason;
 }

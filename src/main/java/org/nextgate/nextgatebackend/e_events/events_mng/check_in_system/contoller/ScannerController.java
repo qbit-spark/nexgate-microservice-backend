@@ -53,7 +53,7 @@ public class ScannerController {
 
         log.info("Fetching scanners for event: {}", eventId);
 
-        List<ScannerEntity> scanners = scannerService.getScannersForEvent(eventId);
+        List<ScannerEntity> scanners = scannerService.getActiveScannersForEvent(eventId);
         List<ScannerResponse> responseList = scanners.stream()
                 .map(scannerMapper::toResponse)
                 .collect(Collectors.toList());
