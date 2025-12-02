@@ -309,6 +309,7 @@ public class TicketValidationServiceImpl implements TicketValidationService {
             EventBookingOrderEntity booking,
             EventBookingOrderEntity.BookedTicket ticket,
             EventScheduleInfo currentDay) {
+
         // Placeholder for future attendance tracking
         // This will be implemented when you add attendance analytics
         log.debug("TODO: Update attendance for ticket: {} on {}", ticket.getTicketInstanceId(), currentDay.getDayName());
