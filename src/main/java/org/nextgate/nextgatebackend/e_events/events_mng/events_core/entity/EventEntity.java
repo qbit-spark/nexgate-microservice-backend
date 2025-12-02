@@ -20,6 +20,7 @@ import org.nextgate.nextgatebackend.e_events.events_mng.events_core.utils.MediaJ
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.entity.TicketEntity;
 import org.nextgate.nextgatebackend.globe_crypto.RSAKeys;
 
+import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -196,6 +197,7 @@ public class EventEntity {
     @JoinColumn(name = "updated_by", referencedColumnName = "id")
     private AccountEntity updatedBy;
 
+
     // Soft delete
     @Column(name = "is_deleted")
     @Builder.Default
@@ -207,6 +209,8 @@ public class EventEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "deleted_by", referencedColumnName = "id")
     private AccountEntity deletedBy;
+
+    private LocalDateTime publishedAt;
 
     @Column(name = "current_stage")
     @Enumerated(EnumType.STRING)

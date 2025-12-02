@@ -5,5 +5,5 @@ public enum EventStatus {
     PUBLISHED,
     HAPPENING,
     CANCELLED,
-    FINISHED
+    COMPLETED
 }
