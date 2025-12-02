@@ -131,7 +131,6 @@ public class EventEntity {
 
     // For SPECIFIC_TIME strategy
 
-
     /**
      * Specific time when check-in opens each day
      * Used when checkInStrategy = SPECIFIC_TIME

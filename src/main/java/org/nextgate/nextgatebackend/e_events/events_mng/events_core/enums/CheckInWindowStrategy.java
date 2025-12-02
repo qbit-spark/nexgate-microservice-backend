@@ -29,5 +29,7 @@ public enum CheckInWindowStrategy {
      * Check-in only during exact event time (strict)
      * No early or late check-in allowed
      */
-    EXACT_TIME
+    EXACT_TIME,
+
+    AS_DAY_START
 }

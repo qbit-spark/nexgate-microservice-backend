@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.nextgate.nextgatebackend.e_events.events_mng.check_in_system.enums.TicketValidationStatus;
 
 import java.time.ZonedDateTime;
 import java.util.UUID;
@@ -26,7 +27,9 @@ public class ValidateTicketResponse {
      * Validation status code
      * VALID, DUPLICATE, INVALID_SIGNATURE, EXPIRED, NOT_FOUND, REVOKED
      */
-    private String status;
+    private TicketValidationStatus status;
+
+
 
     /**
      * Human-readable message

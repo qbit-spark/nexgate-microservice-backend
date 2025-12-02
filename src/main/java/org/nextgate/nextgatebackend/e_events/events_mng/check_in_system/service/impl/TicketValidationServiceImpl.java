@@ -3,6 +3,7 @@ package org.nextgate.nextgatebackend.e_events.events_mng.check_in_system.service
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.nextgate.nextgatebackend.e_events.events_mng.check_in_system.entity.ScannerEntity;
+import org.nextgate.nextgatebackend.e_events.events_mng.check_in_system.enums.TicketValidationStatus;
 import org.nextgate.nextgatebackend.e_events.events_mng.check_in_system.payloads.ValidateTicketRequest;
 import org.nextgate.nextgatebackend.e_events.events_mng.check_in_system.payloads.ValidateTicketResponse;
 import org.nextgate.nextgatebackend.e_events.events_mng.check_in_system.service.ScannerService;
@@ -138,7 +139,7 @@ public class TicketValidationServiceImpl implements TicketValidationService {
 
         addCheckInRecord(ticket, request, scanner, currentDay.getDayName());
 
-        // Save booking with updated ticket
+        // Save booking with an updated ticket
         bookingOrderRepo.save(booking);
 
         // Update scanner stats (successful scan)
@@ -328,7 +329,7 @@ public class TicketValidationServiceImpl implements TicketValidationService {
 
         return ValidateTicketResponse.builder()
                 .valid(true)
-                .status("VALID")
+                .status(TicketValidationStatus.VALID)
                 .message(String.format("✅ Entry granted for %s. Welcome!", currentDay.getDayName()))
                 .ticketInstanceId(ticket.getTicketInstanceId())
                 .ticketTypeName(ticket.getTicketTypeName())
@@ -357,7 +358,7 @@ public class TicketValidationServiceImpl implements TicketValidationService {
 
         return ValidateTicketResponse.builder()
                 .valid(false)
-                .status("DUPLICATE")
+                .status(TicketValidationStatus.DUPLICATE)
                 .message(String.format("❌ Ticket already used for %s. Entry denied.", dayName))
                 .ticketInstanceId(ticket.getTicketInstanceId())
                 .ticketTypeName(ticket.getTicketTypeName())
@@ -381,7 +382,7 @@ public class TicketValidationServiceImpl implements TicketValidationService {
     private ValidateTicketResponse buildInvalidResponse(String errorMessage, ScannerEntity scanner) {
         return ValidateTicketResponse.builder()
                 .valid(false)
-                .status("INVALID_SIGNATURE")
+                .status(TicketValidationStatus.INVALID_SIGNATURE)
                 .message("❌ Invalid ticket. " + errorMessage)
                 .validationMode("ONLINE")
                 .scannerName(scanner.getName())
@@ -394,7 +395,7 @@ public class TicketValidationServiceImpl implements TicketValidationService {
     private ValidateTicketResponse buildNotFoundResponse(UUID ticketInstanceId, ScannerEntity scanner) {
         return ValidateTicketResponse.builder()
                 .valid(false)
-                .status("NOT_FOUND")
+                .status(TicketValidationStatus.NOT_FOUND)
                 .message("❌ Ticket not found in system")
                 .ticketInstanceId(ticketInstanceId)
                 .validationMode("ONLINE")
@@ -438,21 +439,22 @@ public class TicketValidationServiceImpl implements TicketValidationService {
 
         CheckInWindowStrategy strategy = event.getCheckInStrategy() != null
                 ? event.getCheckInStrategy()
-                : CheckInWindowStrategy.HOURS_BEFORE;  // Default
+                : CheckInWindowStrategy.AS_DAY_START;  // Default
 
         return switch (strategy) {
             case HOURS_BEFORE -> calculateHoursBeforeWindow(event, eventStart, eventEnd);
             case SPECIFIC_TIME -> calculateSpecificTimeWindow(event, eventStart);
             case ALL_DAY -> calculateAllDayWindow(eventStart);
             case EXACT_TIME -> new CheckInWindow(eventStart, eventEnd);
+            case AS_DAY_START -> calculateAsDayStartWindow(eventStart, eventEnd, event.getLateCheckInMinutes());
             default ->
                 // Fallback to HOURS_BEFORE
-                    calculateHoursBeforeWindow(event, eventStart, eventEnd);
+                    calculateAsDayStartWindow(eventStart, eventEnd, event.getLateCheckInMinutes());
         };
     }
 
     /**
-     * HOURS_BEFORE: Check-in X hours before event
+     * HOURS_BEFORE: Check in X hours before event
      */
     private CheckInWindow calculateHoursBeforeWindow(
             EventEntity event,
@@ -516,6 +518,22 @@ public class TicketValidationServiceImpl implements TicketValidationService {
         ZonedDateTime checkInEnd = eventDate.plusDays(1).atStartOfDay(eventStart.getZone());
 
         log.debug("ALL_DAY window: {} to {}", checkInStart, checkInEnd);
+        return new CheckInWindow(checkInStart, checkInEnd);
+    }
+
+
+    /**
+     * AS_DAY_START: Check-in allowed from start of the event day until event end + 30 mins
+     */
+    private CheckInWindow calculateAsDayStartWindow(
+            ZonedDateTime eventStart,
+            ZonedDateTime eventEnd,
+            Integer lateMinutes) {
+
+        ZonedDateTime checkInStart = eventStart.toLocalDate().atStartOfDay(eventStart.getZone());
+        ZonedDateTime checkInEnd = eventEnd.plusMinutes(lateMinutes);
+
+        log.debug("AS_DAY_START window: {} to {}", checkInStart, checkInEnd);
         return new CheckInWindow(checkInStart, checkInEnd);
     }
 
