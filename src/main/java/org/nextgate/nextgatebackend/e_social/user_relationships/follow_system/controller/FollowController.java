@@ -1,9 +1,7 @@
 package org.nextgate.nextgatebackend.e_social.user_relationships.follow_system.controller;
 
 import lombok.RequiredArgsConstructor;
-import org.nextgate.nextgatebackend.e_social.user_relationships.follow_system.payload.FollowCheckResponse;
-import org.nextgate.nextgatebackend.e_social.user_relationships.follow_system.payload.FollowResponse;
-import org.nextgate.nextgatebackend.e_social.user_relationships.follow_system.payload.UserStatsResponse;
+import org.nextgate.nextgatebackend.e_social.user_relationships.follow_system.payload.*;
 import org.nextgate.nextgatebackend.e_social.user_relationships.follow_system.entity.FollowEntity;
 import org.nextgate.nextgatebackend.e_social.user_relationships.follow_system.service.FollowService;
 import org.nextgate.nextgatebackend.e_social.user_relationships.follow_system.utils.FollowMapper;
@@ -78,7 +76,7 @@ public class FollowController {
     @GetMapping("/followers/{userId}")
     public ResponseEntity<GlobeSuccessResponseBuilder> getFollowers(@PathVariable UUID userId) {
         List<FollowEntity> followers = followService.getFollowers(userId);
-        List<FollowResponse> response = followMapper.toResponseList(followers);
+        List<FollowerResponse> response = followMapper.toFollowerResponseList(followers);
 
         GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
                 "Followers retrieved successfully",
@@ -91,7 +89,7 @@ public class FollowController {
     @GetMapping("/following/{userId}")
     public ResponseEntity<GlobeSuccessResponseBuilder> getFollowing(@PathVariable UUID userId) {
         List<FollowEntity> following = followService.getFollowing(userId);
-        List<FollowResponse> response = followMapper.toResponseList(following);
+        List<FollowingResponse> response = followMapper.toFollowingResponseList(following);
 
         GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
                 "Following retrieved successfully",
@@ -109,7 +107,7 @@ public class FollowController {
 
         Pageable pageable = PageRequest.of(page - 1, size);
         Page<FollowEntity> followersPage = followService.getFollowersPaged(userId, pageable);
-        Page<FollowResponse> response = followersPage.map(followMapper::toResponse);
+        Page<FollowerResponse> response = followersPage.map(followMapper::toFollowerResponse);
 
         GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
                 "Followers retrieved successfully",
@@ -127,7 +125,7 @@ public class FollowController {
 
         Pageable pageable = PageRequest.of(page - 1, size);
         Page<FollowEntity> followingPage = followService.getFollowingPaged(userId, pageable);
-        Page<FollowResponse> response = followingPage.map(followMapper::toResponse);
+        Page<FollowingResponse> response = followingPage.map(followMapper::toFollowingResponse);
 
         GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
                 "Following retrieved successfully",
@@ -140,7 +138,7 @@ public class FollowController {
     @GetMapping("/requests/pending")
     public ResponseEntity<GlobeSuccessResponseBuilder> getPendingRequests() {
         List<FollowEntity> pendingRequests = followService.getPendingRequests();
-        List<FollowResponse> response = followMapper.toResponseList(pendingRequests);
+        List<FollowerResponse> response = followMapper.toFollowerResponseList(pendingRequests);
 
         GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
                 "Pending requests retrieved successfully",
@@ -169,6 +167,35 @@ public class FollowController {
         GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
                 "Follow status checked",
                 status
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @GetMapping("/featured")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getFeaturedUsers(
+            @RequestParam(defaultValue = "20") int limit) {
+        List<FeaturedUserResponse> featured = followService.getFeaturedUsers(limit);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Featured users retrieved successfully",
+                featured
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @GetMapping("/featured/paged")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getFeaturedUsersPaged(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        Pageable pageable = PageRequest.of(page - 1, size);
+        Page<FeaturedUserResponse> featured = followService.getFeaturedUsersPaged(pageable);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Featured users retrieved successfully",
+                featured
         );
 
         return ResponseEntity.ok(successResponse);

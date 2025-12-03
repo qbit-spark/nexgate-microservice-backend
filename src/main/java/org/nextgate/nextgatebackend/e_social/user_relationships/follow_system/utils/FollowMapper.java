@@ -3,8 +3,8 @@ package org.nextgate.nextgatebackend.e_social.user_relationships.follow_system.u
 import lombok.RequiredArgsConstructor;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.authentication_service.repo.AccountRepo;
+import org.nextgate.nextgatebackend.e_social.user_relationships.follow_system.payload.*;
 import org.nextgate.nextgatebackend.e_social.user_relationships.follow_system.entity.FollowEntity;
-import org.nextgate.nextgatebackend.e_social.user_relationships.follow_system.payload.FollowResponse;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -77,6 +77,101 @@ public class FollowMapper {
         }
 
         return new FollowResponse.UserSummary(
+                account.getId(),
+                account.getUserName(),
+                account.getFirstName(),
+                account.getLastName(),
+                account.getProfilePictureUrls(),
+                account.getIsVerified()
+        );
+    }
+
+    public FollowerResponse toFollowerResponse(FollowEntity entity) {
+        if (entity == null) {
+            return null;
+        }
+
+        AccountEntity follower = accountRepo.findById(entity.getFollowerId()).orElse(null);
+
+        FollowerResponse response = new FollowerResponse();
+        response.setId(entity.getId());
+        response.setUser(toUserInfo(follower));
+        response.setStatus(entity.getStatus());
+        response.setCreatedAt(entity.getCreatedAt());
+
+        return response;
+    }
+
+    public List<FollowerResponse> toFollowerResponseList(List<FollowEntity> entities) {
+        if (entities == null || entities.isEmpty()) {
+            return List.of();
+        }
+
+        Set<UUID> followerIds = entities.stream()
+                .map(FollowEntity::getFollowerId)
+                .collect(Collectors.toSet());
+
+        Map<UUID, AccountEntity> usersMap = accountRepo.findAllById(followerIds).stream()
+                .collect(Collectors.toMap(AccountEntity::getId, account -> account));
+
+        return entities.stream()
+                .map(entity -> {
+                    FollowerResponse response = new FollowerResponse();
+                    response.setId(entity.getId());
+                    response.setUser(toUserInfo(usersMap.get(entity.getFollowerId())));
+                    response.setStatus(entity.getStatus());
+                    response.setCreatedAt(entity.getCreatedAt());
+                    return response;
+                })
+                .collect(Collectors.toList());
+    }
+
+    public FollowingResponse toFollowingResponse(FollowEntity entity) {
+        if (entity == null) {
+            return null;
+        }
+
+        AccountEntity following = accountRepo.findById(entity.getFollowingId()).orElse(null);
+
+        FollowingResponse response = new FollowingResponse();
+        response.setId(entity.getId());
+        response.setUser(toUserInfo(following));
+        response.setStatus(entity.getStatus());
+        response.setCreatedAt(entity.getCreatedAt());
+
+        return response;
+    }
+
+    public List<FollowingResponse> toFollowingResponseList(List<FollowEntity> entities) {
+        if (entities == null || entities.isEmpty()) {
+            return List.of();
+        }
+
+        Set<UUID> followingIds = entities.stream()
+                .map(FollowEntity::getFollowingId)
+                .collect(Collectors.toSet());
+
+        Map<UUID, AccountEntity> usersMap = accountRepo.findAllById(followingIds).stream()
+                .collect(Collectors.toMap(AccountEntity::getId, account -> account));
+
+        return entities.stream()
+                .map(entity -> {
+                    FollowingResponse response = new FollowingResponse();
+                    response.setId(entity.getId());
+                    response.setUser(toUserInfo(usersMap.get(entity.getFollowingId())));
+                    response.setStatus(entity.getStatus());
+                    response.setCreatedAt(entity.getCreatedAt());
+                    return response;
+                })
+                .collect(Collectors.toList());
+    }
+
+    private UserInfo toUserInfo(AccountEntity account) {
+        if (account == null) {
+            return null;
+        }
+
+        return new UserInfo(
                 account.getId(),
                 account.getUserName(),
                 account.getFirstName(),

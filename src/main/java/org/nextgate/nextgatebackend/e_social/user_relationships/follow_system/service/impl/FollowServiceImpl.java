@@ -3,13 +3,14 @@ package org.nextgate.nextgatebackend.e_social.user_relationships.follow_system.s
 import lombok.RequiredArgsConstructor;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.authentication_service.repo.AccountRepo;
-import org.nextgate.nextgatebackend.e_social.user_relationships.follow_system.payload.FollowCheckResponse;
-import org.nextgate.nextgatebackend.e_social.user_relationships.follow_system.payload.UserStatsResponse;
+import org.nextgate.nextgatebackend.e_social.user_relationships.account_privacy.service.AccountPrivacyService;
+import org.nextgate.nextgatebackend.e_social.user_relationships.follow_system.payload.*;
 import org.nextgate.nextgatebackend.e_social.user_relationships.follow_system.entity.FollowEntity;
 import org.nextgate.nextgatebackend.e_social.user_relationships.follow_system.enums.FollowStatus;
 import org.nextgate.nextgatebackend.e_social.user_relationships.follow_system.repo.FollowRepository;
 import org.nextgate.nextgatebackend.e_social.user_relationships.follow_system.service.FollowService;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -18,8 +19,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +28,7 @@ public class FollowServiceImpl implements FollowService {
 
     private final FollowRepository followRepository;
     private final AccountRepo accountRepo;
+    private final AccountPrivacyService accountPrivacyService;
 
     @Override
     @Transactional
@@ -45,10 +47,12 @@ public class FollowServiceImpl implements FollowService {
             throw new IllegalStateException("Already following this user");
         }
 
+        boolean isPrivate = accountPrivacyService.isAccountPrivate(followingId);
+
         FollowEntity follow = new FollowEntity();
         follow.setFollowerId(followerId);
         follow.setFollowingId(followingId);
-        follow.setStatus(FollowStatus.ACCEPTED);
+        follow.setStatus(isPrivate ? FollowStatus.PENDING : FollowStatus.ACCEPTED);
         follow.setCreatedAt(LocalDateTime.now());
 
         return followRepository.save(follow);
@@ -153,6 +157,99 @@ public class FollowServiceImpl implements FollowService {
         boolean isFollowing = followRepository.existsByFollowerIdAndFollowingId(authenticatedUser.getId(), userId);
 
         return new FollowCheckResponse(userId, isFollowing);
+    }
+
+    @Override
+    public List<FeaturedUserResponse> getFeaturedUsers(int limit) {
+        AccountEntity authenticatedUser = getAuthenticatedAccount();
+        UUID currentUserId = authenticatedUser.getId();
+
+        List<UUID> usersIFollow = followRepository.findByFollowerIdAndStatus(currentUserId, FollowStatus.ACCEPTED)
+                .stream()
+                .map(FollowEntity::getFollowingId)
+                .toList();
+
+        List<AccountEntity> allUsers = accountRepo.findAll();
+
+        Map<UUID, Long> followerCounts = allUsers.stream()
+                .collect(Collectors.toMap(
+                        AccountEntity::getId,
+                        user -> followRepository.countByFollowingIdAndStatus(user.getId(), FollowStatus.ACCEPTED)
+                ));
+
+        Set<UUID> usersWhoFollowMe = followRepository.findByFollowingIdAndStatus(currentUserId, FollowStatus.ACCEPTED)
+                .stream()
+                .map(FollowEntity::getFollowerId)
+                .collect(Collectors.toSet());
+
+        return allUsers.stream()
+                .filter(user -> !user.getId().equals(currentUserId))
+                .filter(user -> !usersIFollow.contains(user.getId()))
+                .sorted((u1, u2) -> Long.compare(
+                        followerCounts.getOrDefault(u2.getId(), 0L),
+                        followerCounts.getOrDefault(u1.getId(), 0L)
+                ))
+                .limit(limit)
+                .map(user -> new FeaturedUserResponse(
+                        user.getId(),
+                        user.getUserName(),
+                        user.getFirstName(),
+                        user.getLastName(),
+                        user.getProfilePictureUrls(),
+                        user.getIsVerified(),
+                        followerCounts.getOrDefault(user.getId(), 0L),
+                        usersWhoFollowMe.contains(user.getId())
+                ))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public Page<FeaturedUserResponse> getFeaturedUsersPaged(Pageable pageable) {
+        AccountEntity authenticatedUser = getAuthenticatedAccount();
+        UUID currentUserId = authenticatedUser.getId();
+
+        List<UUID> usersIFollow = followRepository.findByFollowerIdAndStatus(currentUserId, FollowStatus.ACCEPTED)
+                .stream()
+                .map(FollowEntity::getFollowingId)
+                .toList();
+
+        List<AccountEntity> allUsers = accountRepo.findAll();
+
+        Map<UUID, Long> followerCounts = allUsers.stream()
+                .collect(Collectors.toMap(
+                        AccountEntity::getId,
+                        user -> followRepository.countByFollowingIdAndStatus(user.getId(), FollowStatus.ACCEPTED)
+                ));
+
+        Set<UUID> usersWhoFollowMe = followRepository.findByFollowingIdAndStatus(currentUserId, FollowStatus.ACCEPTED)
+                .stream()
+                .map(FollowEntity::getFollowerId)
+                .collect(Collectors.toSet());
+
+        List<FeaturedUserResponse> featured = allUsers.stream()
+                .filter(user -> !user.getId().equals(currentUserId))
+                .filter(user -> !usersIFollow.contains(user.getId()))
+                .sorted((u1, u2) -> Long.compare(
+                        followerCounts.getOrDefault(u2.getId(), 0L),
+                        followerCounts.getOrDefault(u1.getId(), 0L)
+                ))
+                .map(user -> new FeaturedUserResponse(
+                        user.getId(),
+                        user.getUserName(),
+                        user.getFirstName(),
+                        user.getLastName(),
+                        user.getProfilePictureUrls(),
+                        user.getIsVerified(),
+                        followerCounts.getOrDefault(user.getId(), 0L),
+                        usersWhoFollowMe.contains(user.getId())
+                ))
+                .collect(Collectors.toList());
+
+        int start = (int) pageable.getOffset();
+        int end = Math.min(start + pageable.getPageSize(), featured.size());
+        List<FeaturedUserResponse> pageContent = featured.subList(start, end);
+
+        return new PageImpl<>(pageContent, pageable, featured.size());
     }
 
     private AccountEntity getAuthenticatedAccount() {

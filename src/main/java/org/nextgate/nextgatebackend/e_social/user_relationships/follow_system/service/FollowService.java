@@ -2,6 +2,7 @@ package org.nextgate.nextgatebackend.e_social.user_relationships.follow_system.s
 
 
 import org.nextgate.nextgatebackend.e_social.user_relationships.follow_system.entity.FollowEntity;
+import org.nextgate.nextgatebackend.e_social.user_relationships.follow_system.payload.FeaturedUserResponse;
 import org.nextgate.nextgatebackend.e_social.user_relationships.follow_system.payload.FollowCheckResponse;
 import org.nextgate.nextgatebackend.e_social.user_relationships.follow_system.payload.UserStatsResponse;
 import org.springframework.data.domain.Page;
@@ -33,4 +34,8 @@ public interface FollowService {
     UserStatsResponse getUserStats(UUID userId);
 
     FollowCheckResponse checkFollowStatus(UUID userId);
+
+    List<FeaturedUserResponse> getFeaturedUsers(int limit);
+
+    Page<FeaturedUserResponse> getFeaturedUsersPaged(Pageable pageable);
 }
