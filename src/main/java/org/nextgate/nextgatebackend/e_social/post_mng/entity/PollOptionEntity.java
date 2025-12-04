@@ -11,8 +11,8 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "poll_options", indexes = {
-        @Index(name = "idx_poll_id", columnList = "pollId"),
-        @Index(name = "idx_poll_order", columnList = "pollId, optionOrder")
+        @Index(name = "idx_poll_options_poll_id", columnList = "pollId"),
+        @Index(name = "idx_poll_options_poll_order", columnList = "pollId, optionOrder")
 })
 @AllArgsConstructor
 @NoArgsConstructor

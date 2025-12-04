@@ -11,7 +11,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "polls", indexes = {
-        @Index(name = "idx_post_id", columnList = "postId", unique = true)
+        @Index(name = "idx_polls_post_id", columnList = "postId", unique = true)
 })
 @AllArgsConstructor
 @NoArgsConstructor

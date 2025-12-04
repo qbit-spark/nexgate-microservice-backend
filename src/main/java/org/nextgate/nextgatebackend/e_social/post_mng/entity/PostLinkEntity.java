@@ -12,8 +12,8 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "post_links", indexes = {
-        @Index(name = "idx_post_id", columnList = "postId", unique = true),
-        @Index(name = "idx_short_code", columnList = "shortCode", unique = true)
+        @Index(name = "idx_post_links_post_id", columnList = "postId", unique = true),
+        @Index(name = "idx_post_links_short_code", columnList = "shortCode", unique = true)
 })
 @AllArgsConstructor
 @NoArgsConstructor

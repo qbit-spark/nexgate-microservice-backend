@@ -11,12 +11,12 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "poll_votes", indexes = {
-        @Index(name = "idx_poll_id", columnList = "pollId"),
-        @Index(name = "idx_option_id", columnList = "optionId"),
-        @Index(name = "idx_user_id", columnList = "userId"),
-        @Index(name = "idx_poll_user", columnList = "pollId, userId")
+        @Index(name = "idx_poll_votes_poll_id", columnList = "pollId"),
+        @Index(name = "idx_poll_votes_option_id", columnList = "optionId"),
+        @Index(name = "idx_poll_votes_user_id", columnList = "userId"),
+        @Index(name = "idx_poll_votes_poll_user", columnList = "pollId, userId")
 }, uniqueConstraints = {
-        @UniqueConstraint(name = "uk_poll_user_option", columnNames = {"pollId", "userId", "optionId"})
+        @UniqueConstraint(name = "uk_poll_votes_poll_user_option", columnNames = {"pollId", "userId", "optionId"})
 })
 @AllArgsConstructor
 @NoArgsConstructor

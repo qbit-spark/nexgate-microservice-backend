@@ -11,11 +11,11 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "post_shop_mentions", indexes = {
-        @Index(name = "idx_post_id", columnList = "postId"),
-        @Index(name = "idx_mentioned_shop_id", columnList = "mentionedShopId"),
-        @Index(name = "idx_mentioned_shop_created", columnList = "mentionedShopId, createdAt")
+        @Index(name = "idx_post_shop_mentions_post_id", columnList = "postId"),
+        @Index(name = "idx_post_shop_mentions_shop_id", columnList = "mentionedShopId"),
+        @Index(name = "idx_post_shop_mentions_shop_created", columnList = "mentionedShopId, createdAt")
 }, uniqueConstraints = {
-        @UniqueConstraint(name = "uk_post_shop", columnNames = {"postId", "mentionedShopId"})
+        @UniqueConstraint(name = "uk_post_shop_mentions_post_shop", columnNames = {"postId", "mentionedShopId"})
 })
 @AllArgsConstructor
 @NoArgsConstructor

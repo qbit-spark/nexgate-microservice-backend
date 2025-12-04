@@ -11,9 +11,9 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "post_hashtags", indexes = {
-        @Index(name = "idx_post_id", columnList = "postId"),
-        @Index(name = "idx_hashtag", columnList = "hashtag"),
-        @Index(name = "idx_hashtag_created", columnList = "hashtag, createdAt")
+        @Index(name = "idx_post_hashtags_post_id", columnList = "postId"),
+        @Index(name = "idx_post_hashtags_hashtag", columnList = "hashtag"),
+        @Index(name = "idx_post_hashtags_hashtag_created", columnList = "hashtag, createdAt")
 })
 @AllArgsConstructor
 @NoArgsConstructor

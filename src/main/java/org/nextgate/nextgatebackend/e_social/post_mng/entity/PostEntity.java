@@ -12,14 +12,14 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "posts", indexes = {
-        @Index(name = "idx_author_id", columnList = "authorId"),
-        @Index(name = "idx_post_type", columnList = "postType"),
-        @Index(name = "idx_status", columnList = "status"),
-        @Index(name = "idx_published_at", columnList = "publishedAt"),
-        @Index(name = "idx_created_at", columnList = "createdAt"),
-        @Index(name = "idx_is_deleted", columnList = "isDeleted"),
-        @Index(name = "idx_likes_count", columnList = "likesCount"),
-        @Index(name = "idx_status_published", columnList = "status, publishedAt, isDeleted")
+        @Index(name = "idx_posts_author_id", columnList = "authorId"),
+        @Index(name = "idx_posts_post_type", columnList = "postType"),
+        @Index(name = "idx_posts_status", columnList = "status"),
+        @Index(name = "idx_posts_published_at", columnList = "publishedAt"),
+        @Index(name = "idx_posts_created_at", columnList = "createdAt"),
+        @Index(name = "idx_posts_is_deleted", columnList = "isDeleted"),
+        @Index(name = "idx_posts_likes_count", columnList = "likesCount"),
+        @Index(name = "idx_posts_status_published_deleted", columnList = "status, publishedAt, isDeleted")
 })
 @AllArgsConstructor
 @NoArgsConstructor

@@ -11,10 +11,10 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "post_events", indexes = {
-        @Index(name = "idx_post_id", columnList = "postId"),
-        @Index(name = "idx_event_id", columnList = "eventId")
+        @Index(name = "idx_post_events_post_id", columnList = "postId"),
+        @Index(name = "idx_post_events_event_id", columnList = "eventId")
 }, uniqueConstraints = {
-        @UniqueConstraint(name = "uk_post_event", columnNames = {"postId", "eventId"})
+        @UniqueConstraint(name = "uk_post_events_post_event", columnNames = {"postId", "eventId"})
 })
 @AllArgsConstructor
 @NoArgsConstructor
