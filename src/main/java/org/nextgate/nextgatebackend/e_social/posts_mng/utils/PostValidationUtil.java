@@ -1,7 +1,9 @@
 package org.nextgate.nextgatebackend.e_social.posts_mng.utils;
 
+import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PostEntity;
 import org.nextgate.nextgatebackend.e_social.posts_mng.enums.PostType;
 import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.*;
+import org.nextgate.nextgatebackend.e_social.posts_mng.*;
 import org.springframework.stereotype.Component;
 
 import java.net.MalformedURLException;
@@ -21,17 +23,25 @@ public class PostValidationUtil {
     private static final int MAX_SHOPS_PER_POST = 5;
     private static final int MAX_EVENTS_PER_POST = 3;
 
-    // Validates entire create post-request
+    // Validates entire create post request
     public void validateCreatePostRequest(CreatePostRequest request) {
-        validatePostType(request);
-        validateContent(request.getContent(), request.getMedia());
+        validateCreatePostRequest(request, false); // Default: not strict
+    }
+
+    // Validates with strict mode option
+    public void validateCreatePostRequest(CreatePostRequest request, boolean strict) {
+        validatePostType(request, strict);
+
+        if (strict) {
+            validateContent(request.getContent(), request.getMedia());
+        }
 
         if (request.getMedia() != null && !request.getMedia().isEmpty()) {
             validateMedia(request.getMedia());
         }
 
         if (request.getPoll() != null) {
-            validatePoll(request.getPoll(), request.getPostType());
+            validatePoll(request.getPoll(), request.getPostType(), strict);
         }
 
         if (request.getAttachments() != null) {
@@ -47,13 +57,26 @@ public class PostValidationUtil {
         }
     }
 
+    // Validates post ready for publishing
+    public void validateForPublish(PostEntity post) {
+        boolean hasContent = post.getContent() != null && !post.getContent().trim().isEmpty();
+
+        if (!hasContent) {
+            throw new IllegalArgumentException("Post content is required before publishing");
+        }
+
+        if (post.getPostType() == PostType.POLL) {
+            throw new IllegalArgumentException("Poll posts not yet implemented");
+        }
+    }
+
     // Validates post type matches data (poll posts must have poll data)
-    private void validatePostType(CreatePostRequest request) {
+    private void validatePostType(CreatePostRequest request, boolean strict) {
         if (request.getPostType() == null) {
             throw new IllegalArgumentException("Post type is required");
         }
 
-        if (request.getPostType() == PostType.POLL && request.getPoll() == null) {
+        if (strict && request.getPostType() == PostType.POLL && request.getPoll() == null) {
             throw new IllegalArgumentException("Poll data is required for poll posts");
         }
 
@@ -108,16 +131,18 @@ public class PostValidationUtil {
     }
 
     // Validates poll structure and options
-    public void validatePoll(PollRequest poll, PostType postType) {
+    public void validatePoll(PollRequest poll, PostType postType, boolean strict) {
         if (postType != PostType.POLL) {
             throw new IllegalArgumentException("Poll data only allowed for poll posts");
         }
 
-        if (poll.getTitle() == null || poll.getTitle().trim().isEmpty()) {
-            throw new IllegalArgumentException("Poll title is required");
-        }
+        if (strict) {
+            if (poll.getTitle() == null || poll.getTitle().trim().isEmpty()) {
+                throw new IllegalArgumentException("Poll title is required");
+            }
 
-        validatePollOptions(poll.getOptions());
+            validatePollOptions(poll.getOptions());
+        }
 
         if (poll.getExpiresAt() != null && poll.getExpiresAt().isBefore(LocalDateTime.now())) {
             throw new IllegalArgumentException("Poll expiry date must be in the future");
@@ -190,7 +215,7 @@ public class PostValidationUtil {
         }
     }
 
-    // Validates' scheduled time is in the future
+    // Validates scheduled time is in future
     public void validateScheduledTime(LocalDateTime scheduledAt) {
         if (scheduledAt.isBefore(LocalDateTime.now())) {
             throw new IllegalArgumentException("Scheduled time must be in the future");
