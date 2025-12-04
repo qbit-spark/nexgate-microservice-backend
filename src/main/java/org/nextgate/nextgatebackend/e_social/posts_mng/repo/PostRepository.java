@@ -6,7 +6,6 @@ import org.nextgate.nextgatebackend.e_social.posts_mng.enums.PostType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
