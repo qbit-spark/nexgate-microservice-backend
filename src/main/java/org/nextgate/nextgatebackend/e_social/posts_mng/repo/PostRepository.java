@@ -17,6 +17,8 @@ public interface PostRepository extends JpaRepository<PostEntity, UUID> {
 
     Optional<PostEntity> findByIdAndIsDeletedFalse(UUID id);
 
+    Optional<PostEntity> findByAuthorIdAndStatusAndIsDeletedFalse(UUID authorId, PostStatus status);
+
     List<PostEntity> findByAuthorIdAndIsDeletedFalseOrderByCreatedAtDesc(UUID authorId);
 
     Page<PostEntity> findByAuthorIdAndIsDeletedFalse(UUID authorId, Pageable pageable);

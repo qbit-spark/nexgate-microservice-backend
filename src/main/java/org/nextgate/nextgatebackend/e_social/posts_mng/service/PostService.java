@@ -18,6 +18,17 @@ public interface PostService {
 
      PostEntity publishPost(UUID postId);
 
+    // Attach to draft (discovery flow)
+    PostEntity attachProductToDraft(UUID productId);
+
+    PostEntity attachShopToDraft(UUID shopId);
+
+    PostEntity attachEventToDraft(UUID eventId);
+
+    PostEntity getCurrentDraft();
+
+
+
     // PostEntity schedulePost(UUID postId, LocalDateTime scheduledAt);
 
     // PostEntity saveDraft(CreatePostRequest request);

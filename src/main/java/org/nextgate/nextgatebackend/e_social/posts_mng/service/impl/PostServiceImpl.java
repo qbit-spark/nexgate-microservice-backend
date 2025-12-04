@@ -12,6 +12,7 @@ import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.repo.EventsRepo;
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.*;
 import org.nextgate.nextgatebackend.e_social.posts_mng.enums.PostStatus;
+import org.nextgate.nextgatebackend.e_social.posts_mng.enums.PostType;
 import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.CreatePostRequest;
 import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.MediaData;
 import org.nextgate.nextgatebackend.e_social.posts_mng.repo.*;
@@ -109,6 +110,98 @@ public class PostServiceImpl implements PostService {
 
         //Todo: Send notification to collaborators
     }
+
+
+    @Override
+    @Transactional
+    public PostEntity attachProductToDraft(UUID productId) {
+        if (!productRepo.existsById(productId)) {
+            throw new IllegalArgumentException("Product not found: " + productId);
+        }
+
+        PostEntity draft = getOrCreateDraft();
+
+        if (postProductRepository.existsByPostIdAndProductId(draft.getId(), productId)) {
+            throw new IllegalArgumentException("Product already attached to this draft");
+        }
+
+        PostProductEntity postProduct = new PostProductEntity();
+        postProduct.setPostId(draft.getId());
+        postProduct.setProductId(productId);
+        postProductRepository.save(postProduct);
+
+        return draft;
+    }
+
+    @Override
+    @Transactional
+    public PostEntity attachShopToDraft(UUID shopId) {
+        if (!shopRepo.existsById(shopId)) {
+            throw new IllegalArgumentException("Shop not found: " + shopId);
+        }
+
+        PostEntity draft = getOrCreateDraft();
+
+        if (postShopRepository.existsByPostIdAndShopId(draft.getId(), shopId)) {
+            throw new IllegalArgumentException("Shop already attached to this draft");
+        }
+
+        PostShopEntity postShop = new PostShopEntity();
+        postShop.setPostId(draft.getId());
+        postShop.setShopId(shopId);
+        postShopRepository.save(postShop);
+
+        return draft;
+    }
+
+    @Override
+    @Transactional
+    public PostEntity attachEventToDraft(UUID eventId) {
+        if (!eventsRepo.existsById(eventId)) {
+            throw new IllegalArgumentException("Event not found: " + eventId);
+        }
+
+        PostEntity draft = getOrCreateDraft();
+
+        if (postEventRepository.existsByPostIdAndEventId(draft.getId(), eventId)) {
+            throw new IllegalArgumentException("Event already attached to this draft");
+        }
+
+        PostEventEntity postEvent = new PostEventEntity();
+        postEvent.setPostId(draft.getId());
+        postEvent.setEventId(eventId);
+        postEventRepository.save(postEvent);
+
+        return draft;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PostEntity getCurrentDraft() {
+        AccountEntity author = getAuthenticatedAccount();
+
+        return postRepository
+                .findByAuthorIdAndStatusAndIsDeletedFalse(author.getId(), PostStatus.DRAFT)
+                .orElse(null);
+    }
+
+
+    private PostEntity getOrCreateDraft() {
+        AccountEntity author = getAuthenticatedAccount();
+
+        return postRepository
+                .findByAuthorIdAndStatusAndIsDeletedFalse(author.getId(), PostStatus.DRAFT)
+                .orElseGet(() -> createEmptyDraft(author));
+    }
+
+    private PostEntity createEmptyDraft(AccountEntity author) {
+        PostEntity draft = new PostEntity();
+        draft.setAuthorId(author.getId());
+        draft.setPostType(PostType.REGULAR);
+        draft.setStatus(PostStatus.DRAFT);
+        return postRepository.save(draft);
+    }
+
 
     private void setPrivacySettings(PostEntity post, CreatePostRequest request) {
         if (request.getPrivacySettings() != null) {
