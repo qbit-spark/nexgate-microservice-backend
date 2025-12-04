@@ -106,6 +106,8 @@ public class PostServiceImpl implements PostService {
         post.setPublishedAt(LocalDateTime.now());
 
         return postRepository.save(post);
+
+        //Todo: Send notification to collaborators
     }
 
     private void setPrivacySettings(PostEntity post, CreatePostRequest request) {
