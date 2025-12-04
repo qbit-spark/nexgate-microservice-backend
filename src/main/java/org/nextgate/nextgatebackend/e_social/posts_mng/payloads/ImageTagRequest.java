@@ -1,4 +1,4 @@
-package org.nextgate.nextgatebackend.e_social.posts.dto.request;
+package org.nextgate.nextgatebackend.e_social.posts_mng.payloads;
 
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
