@@ -7,7 +7,6 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.UUID;
 
-@Repository
 public interface PollOptionRepository extends JpaRepository<PollOptionEntity, UUID> {
 
     List<PollOptionEntity> findByPollIdOrderByOptionOrder(UUID pollId);

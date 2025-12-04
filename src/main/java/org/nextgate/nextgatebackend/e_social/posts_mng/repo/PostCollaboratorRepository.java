@@ -9,7 +9,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-@Repository
 public interface PostCollaboratorRepository extends JpaRepository<PostCollaboratorEntity, UUID> {
 
     List<PostCollaboratorEntity> findByPostId(UUID postId);
