@@ -55,8 +55,7 @@ public class PostServiceImpl implements PostService {
     @Override
     @Transactional
     public PostEntity createPost(CreatePostRequest request) {
-
-        validationUtil.validateCreatePostRequest(request);
+        validationUtil.validateCreatePostRequest(request, false); // Lenient validation for draft
 
         AccountEntity author = getAuthenticatedAccount();
 
@@ -85,6 +84,30 @@ public class PostServiceImpl implements PostService {
         return savedPost;
     }
 
+    @Override
+    @Transactional
+    public PostEntity publishPost(UUID postId) {
+        AccountEntity author = getAuthenticatedAccount();
+
+        PostEntity post = postRepository.findByIdAndIsDeletedFalse(postId)
+                .orElseThrow(() -> new IllegalArgumentException("Post not found"));
+
+        if (!post.getAuthorId().equals(author.getId())) {
+            throw new IllegalArgumentException("You can only publish your own posts");
+        }
+
+        if (post.getStatus() != PostStatus.DRAFT) {
+            throw new IllegalArgumentException("Only draft posts can be published");
+        }
+
+        validationUtil.validateForPublish(post);
+
+        post.setStatus(PostStatus.PUBLISHED);
+        post.setPublishedAt(LocalDateTime.now());
+
+        return postRepository.save(post);
+    }
+
     private void setPrivacySettings(PostEntity post, CreatePostRequest request) {
         if (request.getPrivacySettings() != null) {
             post.setVisibility(request.getPrivacySettings().getVisibility());
@@ -100,7 +123,8 @@ public class PostServiceImpl implements PostService {
             post.setStatus(PostStatus.SCHEDULED);
             post.setScheduledAt(request.getScheduledAt());
         } else {
-            post.setStatus(PostStatus.DRAFT);
+            post.setStatus(PostStatus.PUBLISHED);
+            post.setPublishedAt(LocalDateTime.now());
         }
     }
 
@@ -227,8 +251,6 @@ public class PostServiceImpl implements PostService {
             collaborator.setPostId(post.getId());
             collaborator.setUserId(collaboratorId);
             postCollaboratorRepository.save(collaborator);
-
-            //Todo: We have to notify all collaborators
         }
     }
 

@@ -4,6 +4,8 @@ package org.nextgate.nextgatebackend.e_social.posts_mng.service;
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PostEntity;
 import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.CreatePostRequest;
 
+import java.util.UUID;
+
 
 public interface PostService {
 
@@ -14,7 +16,7 @@ public interface PostService {
 
     // void deletePost(UUID postId);
 
-    // PostEntity publishPost(UUID postId);
+     PostEntity publishPost(UUID postId);
 
     // PostEntity schedulePost(UUID postId, LocalDateTime scheduledAt);
 
