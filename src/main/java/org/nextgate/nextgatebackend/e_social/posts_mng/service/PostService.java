@@ -3,20 +3,18 @@ package org.nextgate.nextgatebackend.e_social.posts_mng.service;
 
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PostEntity;
 import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.CreatePostRequest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
+import java.util.List;
 import java.util.UUID;
-
 
 public interface PostService {
 
     // Create and manage posts
     PostEntity createPost(CreatePostRequest request);
 
-    // PostEntity updatePost(UUID postId, UpdatePostRequest request);
-
-    // void deletePost(UUID postId);
-
-     PostEntity publishPost(UUID postId);
+    PostEntity publishPost(UUID postId);
 
     // Attach to draft (discovery flow)
     PostEntity attachProductToDraft(UUID productId);
@@ -25,9 +23,30 @@ public interface PostService {
 
     PostEntity attachEventToDraft(UUID eventId);
 
+    PostEntity attachBuyTogetherGroupToDraft(UUID groupId);
+
+    PostEntity attachInstallmentPlanToDraft(UUID planId);
+
     PostEntity getCurrentDraft();
 
+    // Remove from draft
+    PostEntity removeProductFromDraft(UUID productId);
 
+    PostEntity removeShopFromDraft(UUID shopId);
+
+    PostEntity removeEventFromDraft(UUID eventId);
+
+    PostEntity removeBuyTogetherGroupFromDraft(UUID groupId);
+
+    PostEntity removeInstallmentPlanFromDraft(UUID planId);
+
+    void discardDraft();
+
+    // PostEntity updatePost(UUID postId, UpdatePostRequest request);
+
+    // void deletePost(UUID postId);
+
+    // PostEntity publishPost(UUID postId);
 
     // PostEntity schedulePost(UUID postId, LocalDateTime scheduledAt);
 

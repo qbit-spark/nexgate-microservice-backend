@@ -107,10 +107,7 @@ public class PostServiceImpl implements PostService {
         post.setPublishedAt(LocalDateTime.now());
 
         return postRepository.save(post);
-
-        //Todo: Send notification to collaborators
     }
-
 
     @Override
     @Transactional
@@ -176,6 +173,48 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
+    @Transactional
+    public PostEntity attachBuyTogetherGroupToDraft(UUID groupId) {
+        if (!groupPurchaseRepo.existsById(groupId)) {
+            throw new IllegalArgumentException("Buy together group not found: " + groupId);
+        }
+
+        PostEntity draft = getOrCreateDraft();
+
+        if (postBuyTogetherGroupRepository.existsByPostIdAndGroupId(draft.getId(), groupId)) {
+            throw new IllegalArgumentException("Buy together group already attached to this draft");
+        }
+
+        PostBuyTogetherGroupEntity postGroup = new PostBuyTogetherGroupEntity();
+        postGroup.setPostId(draft.getId());
+        postGroup.setGroupId(groupId);
+        postBuyTogetherGroupRepository.save(postGroup);
+
+        return draft;
+    }
+
+    @Override
+    @Transactional
+    public PostEntity attachInstallmentPlanToDraft(UUID planId) {
+        if (!installmentPlanRepo.existsById(planId)) {
+            throw new IllegalArgumentException("Installment plan not found: " + planId);
+        }
+
+        PostEntity draft = getOrCreateDraft();
+
+        if (postInstallmentPlanRepository.existsByPostIdAndPlanId(draft.getId(), planId)) {
+            throw new IllegalArgumentException("Installment plan already attached to this draft");
+        }
+
+        PostInstallmentPlanEntity postPlan = new PostInstallmentPlanEntity();
+        postPlan.setPostId(draft.getId());
+        postPlan.setPlanId(planId);
+        postInstallmentPlanRepository.save(postPlan);
+
+        return draft;
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public PostEntity getCurrentDraft() {
         AccountEntity author = getAuthenticatedAccount();
@@ -184,7 +223,6 @@ public class PostServiceImpl implements PostService {
                 .findByAuthorIdAndStatusAndIsDeletedFalse(author.getId(), PostStatus.DRAFT)
                 .orElse(null);
     }
-
 
     private PostEntity getOrCreateDraft() {
         AccountEntity author = getAuthenticatedAccount();
@@ -202,6 +240,149 @@ public class PostServiceImpl implements PostService {
         return postRepository.save(draft);
     }
 
+    @Override
+    @Transactional
+    public PostEntity removeProductFromDraft(UUID productId) {
+        AccountEntity author = getAuthenticatedAccount();
+        PostEntity draft = getCurrentDraft();
+
+        if (draft == null) {
+            throw new IllegalArgumentException("No draft post found");
+        }
+
+        if (!draft.getAuthorId().equals(author.getId())) {
+            throw new IllegalArgumentException("You can only modify your own draft");
+        }
+
+        PostProductEntity postProduct = postProductRepository.findByPostId(draft.getId())
+                .stream()
+                .filter(pp -> pp.getProductId().equals(productId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Product not attached to draft"));
+
+        postProductRepository.delete(postProduct);
+        return draft;
+    }
+
+    @Override
+    @Transactional
+    public PostEntity removeShopFromDraft(UUID shopId) {
+        AccountEntity author = getAuthenticatedAccount();
+        PostEntity draft = getCurrentDraft();
+
+        if (draft == null) {
+            throw new IllegalArgumentException("No draft post found");
+        }
+
+        if (!draft.getAuthorId().equals(author.getId())) {
+            throw new IllegalArgumentException("You can only modify your own draft");
+        }
+
+        PostShopEntity postShop = postShopRepository.findByPostId(draft.getId())
+                .stream()
+                .filter(ps -> ps.getShopId().equals(shopId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Shop not attached to draft"));
+
+        postShopRepository.delete(postShop);
+        return draft;
+    }
+
+    @Override
+    @Transactional
+    public PostEntity removeEventFromDraft(UUID eventId) {
+        AccountEntity author = getAuthenticatedAccount();
+        PostEntity draft = getCurrentDraft();
+
+        if (draft == null) {
+            throw new IllegalArgumentException("No draft post found");
+        }
+
+        if (!draft.getAuthorId().equals(author.getId())) {
+            throw new IllegalArgumentException("You can only modify your own draft");
+        }
+
+        PostEventEntity postEvent = postEventRepository.findByPostId(draft.getId())
+                .stream()
+                .filter(pe -> pe.getEventId().equals(eventId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Event not attached to draft"));
+
+        postEventRepository.delete(postEvent);
+        return draft;
+    }
+
+    @Override
+    @Transactional
+    public PostEntity removeBuyTogetherGroupFromDraft(UUID groupId) {
+        AccountEntity author = getAuthenticatedAccount();
+        PostEntity draft = getCurrentDraft();
+
+        if (draft == null) {
+            throw new IllegalArgumentException("No draft post found");
+        }
+
+        if (!draft.getAuthorId().equals(author.getId())) {
+            throw new IllegalArgumentException("You can only modify your own draft");
+        }
+
+        PostBuyTogetherGroupEntity postGroup = postBuyTogetherGroupRepository.findByPostId(draft.getId())
+                .stream()
+                .filter(pg -> pg.getGroupId().equals(groupId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Buy together group not attached to draft"));
+
+        postBuyTogetherGroupRepository.delete(postGroup);
+        return draft;
+    }
+
+    @Override
+    @Transactional
+    public PostEntity removeInstallmentPlanFromDraft(UUID planId) {
+        AccountEntity author = getAuthenticatedAccount();
+        PostEntity draft = getCurrentDraft();
+
+        if (draft == null) {
+            throw new IllegalArgumentException("No draft post found");
+        }
+
+        if (!draft.getAuthorId().equals(author.getId())) {
+            throw new IllegalArgumentException("You can only modify your own draft");
+        }
+
+        PostInstallmentPlanEntity postPlan = postInstallmentPlanRepository.findByPostId(draft.getId())
+                .stream()
+                .filter(pp -> pp.getPlanId().equals(planId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Installment plan not attached to draft"));
+
+        postInstallmentPlanRepository.delete(postPlan);
+        return draft;
+    }
+
+    @Override
+    @Transactional
+    public void discardDraft() {
+        AccountEntity author = getAuthenticatedAccount();
+        PostEntity draft = getCurrentDraft();
+
+        if (draft == null) {
+            throw new IllegalArgumentException("No draft post found");
+        }
+
+        if (!draft.getAuthorId().equals(author.getId())) {
+            throw new IllegalArgumentException("You can only discard your own draft");
+        }
+
+        postProductRepository.deleteByPostId(draft.getId());
+        postShopRepository.deleteByPostId(draft.getId());
+        postEventRepository.deleteByPostId(draft.getId());
+        postBuyTogetherGroupRepository.deleteByPostId(draft.getId());
+        postInstallmentPlanRepository.deleteByPostId(draft.getId());
+        postCollaboratorRepository.deleteByPostId(draft.getId());
+
+        postRepository.delete(draft);
+    }
 
     private void setPrivacySettings(PostEntity post, CreatePostRequest request) {
         if (request.getPrivacySettings() != null) {
