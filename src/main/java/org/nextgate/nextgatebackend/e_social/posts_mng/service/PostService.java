@@ -3,6 +3,9 @@ package org.nextgate.nextgatebackend.e_social.posts_mng.service;
 
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PostEntity;
 import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.CreatePostRequest;
+import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.MediaRequest;
+import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.PrivacySettingsRequest;
+import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.UpdateDraftRequest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -42,43 +45,34 @@ public interface PostService {
 
     void discardDraft();
 
-    // PostEntity updatePost(UUID postId, UpdatePostRequest request);
-
-    // void deletePost(UUID postId);
-
-    // PostEntity publishPost(UUID postId);
-
-    // PostEntity schedulePost(UUID postId, LocalDateTime scheduledAt);
-
-    // PostEntity saveDraft(CreatePostRequest request);
-
     // Get posts
-    // PostEntity getPostById(UUID postId);
+    PostEntity getPostById(UUID postId);
 
-    // Page<PostEntity> getPostsByAuthor(UUID authorId, Pageable pageable);
+    Page<PostEntity> getPostsByAuthor(UUID authorId, Pageable pageable);
 
-    // Page<PostEntity> getFeedPosts(Pageable pageable);
+    Page<PostEntity> getPublishedPosts(Pageable pageable);
 
-    // Page<PostEntity> getPublicPosts(Pageable pageable);
+    List<PostEntity> getDraftsByAuthor(UUID authorId);
 
-    // List<PostEntity> getDraftsByAuthor(UUID authorId);
+    List<PostEntity> getScheduledPostsByAuthor(UUID authorId);
 
-    // List<PostEntity> getScheduledPostsByAuthor(UUID authorId);
+    // Update draft
+    PostEntity updateDraft(UUID postId, UpdateDraftRequest request);
+
+    PostEntity updateDraftContent(UUID postId, String content);
+
+    PostEntity addMediaToDraft(UUID postId, List<MediaRequest> media);
+
+    PostEntity updateDraftPrivacySettings(UUID postId, PrivacySettingsRequest settings);
+
+    // Delete post
+    void deletePost(UUID postId);
 
     // Collaboration
-    // void acceptCollaboration(UUID postId, UUID collaborationId);
+    PostEntity acceptCollaboration(UUID postId);
 
-    // void declineCollaboration(UUID postId, UUID collaborationId);
+    PostEntity declineCollaboration(UUID postId);
 
-    // void removeCollaborator(UUID postId, UUID collaboratorId);
+    void removeCollaborator(UUID postId, UUID collaboratorId);
 
-    // Poll operations
-    // void voteOnPoll(UUID postId, List<UUID> optionIds);
-
-    // void removeVote(UUID postId);
-
-    // Statistics
-    // long getPostsCount(UUID authorId);
-
-    // long getDraftsCount(UUID authorId);
 }

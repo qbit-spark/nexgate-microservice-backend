@@ -11,15 +11,17 @@ import org.nextgate.nextgatebackend.e_commerce.products_mng_service.products.rep
 import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng.repo.ShopRepo;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.repo.EventsRepo;
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.*;
+import org.nextgate.nextgatebackend.e_social.posts_mng.enums.CollaboratorStatus;
 import org.nextgate.nextgatebackend.e_social.posts_mng.enums.PostStatus;
 import org.nextgate.nextgatebackend.e_social.posts_mng.enums.PostType;
-import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.CreatePostRequest;
-import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.MediaData;
+import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.*;
 import org.nextgate.nextgatebackend.e_social.posts_mng.repo.*;
 import org.nextgate.nextgatebackend.e_social.posts_mng.service.PostService;
 import org.nextgate.nextgatebackend.e_social.posts_mng.utils.ContentParsingUtil;
 import org.nextgate.nextgatebackend.e_social.posts_mng.utils.LinkProcessingUtil;
 import org.nextgate.nextgatebackend.e_social.posts_mng.utils.PostValidationUtil;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -396,6 +398,286 @@ public class PostServiceImpl implements PostService {
         postRepository.delete(draft);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public PostEntity getPostById(UUID postId) {
+        return postRepository.findByIdAndIsDeletedFalse(postId)
+                .orElseThrow(() -> new IllegalArgumentException("Post not found"));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<PostEntity> getPostsByAuthor(UUID authorId, Pageable pageable) {
+        if (!accountRepo.existsById(authorId)) {
+            throw new IllegalArgumentException("Author not found");
+        }
+        return postRepository.findByAuthorIdAndIsDeletedFalse(authorId, pageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<PostEntity> getPublishedPosts(Pageable pageable) {
+        return postRepository.findByStatusAndIsDeletedFalse(PostStatus.PUBLISHED, pageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PostEntity> getDraftsByAuthor(UUID authorId) {
+        AccountEntity author = getAuthenticatedAccount();
+
+        if (!authorId.equals(author.getId())) {
+            throw new IllegalArgumentException("You can only view your own drafts");
+        }
+
+        PostEntity draft = postRepository
+                .findByAuthorIdAndStatusAndIsDeletedFalse(authorId, PostStatus.DRAFT)
+                .orElse(null);
+
+        return draft != null ? List.of(draft) : List.of();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PostEntity> getScheduledPostsByAuthor(UUID authorId) {
+        AccountEntity author = getAuthenticatedAccount();
+
+        if (!authorId.equals(author.getId())) {
+            throw new IllegalArgumentException("You can only view your own scheduled posts");
+        }
+
+        return postRepository.findByStatusAndScheduledAtBeforeAndIsDeletedFalse(
+                PostStatus.SCHEDULED,
+                LocalDateTime.now().plusYears(100)
+        );
+    }
+
+    @Override
+    @Transactional
+    public PostEntity updateDraft(UUID postId, UpdateDraftRequest request) {
+        AccountEntity author = getAuthenticatedAccount();
+
+        PostEntity post = postRepository.findByIdAndIsDeletedFalse(postId)
+                .orElseThrow(() -> new IllegalArgumentException("Post not found"));
+
+        if (!post.getAuthorId().equals(author.getId())) {
+            throw new IllegalArgumentException("You can only update your own posts");
+        }
+
+        if (post.getStatus() != PostStatus.DRAFT) {
+            throw new IllegalArgumentException("Only draft posts can be updated");
+        }
+
+        if (request.getContent() != null) {
+            post.setContent(request.getContent());
+            postUserMentionRepository.deleteByPostId(post.getId());
+            postShopMentionRepository.deleteByPostId(post.getId());
+            postHashtagRepository.deleteByPostId(post.getId());
+            parseAndSaveContent(post, request.getContent());
+        }
+
+        if (request.getMedia() != null) {
+            setMediaData(post, request);
+        }
+
+        if (request.getPrivacySettings() != null) {
+            updatePrivacySettings(post, request.getPrivacySettings());
+        }
+
+        return postRepository.save(post);
+    }
+
+    @Override
+    @Transactional
+    public PostEntity updateDraftContent(UUID postId, String content) {
+        AccountEntity author = getAuthenticatedAccount();
+
+        PostEntity post = postRepository.findByIdAndIsDeletedFalse(postId)
+                .orElseThrow(() -> new IllegalArgumentException("Post not found"));
+
+        if (!post.getAuthorId().equals(author.getId())) {
+            throw new IllegalArgumentException("You can only update your own posts");
+        }
+
+        if (post.getStatus() != PostStatus.DRAFT) {
+            throw new IllegalArgumentException("Only draft posts can be updated");
+        }
+
+        post.setContent(content);
+
+        postUserMentionRepository.deleteByPostId(post.getId());
+        postShopMentionRepository.deleteByPostId(post.getId());
+        postHashtagRepository.deleteByPostId(post.getId());
+
+        if (content != null && !content.trim().isEmpty()) {
+            parseAndSaveContent(post, content);
+        }
+
+        return postRepository.save(post);
+    }
+
+    @Override
+    @Transactional
+    public PostEntity addMediaToDraft(UUID postId, List<MediaRequest> media) {
+        AccountEntity author = getAuthenticatedAccount();
+
+        PostEntity post = postRepository.findByIdAndIsDeletedFalse(postId)
+                .orElseThrow(() -> new IllegalArgumentException("Post not found"));
+
+        if (!post.getAuthorId().equals(author.getId())) {
+            throw new IllegalArgumentException("You can only update your own posts");
+        }
+
+        if (post.getStatus() != PostStatus.DRAFT) {
+            throw new IllegalArgumentException("Only draft posts can be updated");
+        }
+
+        validationUtil.validateMedia(media);
+
+        UpdateDraftRequest request = new UpdateDraftRequest();
+        request.setMedia(media);
+        setMediaData(post, request);
+
+        return postRepository.save(post);
+    }
+
+    @Override
+    @Transactional
+    public PostEntity updateDraftPrivacySettings(UUID postId, PrivacySettingsRequest settings) {
+        AccountEntity author = getAuthenticatedAccount();
+
+        PostEntity post = postRepository.findByIdAndIsDeletedFalse(postId)
+                .orElseThrow(() -> new IllegalArgumentException("Post not found"));
+
+        if (!post.getAuthorId().equals(author.getId())) {
+            throw new IllegalArgumentException("You can only update your own posts");
+        }
+
+        if (post.getStatus() != PostStatus.DRAFT) {
+            throw new IllegalArgumentException("Only draft posts can be updated");
+        }
+
+        updatePrivacySettings(post, settings);
+
+        return postRepository.save(post);
+    }
+
+    private void updatePrivacySettings(PostEntity post, PrivacySettingsRequest settings) {
+        if (settings.getVisibility() != null) {
+            post.setVisibility(settings.getVisibility());
+        }
+        if (settings.getWhoCanComment() != null) {
+            post.setWhoCanComment(settings.getWhoCanComment());
+        }
+        if (settings.getWhoCanRepost() != null) {
+            post.setWhoCanRepost(settings.getWhoCanRepost());
+        }
+        if (settings.getHideLikesCount() != null) {
+            post.setHideLikesCount(settings.getHideLikesCount());
+        }
+        if (settings.getHideCommentsCount() != null) {
+            post.setHideCommentsCount(settings.getHideCommentsCount());
+        }
+    }
+
+    @Override
+    @Transactional
+    public void deletePost(UUID postId) {
+        AccountEntity author = getAuthenticatedAccount();
+
+        PostEntity post = postRepository.findByIdAndIsDeletedFalse(postId)
+                .orElseThrow(() -> new IllegalArgumentException("Post not found"));
+
+        if (!post.getAuthorId().equals(author.getId())) {
+            throw new IllegalArgumentException("You can only delete your own posts");
+        }
+
+        post.setDeleted(true);
+        post.setDeletedAt(LocalDateTime.now());
+
+        postRepository.save(post);
+    }
+
+    @Override
+    @Transactional
+    public PostEntity acceptCollaboration(UUID postId) {
+        AccountEntity collaborator = getAuthenticatedAccount();
+
+        PostEntity post = postRepository.findByIdAndIsDeletedFalse(postId)
+                .orElseThrow(() -> new IllegalArgumentException("Post not found"));
+
+        PostCollaboratorEntity collaboration = postCollaboratorRepository
+                .findByPostIdAndUserId(postId, collaborator.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Collaboration invitation not found"));
+
+        if (collaboration.getStatus() != CollaboratorStatus.PENDING) {
+            throw new IllegalArgumentException("Collaboration already " + collaboration.getStatus().name().toLowerCase());
+        }
+
+        collaboration.setStatus(CollaboratorStatus.ACCEPTED);
+        collaboration.setRespondedAt(LocalDateTime.now());
+        postCollaboratorRepository.save(collaboration);
+
+        return post;
+    }
+
+    @Override
+    @Transactional
+    public PostEntity declineCollaboration(UUID postId) {
+        AccountEntity collaborator = getAuthenticatedAccount();
+
+        PostEntity post = postRepository.findByIdAndIsDeletedFalse(postId)
+                .orElseThrow(() -> new IllegalArgumentException("Post not found"));
+
+        PostCollaboratorEntity collaboration = postCollaboratorRepository
+                .findByPostIdAndUserId(postId, collaborator.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Collaboration invitation not found"));
+
+        if (collaboration.getStatus() != CollaboratorStatus.PENDING) {
+            throw new IllegalArgumentException("Collaboration already " + collaboration.getStatus().name().toLowerCase());
+        }
+
+        collaboration.setStatus(CollaboratorStatus.DECLINED);
+        collaboration.setRespondedAt(LocalDateTime.now());
+        postCollaboratorRepository.save(collaboration);
+
+        return post;
+    }
+
+    @Override
+    @Transactional
+    public void removeCollaborator(UUID postId, UUID collaboratorId) {
+        AccountEntity currentUser = getAuthenticatedAccount();
+
+        PostEntity post = postRepository.findByIdAndIsDeletedFalse(postId)
+                .orElseThrow(() -> new IllegalArgumentException("Post not found"));
+
+        PostCollaboratorEntity collaboration = postCollaboratorRepository
+                .findByPostIdAndUserId(postId, collaboratorId)
+                .orElseThrow(() -> new IllegalArgumentException("Collaborator not found"));
+
+        boolean isAuthor = post.getAuthorId().equals(currentUser.getId());
+        boolean isSelf = collaboratorId.equals(currentUser.getId());
+
+        if (!isAuthor && !isSelf) {
+            throw new IllegalArgumentException("You can only remove yourself or be the post author to remove collaborators");
+        }
+
+        if (collaboration.getStatus() != CollaboratorStatus.ACCEPTED) {
+            throw new IllegalArgumentException("Can only remove accepted collaborators");
+        }
+
+        postCollaboratorRepository.delete(collaboration);
+
+        long remainingCollaborators = postCollaboratorRepository
+                .findByPostIdAndStatus(postId, CollaboratorStatus.ACCEPTED)
+                .size();
+
+        if (remainingCollaborators == 0) {
+            post.setCollaborative(false);
+            postRepository.save(post);
+        }
+    }
+
     private void parseAndSaveContent(PostEntity post, String content) {
         parseAndSaveMentions(post, content);
         parseAndSaveHashtags(post, content);
@@ -470,6 +752,29 @@ public class PostServiceImpl implements PostService {
     }
 
     private void setMediaData(PostEntity post, CreatePostRequest request) {
+        try {
+            List<MediaData> mediaDataList = new ArrayList<>();
+            for (int i = 0; i < request.getMedia().size(); i++) {
+                var mediaRequest = request.getMedia().get(i);
+                MediaData mediaData = new MediaData();
+                mediaData.setId(UUID.randomUUID().toString());
+                mediaData.setMediaType(mediaRequest.getMediaType());
+                mediaData.setOriginalUrl(mediaRequest.getMediaUrl());
+                mediaData.setPlaceholderBase64(mediaRequest.getPlaceholderBase64());
+                mediaData.setWidth(mediaRequest.getWidth());
+                mediaData.setHeight(mediaRequest.getHeight());
+                mediaData.setDuration(mediaRequest.getDuration());
+                mediaData.setOrder(i + 1);
+                mediaData.setImageTags(new ArrayList<>());
+                mediaDataList.add(mediaData);
+            }
+            post.setMediaData(objectMapper.writeValueAsString(mediaDataList));
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to serialize media data", e);
+        }
+    }
+
+    private void setMediaData(PostEntity post, UpdateDraftRequest request) {
         try {
             List<MediaData> mediaDataList = new ArrayList<>();
             for (int i = 0; i < request.getMedia().size(); i++) {
