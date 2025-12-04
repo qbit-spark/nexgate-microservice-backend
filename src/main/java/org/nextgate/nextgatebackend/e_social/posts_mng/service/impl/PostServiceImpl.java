@@ -17,6 +17,8 @@ import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.CreatePostReques
 import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.MediaData;
 import org.nextgate.nextgatebackend.e_social.posts_mng.repo.*;
 import org.nextgate.nextgatebackend.e_social.posts_mng.service.PostService;
+import org.nextgate.nextgatebackend.e_social.posts_mng.utils.ContentParsingUtil;
+import org.nextgate.nextgatebackend.e_social.posts_mng.utils.LinkProcessingUtil;
 import org.nextgate.nextgatebackend.e_social.posts_mng.utils.PostValidationUtil;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -36,6 +38,8 @@ public class PostServiceImpl implements PostService {
     private final PostRepository postRepository;
     private final AccountRepo accountRepo;
     private final PostValidationUtil validationUtil;
+    private final ContentParsingUtil contentParsingUtil;
+    private final LinkProcessingUtil linkProcessingUtil;
     private final ObjectMapper objectMapper;
 
     // Attachment repositories
@@ -52,6 +56,10 @@ public class PostServiceImpl implements PostService {
     private final PostInstallmentPlanRepository postInstallmentPlanRepository;
     private final PostEventRepository postEventRepository;
     private final PostCollaboratorRepository postCollaboratorRepository;
+    private final PostUserMentionRepository postUserMentionRepository;
+    private final PostShopMentionRepository postShopMentionRepository;
+    private final PostHashtagRepository postHashtagRepository;
+    private final PostLinkRepository postLinkRepository;
 
     @Override
     @Transactional
@@ -73,6 +81,10 @@ public class PostServiceImpl implements PostService {
         }
 
         PostEntity savedPost = postRepository.save(post);
+
+        if (request.getContent() != null && !request.getContent().trim().isEmpty()) {
+            parseAndSaveContent(savedPost, request.getContent());
+        }
 
         if (request.getAttachments() != null) {
             saveAttachments(savedPost, request);
@@ -384,6 +396,59 @@ public class PostServiceImpl implements PostService {
         postRepository.delete(draft);
     }
 
+    private void parseAndSaveContent(PostEntity post, String content) {
+        parseAndSaveMentions(post, content);
+        parseAndSaveHashtags(post, content);
+        parseAndSaveShopMentions(post, content);
+    }
+
+    private void parseAndSaveMentions(PostEntity post, String content) {
+        List<ContentParsingUtil.ParsedMention> mentions = contentParsingUtil.parseMentions(content);
+
+        for (ContentParsingUtil.ParsedMention mention : mentions) {
+            accountRepo.findByUserName(mention.getUserName()).ifPresent(user -> {
+                if (!postUserMentionRepository.existsByPostIdAndMentionedUserId(post.getId(), user.getId())) {
+                    PostUserMentionEntity mentionEntity = new PostUserMentionEntity();
+                    mentionEntity.setPostId(post.getId());
+                    mentionEntity.setMentionedUserId(user.getId());
+                    mentionEntity.setStartIndex(mention.getStartIndex());
+                    mentionEntity.setEndIndex(mention.getEndIndex());
+                    postUserMentionRepository.save(mentionEntity);
+                }
+            });
+        }
+    }
+
+    private void parseAndSaveHashtags(PostEntity post, String content) {
+        List<ContentParsingUtil.ParsedHashtag> hashtags = contentParsingUtil.parseHashtags(content);
+
+        for (ContentParsingUtil.ParsedHashtag hashtag : hashtags) {
+            PostHashtagEntity hashtagEntity = new PostHashtagEntity();
+            hashtagEntity.setPostId(post.getId());
+            hashtagEntity.setHashtag(hashtag.getHashtag());
+            hashtagEntity.setStartIndex(hashtag.getStartIndex());
+            hashtagEntity.setEndIndex(hashtag.getEndIndex());
+            postHashtagRepository.save(hashtagEntity);
+        }
+    }
+
+    private void parseAndSaveShopMentions(PostEntity post, String content) {
+        List<ContentParsingUtil.ParsedShopMention> shopMentions = contentParsingUtil.parseShopMentions(content);
+
+        for (ContentParsingUtil.ParsedShopMention shopMention : shopMentions) {
+            shopRepo.findByShopSlugAndIsDeletedFalse(shopMention.getShopSlug()).ifPresent(shop -> {
+                if (!postShopMentionRepository.existsByPostIdAndMentionedShopId(post.getId(), shop.getShopId())) {
+                    PostShopMentionEntity mentionEntity = new PostShopMentionEntity();
+                    mentionEntity.setPostId(post.getId());
+                    mentionEntity.setMentionedShopId(shop.getShopId());
+                    mentionEntity.setStartIndex(shopMention.getStartIndex());
+                    mentionEntity.setEndIndex(shopMention.getEndIndex());
+                    postShopMentionRepository.save(mentionEntity);
+                }
+            });
+        }
+    }
+
     private void setPrivacySettings(PostEntity post, CreatePostRequest request) {
         if (request.getPrivacySettings() != null) {
             post.setVisibility(request.getPrivacySettings().getVisibility());
@@ -449,6 +514,10 @@ public class PostServiceImpl implements PostService {
         if (attachments.getEventIds() != null) {
             saveEventAttachments(post, attachments.getEventIds());
         }
+
+        if (attachments.getExternalLink() != null) {
+            saveExternalLink(post, attachments.getExternalLink().getUrl());
+        }
     }
 
     private void saveProductAttachments(PostEntity post, List<UUID> productIds) {
@@ -509,6 +578,41 @@ public class PostServiceImpl implements PostService {
             postEvent.setEventId(eventId);
             postEventRepository.save(postEvent);
         }
+    }
+
+    private void saveExternalLink(PostEntity post, String url) {
+        String shortCode = generateUniqueShortCode();
+        String domain = linkProcessingUtil.extractDomain(url);
+        boolean isSafe = linkProcessingUtil.isUrlSafe(url);
+
+        PostLinkEntity link = new PostLinkEntity();
+        link.setPostId(post.getId());
+        link.setOriginalUrl(url);
+        link.setShortCode(shortCode);
+        link.setDomain(domain);
+        link.setSafe(isSafe);
+
+        postLinkRepository.save(link);
+
+        post.setHasExternalLink(true);
+        postRepository.save(post);
+    }
+
+    private String generateUniqueShortCode() {
+        String shortCode;
+        int attempts = 0;
+        int maxAttempts = 10;
+
+        do {
+            shortCode = linkProcessingUtil.generateShortCode();
+            attempts++;
+
+            if (attempts >= maxAttempts) {
+                throw new RuntimeException("Failed to generate unique short code");
+            }
+        } while (postLinkRepository.findByShortCode(shortCode).isPresent());
+
+        return shortCode;
     }
 
     private void saveCollaborators(PostEntity post, CreatePostRequest request) {

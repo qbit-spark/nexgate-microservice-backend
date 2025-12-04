@@ -35,4 +35,6 @@ public interface ShopRepo extends JpaRepository<ShopEntity, UUID> {
 
     Optional<ShopEntity> findByShopIdAndIsDeletedFalseAndStatus(UUID shopId, ShopStatus status);
 
+    Optional<ShopEntity> findByShopSlugAndIsDeletedFalse(String shopSlug);
+
 }
