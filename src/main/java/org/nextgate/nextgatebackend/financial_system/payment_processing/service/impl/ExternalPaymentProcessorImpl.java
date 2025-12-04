@@ -1,7 +1,7 @@
 package org.nextgate.nextgatebackend.financial_system.payment_processing.service.impl;
 
 import lombok.extern.slf4j.Slf4j;
-import org.nextgate.nextgatebackend.checkout_session.entity.CheckoutSessionEntity;
+import org.nextgate.nextgatebackend.financial_system.payment_processing.contract.PayableCheckoutSession;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.enums.PaymentMethod;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.payloads.PaymentResult;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.service.ExternalPaymentProcessor;
@@ -14,15 +14,14 @@ public class ExternalPaymentProcessorImpl implements ExternalPaymentProcessor {
 
     @Override
     public PaymentResult processPayment(
-            CheckoutSessionEntity checkoutSession,
+            PayableCheckoutSession session,
             PaymentMethod paymentMethod) throws RandomExceptions {
 
-        log.info("EXTERNAL PAYMENT PLACEHOLDER: Checkout session: {}, Payment method: {}",
-                checkoutSession.getSessionId(), paymentMethod);
+        log.info("EXTERNAL PAYMENT PLACEHOLDER | Session: {} | Method: {}",
+                session.getSessionId(), paymentMethod);
 
-        // TODO: Implement external payment integration in Phase 8
         throw new RandomExceptions(
-                String.format("External payment method %s not yet implemented. Please use WALLET payment.",
+                String.format("External payment method %s not yet implemented. Please use WALLET.",
                         paymentMethod)
         );
     }

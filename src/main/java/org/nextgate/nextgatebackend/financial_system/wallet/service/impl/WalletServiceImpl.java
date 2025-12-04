@@ -13,6 +13,7 @@ import org.nextgate.nextgatebackend.financial_system.transaction_history.enums.T
 import org.nextgate.nextgatebackend.financial_system.transaction_history.enums.TransactionType;
 import org.nextgate.nextgatebackend.financial_system.transaction_history.service.TransactionHistoryService;
 import org.nextgate.nextgatebackend.financial_system.wallet.entity.WalletEntity;
+import org.nextgate.nextgatebackend.financial_system.wallet.events.WalletTopUpEvent;
 import org.nextgate.nextgatebackend.financial_system.wallet.repo.WalletRepository;
 import org.nextgate.nextgatebackend.financial_system.wallet.service.WalletService;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
@@ -24,6 +25,7 @@ import org.nextgate.nextgatebackend.notification_system.publisher.enums.Notifica
 import org.nextgate.nextgatebackend.notification_system.publisher.enums.NotificationPriority;
 import org.nextgate.nextgatebackend.notification_system.publisher.enums.NotificationType;
 import org.nextgate.nextgatebackend.notification_system.publisher.mapper.WalletNotificationMapper;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -31,12 +33,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-
-import static org.nextgate.nextgatebackend.notification_system.publisher.enums.NotificationChannel.*;
 
 @Service
 @RequiredArgsConstructor
@@ -47,8 +46,7 @@ public class WalletServiceImpl implements WalletService {
     private final AccountRepo accountRepo;
     private final LedgerService ledgerService;
     private final TransactionHistoryService transactionHistoryService;
-    private final NotificationPublisher notificationPublisher;
-
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -152,7 +150,7 @@ public class WalletServiceImpl implements WalletService {
 
     @Override
     @Transactional
-    public WalletEntity topupWallet(BigDecimal amount, String description)
+    public void topupWallet(BigDecimal amount, String description)
             throws ItemNotFoundException, RandomExceptions {
 
         // 1. Get account and validate wallet
@@ -200,12 +198,18 @@ public class WalletServiceImpl implements WalletService {
         BigDecimal newBalance = getMyWalletBalance();
 
         // 7. Send notification
-        sendTopUpNotification(account, amount, newBalance, transactionHistory.getTransactionRef());
+        eventPublisher.publishEvent(new WalletTopUpEvent(
+                this,
+                account,
+                amount,
+                newBalance,
+                transactionHistory.getTransactionRef()
+        ));
+
 
         log.info("✅ Wallet top-up successful: {} TZS for user: {} | Balance: {} → {}",
                 amount, account.getUserName(), previousBalance, newBalance);
 
-        return saved;
     }
 
 
@@ -330,49 +334,5 @@ public class WalletServiceImpl implements WalletService {
     }
 
 
-    private void sendTopUpNotification(
-            AccountEntity customer,
-            BigDecimal topUpAmount,
-            BigDecimal newBalance,
-            String transactionId) {
-
-            // 1. Prepare notification data using mapper
-            Map<String, Object> data = WalletNotificationMapper.mapWalletTopUp(
-                    customer.getFirstName(),
-                    topUpAmount,
-                    newBalance,
-                    transactionId
-            );
-
-            // 2. Build recipient
-            Recipient recipient = Recipient.builder()
-                    .userId(customer.getId().toString())
-                    .email(customer.getEmail())
-                    .phone(customer.getPhoneNumber())
-                    .name(customer.getFirstName())
-                    .language("en")  // Default language
-                    .build();
-
-            // 3. Create notification event
-            NotificationEvent event = NotificationEvent.builder()
-                    .type(NotificationType.WALLET_BALANCE_UPDATE)
-                    .recipients(List.of(recipient))
-                    .channels(List.of(
-                            NotificationChannel.EMAIL,
-                            NotificationChannel.SMS,
-                            NotificationChannel.PUSH,
-                            NotificationChannel.IN_APP
-                    ))
-                    .priority(NotificationPriority.NORMAL)
-                    .data(data)
-                    .build();
-
-            // 4. Publish notification
-            notificationPublisher.publish(event);
-
-            log.info("📤 Wallet top-up notification sent: user={}, amount={}, txn={}",
-                    customer.getUserName(), topUpAmount, transactionId);
-
-    }
 
 }

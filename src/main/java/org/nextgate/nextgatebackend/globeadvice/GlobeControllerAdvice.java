@@ -1,6 +1,7 @@
 package org.nextgate.nextgatebackend.globeadvice;
 
 
+import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventCreationStage;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.*;
 import org.nextgate.nextgatebackend.globeresponsebody.GlobeFailureResponseBuilder;
 import org.springframework.http.ResponseEntity;
@@ -130,6 +131,38 @@ public class GlobeControllerAdvice {
     public ResponseEntity<GlobeFailureResponseBuilder> handleLedgerException(LedgerException ex) {
         GlobeFailureResponseBuilder response = GlobeFailureResponseBuilder.badRequest(ex.getMessage());
         return ResponseEntity.status(response.getHttpStatus()).body(response);
+    }
+
+    @ExceptionHandler(EventValidationException.class)
+    public ResponseEntity<GlobeFailureResponseBuilder> handleEventValidationException(EventValidationException ex) {
+        Map<String, Object> details = new HashMap<>();
+        details.put("message", ex.getMessage());
+
+        // Include stage information if available
+        if (ex.getStage() != null) {
+            details.put("stage", ex.getStage().name());
+            details.put("stageDisplayName", getStageDisplayName(ex.getStage()));
+        }
+
+        GlobeFailureResponseBuilder response = GlobeFailureResponseBuilder.unprocessableEntity(
+                "Event validation failed",
+                details
+        );
+
+        return ResponseEntity.status(response.getHttpStatus()).body(response);
+    }
+
+    // Helper method to get user-friendly stage names
+    private String getStageDisplayName(EventCreationStage stage) {
+        return switch (stage) {
+            case BASIC_INFO -> "Basic Information";
+            case SCHEDULE -> "Schedule";
+            case LOCATION_DETAILS -> "Location Details";
+            case TICKETS -> "Tickets";
+            case MEDIA -> "Media";
+            case LINKS -> "Links";
+            case REVIEW -> "Review";
+        };
     }
 
 

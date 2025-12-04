@@ -6,9 +6,10 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
-import org.nextgate.nextgatebackend.checkout_session.entity.CheckoutSessionEntity;
 import org.nextgate.nextgatebackend.financial_system.escrow.enums.EscrowStatus;
 import org.nextgate.nextgatebackend.financial_system.escrow.utils.JsonMetadataConverter;
+import org.nextgate.nextgatebackend.globe_enums.CheckoutSessionsDomains;
+
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -18,7 +19,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "escrow_accounts",
         indexes = {
-                @Index(name = "idx_escrow_checkout", columnList = "checkout_session_id"),
+                @Index(name = "idx_escrow_session", columnList = "checkout_session_id, session_domain"),
                 @Index(name = "idx_escrow_buyer", columnList = "buyer_id"),
                 @Index(name = "idx_escrow_seller", columnList = "seller_id"),
                 @Index(name = "idx_escrow_status", columnList = "status"),
@@ -38,9 +39,14 @@ public class EscrowAccountEntity {
     @Column(unique = true, nullable = false, length = 50)
     private String escrowNumber;
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "checkout_session_id", unique = true)
-    private CheckoutSessionEntity checkoutSession;
+    // Universal session reference
+    @Column(name = "checkout_session_id", nullable = false)
+    private UUID checkoutSessionId;
+
+    //Todo: this should be false later in production
+    @Enumerated(EnumType.STRING)
+    @Column(name = "session_domain", nullable = true, length = 20)
+    private CheckoutSessionsDomains sessionDomain;
 
     @Column(name = "order_id")
     private String orderId;

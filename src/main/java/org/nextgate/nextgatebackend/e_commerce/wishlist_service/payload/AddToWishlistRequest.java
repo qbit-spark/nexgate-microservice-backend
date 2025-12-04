@@ -1,0 +1,13 @@
+package org.nextgate.nextgatebackend.e_commerce.wishlist_service.payload;
+
+import jakarta.validation.constraints.NotNull;
+import lombok.Data;
+
+import java.util.UUID;
+
+@Data
+public class AddToWishlistRequest {
+
+    @NotNull(message = "Product ID is required")
+    private UUID productId;
+}

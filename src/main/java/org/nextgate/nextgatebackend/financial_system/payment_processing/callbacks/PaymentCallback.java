@@ -1,38 +1,30 @@
 package org.nextgate.nextgatebackend.financial_system.payment_processing.callbacks;
 
+import org.nextgate.nextgatebackend.financial_system.payment_processing.contract.PayableCheckoutSession;
 import org.apache.coyote.BadRequestException;
-import org.nextgate.nextgatebackend.checkout_session.entity.CheckoutSessionEntity;
 import org.nextgate.nextgatebackend.financial_system.escrow.entity.EscrowAccountEntity;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.payloads.PaymentResult;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
+import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
 
 /**
  * Callback interface for payment processing events
  */
 public interface PaymentCallback {
 
-    /**
-     * Called after successful payment and escrow creation
-     */
     void onPaymentSuccess(
-            CheckoutSessionEntity checkoutSession,
+            PayableCheckoutSession session,
             EscrowAccountEntity escrow
-    ) throws BadRequestException, ItemNotFoundException;
+    ) throws BadRequestException, ItemNotFoundException, RandomExceptions;
 
-    /**
-     * Called when payment fails
-     */
     void onPaymentFailure(
-            CheckoutSessionEntity checkoutSession,
+            PayableCheckoutSession session,
             PaymentResult result,
             String errorMessage
     );
 
-    /**
-     * Called when payment is pending (for external payments)
-     */
     void onPaymentPending(
-            CheckoutSessionEntity checkoutSession,
+            PayableCheckoutSession session,
             PaymentResult result
     );
 }

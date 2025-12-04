@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.enums.PaymentMethod;
+import org.nextgate.nextgatebackend.globe_enums.CheckoutSessionsDomains;
 
 import java.util.UUID;
 
@@ -18,9 +19,9 @@ public class PaymentRequest {
 
     private UUID checkoutSessionId;
 
-    // Optional: Override payment method from checkout session
+    private CheckoutSessionsDomains sessionDomain;
+
     private PaymentMethod paymentMethod;
 
-    // Optional: Idempotency key for duplicate prevention
     private String idempotencyKey;
 }

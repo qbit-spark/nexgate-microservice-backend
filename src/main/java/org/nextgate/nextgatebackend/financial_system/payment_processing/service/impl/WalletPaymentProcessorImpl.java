@@ -1,19 +1,20 @@
 package org.nextgate.nextgatebackend.financial_system.payment_processing.service.impl;
 
+
+import org.nextgate.nextgatebackend.financial_system.payment_processing.contract.PayableCheckoutSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
-import org.nextgate.nextgatebackend.checkout_session.entity.CheckoutSessionEntity;
 import org.nextgate.nextgatebackend.financial_system.escrow.entity.EscrowAccountEntity;
 import org.nextgate.nextgatebackend.financial_system.escrow.service.EscrowService;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.enums.PaymentStatus;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.payloads.PaymentResult;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.service.WalletPaymentProcessor;
+import org.nextgate.nextgatebackend.financial_system.payment_processing.strategy.SessionMetadataExtractorRegistry;
 import org.nextgate.nextgatebackend.financial_system.wallet.entity.WalletEntity;
 import org.nextgate.nextgatebackend.financial_system.wallet.service.WalletService;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
-import org.nextgate.nextgatebackend.shops_mng_service.shops.shops_mng.repo.ShopRepo;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,64 +27,55 @@ public class WalletPaymentProcessorImpl implements WalletPaymentProcessor {
 
     private final WalletService walletService;
     private final EscrowService escrowService;
-    private final ShopRepo shopRepo;
+    private final SessionMetadataExtractorRegistry extractorRegistry;
+
 
     @Override
     @Transactional
-    public PaymentResult processPayment(CheckoutSessionEntity checkoutSession)
+    public PaymentResult processPayment(PayableCheckoutSession session)
             throws ItemNotFoundException, RandomExceptions {
 
         try {
-            // Extract buyer and seller from checkout session
-            var buyer = checkoutSession.getCustomer();
-            var seller = extractSellerFromCheckoutSession(checkoutSession);
-            var totalAmount = checkoutSession.getPricing().getTotal();
+            AccountEntity payer = session.getPayer();
+            AccountEntity payee = extractorRegistry
+                    .getExtractor(session.getSessionDomain())
+                    .extractPayee(session);
 
-            log.info("Processing wallet payment for checkout session: {}, amount: {} TZS",
-                    checkoutSession.getSessionId(), totalAmount);
+            BigDecimal totalAmount = session.getTotalAmount();
 
-            // Check if escrow already exists (idempotency)
-            if (escrowService.escrowExistsForCheckoutSession(checkoutSession)) {
-                log.warn("Escrow already exists for checkout session: {}", checkoutSession.getSessionId());
+            log.info("Processing wallet payment | Session: {} | Domain: {} | Amount: {} TZS",
+                    session.getSessionId(), session.getSessionDomain(), totalAmount);
+
+            if (session.getEscrowId() != null) {
+                log.warn("Escrow already exists for session: {}", session.getSessionId());
                 return PaymentResult.builder()
                         .status(PaymentStatus.FAILED)
-                        .message("Payment already processed for this checkout session")
+                        .message("Payment already processed")
                         .errorCode("DUPLICATE_PAYMENT")
-                        .errorMessage("Escrow already exists")
                         .build();
             }
 
-            // Get buyer's wallet and validate balance
-            WalletEntity buyerWallet = walletService.getWalletByAccountId(buyer.getAccountId());
+            WalletEntity payerWallet = walletService.getWalletByAccountId(payer.getAccountId());
 
-            if (!buyerWallet.getIsActive()) {
-                throw new RandomExceptions("Wallet is not active. Please contact support.");
+            if (!payerWallet.getIsActive()) {
+                throw new RandomExceptions("Wallet is not active");
             }
 
-            BigDecimal walletBalance = walletService.getWalletBalance(buyerWallet);
+            BigDecimal walletBalance = walletService.getWalletBalance(payerWallet);
 
             if (walletBalance.compareTo(totalAmount) < 0) {
-                log.warn("Insufficient balance for user: {} - Required: {}, Available: {}",
-                        buyer.getUserName(), totalAmount, walletBalance);
-
                 return PaymentResult.builder()
                         .status(PaymentStatus.FAILED)
-                        .message(String.format("Insufficient balance. Required: %s TZS, Available: %s TZS",
+                        .message(String.format("Insufficient balance. Required: %s, Available: %s",
                                 totalAmount, walletBalance))
                         .errorCode("INSUFFICIENT_BALANCE")
-                        .errorMessage("Wallet balance too low")
                         .build();
             }
 
-            // Create escrow (this moves money from wallet to escrow)
-            EscrowAccountEntity escrow = escrowService.holdMoney(
-                    checkoutSession,
-                    buyer,
-                    seller,
-                    totalAmount
-            );
+            // ✅ NO MORE CASTING! Clean universal call
+            EscrowAccountEntity escrow = escrowService.holdMoney(session, payer, payee, totalAmount);
 
-            log.info("Wallet payment successful - Escrow created: {}", escrow.getEscrowNumber());
+            log.info("✅ Payment successful | Escrow: {}", escrow.getEscrowNumber());
 
             return PaymentResult.builder()
                     .status(PaymentStatus.SUCCESS)
@@ -91,36 +83,10 @@ public class WalletPaymentProcessorImpl implements WalletPaymentProcessor {
                     .escrow(escrow)
                     .build();
 
-        } catch (ItemNotFoundException | RandomExceptions e) {
-            log.error("Wallet payment failed: {}", e.getMessage());
-            throw e;
         } catch (Exception e) {
-            log.error("Unexpected error during wallet payment", e);
-            return PaymentResult.builder()
-                    .status(PaymentStatus.FAILED)
-                    .message("Payment processing failed")
-                    .errorCode("PROCESSING_ERROR")
-                    .errorMessage(e.getMessage())
-                    .build();
+            log.error("Payment failed: {}", e.getMessage());
+            throw e;
         }
     }
 
-    // Extracts seller from checkout session items
-    private AccountEntity extractSellerFromCheckoutSession(
-            CheckoutSessionEntity checkoutSession) throws RandomExceptions {
-
-        // Get first item's shop owner as seller
-        if (checkoutSession.getItems() == null || checkoutSession.getItems().isEmpty()) {
-            throw new RandomExceptions("No items found in checkout session");
-        }
-
-        var firstItem = checkoutSession.getItems().get(0);
-        var shopId = firstItem.getShopId();
-
-        var shop = shopRepo.findById(shopId)
-                .orElseThrow(() -> new RandomExceptions("Shop not found for ID: " + shopId));
-
-        // TODO: Fetch actual seller from shop service
-        return shop.getOwner();
-    }
 }

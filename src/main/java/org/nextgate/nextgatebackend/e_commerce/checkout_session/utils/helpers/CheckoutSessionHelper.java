@@ -1,0 +1,613 @@
+package org.nextgate.nextgatebackend.e_commerce.checkout_session.utils.helpers;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.coyote.BadRequestException;
+import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
+import org.nextgate.nextgatebackend.e_commerce.cart_service.entity.CartEntity;
+import org.nextgate.nextgatebackend.e_commerce.cart_service.entity.CartItemEntity;
+import org.nextgate.nextgatebackend.e_commerce.cart_service.repo.CartRepo;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.ProductCheckoutSessionEntity;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.payload.CreateCheckoutSessionRequest;
+import org.nextgate.nextgatebackend.e_commerce.checkout_session.payload.UpdateCheckoutSessionRequest;
+import org.nextgate.nextgatebackend.financial_system.wallet.entity.WalletEntity;
+import org.nextgate.nextgatebackend.financial_system.wallet.service.WalletService;
+import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
+import org.nextgate.nextgatebackend.payment_methods.entity.PaymentMethodsEntity;
+import org.nextgate.nextgatebackend.payment_methods.enums.PaymentMethodsType;
+import org.nextgate.nextgatebackend.e_commerce.products_mng_service.products.entity.ProductEntity;
+import org.nextgate.nextgatebackend.e_commerce.products_mng_service.products.enums.ProductStatus;
+import org.nextgate.nextgatebackend.e_commerce.products_mng_service.products.repo.ProductRepo;
+import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng.repo.ShopRepo;
+import org.springframework.stereotype.Component;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.util.*;
+
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class CheckoutSessionHelper {
+
+    private final WalletService walletService;
+    private final ProductRepo productRepo;
+    private final CartRepo cartRepo;
+    private final ShopRepo shopRepo;
+
+    // ========================================
+    // BILLING ADDRESS DETERMINATION
+    // ========================================
+
+    public ProductCheckoutSessionEntity.BillingAddress determineBillingAddress(
+            CreateCheckoutSessionRequest request,
+            PaymentMethodsEntity paymentMethod) {
+
+        // If payment method has billing address, use it
+        if (paymentMethod.getBillingAddress() != null) {
+            return convertPaymentMethodBillingToCheckoutBilling(paymentMethod.getBillingAddress());
+        }
+
+        // Otherwise, return null (don't fallback to shipping)
+        return null;
+    }
+
+    private ProductCheckoutSessionEntity.BillingAddress convertPaymentMethodBillingToCheckoutBilling(
+            PaymentMethodsEntity.BillingAddress pmBilling) {
+
+        return ProductCheckoutSessionEntity.BillingAddress.builder()
+                .sameAsShipping(false)
+                .fullName(null)
+                .addressLine1(pmBilling.getStreet())
+                .city(pmBilling.getCity())
+                .state(pmBilling.getState())
+                .postalCode(pmBilling.getPostalCode())
+                .country(pmBilling.getCountry())
+                .build();
+    }
+
+    // ========================================
+    // SHIPPING ADDRESS FETCHING (PLACEHOLDER)
+    // ========================================
+
+    public ProductCheckoutSessionEntity.ShippingAddress fetchShippingAddress(UUID shippingAddressId) {
+
+        // Todo: Fetch from ShippingAddressService/Repo when available
+        return ProductCheckoutSessionEntity.ShippingAddress.builder()
+                .fullName("John Doe")
+                .addressLine1("123 Main Street")
+                .addressLine2(null)
+                .city("Dar es Salaam")
+                .state("Dar es Salaam Region")
+                .postalCode("12345")
+                .country("Tanzania")
+                .phone("+255123456789")
+                .build();
+    }
+
+    // ========================================
+    // SHIPPING METHOD CREATION (PLACEHOLDER)
+    // ========================================
+
+    public ProductCheckoutSessionEntity.ShippingMethod createPlaceholderShippingMethod(String shippingMethodId) {
+
+        // Todo: Fetch from ShippingService when available
+        return ProductCheckoutSessionEntity.ShippingMethod.builder()
+                .id(shippingMethodId)
+                .name("Standard Shipping")
+                .carrier("DHL")
+                .cost(BigDecimal.ZERO) // Will be calculated later
+                .estimatedDays("3-5 business days")
+                .estimatedDelivery(LocalDateTime.now().plusDays(5).toString())
+                .build();
+    }
+
+    // ========================================
+    // PRODUCT FETCHING & VALIDATION - REAL IMPLEMENTATION
+    // ========================================
+
+    public ProductCheckoutSessionEntity.CheckoutItem fetchAndBuildCheckoutItem(
+            UUID productId,
+            Integer quantity) throws ItemNotFoundException, BadRequestException {
+
+        // Fetch real product from database
+        ProductEntity product = productRepo.findByProductIdAndIsDeletedFalse(productId)
+                .orElseThrow(() -> new ItemNotFoundException("Product not found"));
+
+        // Validate product is available for purchase
+        if (product.getStatus() != ProductStatus.ACTIVE) {
+            throw new BadRequestException("Product is not available for purchase");
+        }
+
+        // Validate inventory
+        if (!product.isInStock()) {
+            throw new BadRequestException("Product is out of stock");
+        }
+
+        // Validate quantity against product constraints
+        if (!product.canOrderQuantity(quantity)) {
+            throw new BadRequestException(
+                    String.format("Invalid quantity. Min: %d, Max: %d",
+                            product.getMinOrderQuantity(),
+                            product.getMaxOrderQuantity())
+            );
+        }
+
+        // Validate stock availability
+        if (product.getStockQuantity() < quantity) {
+            throw new BadRequestException(
+                    String.format("Insufficient stock. Available: %d, Requested: %d",
+                            product.getStockQuantity(), quantity)
+            );
+        }
+
+        // Build checkout item from real product
+        return buildCheckoutItemFromProduct(product, quantity);
+    }
+
+
+    private ProductCheckoutSessionEntity.CheckoutItem buildCheckoutItemFromProduct(
+            ProductEntity product,
+            Integer quantity) throws ItemNotFoundException, BadRequestException {
+
+        log.debug("╔════════════════════════════════════════════════════════╗");
+        log.debug("║   BUILDING CHECKOUT ITEM                              ║");
+        log.debug("╚════════════════════════════════════════════════════════╝");
+        log.debug("Product: {} x{}", product.getProductName(), quantity);
+
+        // ========================================
+        // 1. VALIDATE PRODUCT
+        // ========================================
+        if (product.getStatus() != ProductStatus.ACTIVE) {
+            throw new BadRequestException("Product is not available for purchase");
+        }
+
+        if (!product.isInStock()) {
+            throw new BadRequestException("Product is out of stock");
+        }
+
+        if (!product.canOrderQuantity(quantity)) {
+            throw new BadRequestException(
+                    String.format("Invalid quantity. Min: %d, Max: %d",
+                            product.getMinOrderQuantity(),
+                            product.getMaxOrderQuantity())
+            );
+        }
+
+        if (product.getStockQuantity() < quantity) {
+            throw new BadRequestException(
+                    String.format("Insufficient stock. Available: %d, Requested: %d",
+                            product.getStockQuantity(), quantity)
+            );
+        }
+
+        // ========================================
+        // 2. GET BASE PRICING
+        // ========================================
+        BigDecimal unitPrice = product.getPrice();
+
+        if (unitPrice == null || unitPrice.compareTo(BigDecimal.ZERO) <= 0) {
+            log.error("Product has invalid price: {}", unitPrice);
+            throw new BadRequestException(
+                    String.format("Product '%s' has invalid price", product.getProductName())
+            );
+        }
+
+        log.debug("  Unit Price: {} TZS", unitPrice);
+
+        // ========================================
+        // 3. CALCULATE DISCOUNT (IF ON SALE)
+        // ========================================
+        BigDecimal discountPerItem = BigDecimal.ZERO;
+
+        if (product.isOnSale() && product.getComparePrice() != null) {
+            // Discount per item = comparePrice - currentPrice
+            discountPerItem = product.getComparePrice().subtract(unitPrice);
+
+            log.debug("  Product is on sale:");
+            log.debug("    Compare Price: {} TZS", product.getComparePrice());
+            log.debug("    Current Price: {} TZS", unitPrice);
+            log.debug("    Discount Per Item: {} TZS", discountPerItem);
+
+            // SAFETY: Discount can't be more than compare price (would be > 100% off)
+            if (discountPerItem.compareTo(product.getComparePrice()) > 0) {
+                log.warn("  ⚠️ Invalid discount detected - capping to zero");
+                discountPerItem = BigDecimal.ZERO;
+            }
+
+            // SAFETY: Discount can't be negative
+            if (discountPerItem.compareTo(BigDecimal.ZERO) < 0) {
+                log.warn("  ⚠️ Negative discount detected - setting to zero");
+                discountPerItem = BigDecimal.ZERO;
+            }
+        }
+
+        // Total discount for all items (discount per item × quantity)
+        BigDecimal totalDiscount = discountPerItem.multiply(BigDecimal.valueOf(quantity));
+
+        log.debug("  Total Discount: {} TZS (for {} items)", totalDiscount, quantity);
+
+        // ========================================
+        // 4. CALCULATE SUBTOTAL
+        // ========================================
+        // Subtotal = unit price × quantity (BEFORE any discount)
+        BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
+
+        log.debug("  Subtotal: {} TZS", subtotal);
+
+        // ========================================
+        // 5. CALCULATE TAX
+        // ========================================
+        // TODO: Implement proper tax calculation based on location/product type
+        BigDecimal tax = BigDecimal.ZERO;
+
+        log.debug("  Tax: {} TZS", tax);
+
+        // ========================================
+        // 6. CALCULATE FINAL TOTAL
+        // ========================================
+        // Total = subtotal + tax
+        // Note: Discount is tracked separately, not deducted here
+        BigDecimal total = subtotal.add(tax);
+
+        log.debug("  Total: {} TZS", total);
+
+        // ========================================
+        // 7. SAFETY VALIDATION
+        // ========================================
+        if (total.compareTo(BigDecimal.ZERO) <= 0) {
+            log.error("╔════════════════════════════════════════════════════════╗");
+            log.error("║   ⚠️  INVALID PRICING DETECTED  ⚠️                    ║");
+            log.error("╚════════════════════════════════════════════════════════╝");
+            log.error("Product: {}", product.getProductName());
+            log.error("  Unit Price: {} TZS", unitPrice);
+            log.error("  Quantity: {}", quantity);
+            log.error("  Compare Price: {}", product.getComparePrice());
+            log.error("  Discount Per Item: {} TZS", discountPerItem);
+            log.error("  Total Discount: {} TZS", totalDiscount);
+            log.error("  Subtotal: {} TZS", subtotal);
+            log.error("  Tax: {} TZS", tax);
+            log.error("  TOTAL: {} TZS ❌", total);
+
+            throw new BadRequestException(
+                    String.format(
+                            "Invalid pricing for product '%s'. Total cannot be negative or zero. " +
+                                    "Please contact support.",
+                            product.getProductName()
+                    )
+            );
+        }
+
+        log.debug("✓ Checkout item validated successfully");
+        log.debug("╚════════════════════════════════════════════════════════╝");
+
+        // ========================================
+        // 8. BUILD AND RETURN CHECKOUT ITEM
+        // ========================================
+        return ProductCheckoutSessionEntity.CheckoutItem.builder()
+                .productId(product.getProductId())
+                .productName(product.getProductName())
+                .productSlug(product.getProductSlug())
+                .productImage(product.getProductImages() != null && !product.getProductImages().isEmpty()
+                        ? product.getProductImages().getFirst() : null)
+                .quantity(quantity)
+                .unitPrice(unitPrice)
+                .subtotal(subtotal)
+                .tax(tax)
+                .total(total)
+                .shopId(product.getShop().getShopId())
+                .shopName(product.getShop().getShopName())
+                .shopLogo(product.getShop().getLogoUrl())
+                .availableForCheckout(product.isInStock())
+                .availableQuantity(product.getStockQuantity())
+                .build();
+    }
+
+
+
+    // ========================================
+    // PRICING CALCULATION
+    // ========================================
+
+    public ProductCheckoutSessionEntity.PricingSummary calculatePricing(
+            List<ProductCheckoutSessionEntity.CheckoutItem> items,
+            ProductCheckoutSessionEntity.ShippingMethod shippingMethod) {
+
+        BigDecimal subtotal = BigDecimal.ZERO;
+        BigDecimal totalTax = BigDecimal.ZERO;
+
+        for (ProductCheckoutSessionEntity.CheckoutItem item : items) {
+            subtotal = subtotal.add(item.getSubtotal());
+            totalTax = totalTax.add(item.getTax());
+        }
+
+        BigDecimal shippingCost = shippingMethod != null ? shippingMethod.getCost() : BigDecimal.ZERO;
+        BigDecimal total = subtotal.add(shippingCost).add(totalTax);
+
+        return ProductCheckoutSessionEntity.PricingSummary.builder()
+                .subtotal(subtotal.setScale(2, RoundingMode.HALF_UP))
+                .shippingCost(shippingCost.setScale(2, RoundingMode.HALF_UP))
+                .tax(totalTax.setScale(2, RoundingMode.HALF_UP))
+                .total(total.setScale(2, RoundingMode.HALF_UP))
+                .currency("TZS")
+                .build();
+    }
+
+    // ========================================
+    // PAYMENT INTENT CREATION
+    // ========================================
+
+    public ProductCheckoutSessionEntity.PaymentIntent createPaymentIntent(
+            PaymentMethodsEntity paymentMethod,
+            ProductCheckoutSessionEntity.PricingSummary pricing,
+            UUID accountId) throws BadRequestException, ItemNotFoundException {
+
+        return switch (paymentMethod.getPaymentMethodType()) {
+            case WALLET -> createWalletPaymentIntent(paymentMethod, pricing, accountId);
+            case CASH_ON_DELIVERY -> createCODPaymentIntent();
+            case CREDIT_CARD, DEBIT_CARD -> throw new BadRequestException("Card payment not implemented yet");
+            case MNO_PAYMENT -> throw new BadRequestException("M-Pesa payment not implemented yet");
+            case PAYPAL -> throw new BadRequestException("PayPal payment not implemented yet");
+            case BANK_TRANSFER -> throw new BadRequestException("Bank transfer not implemented yet");
+            case CRYPTOCURRENCY -> throw new BadRequestException("Cryptocurrency payment not implemented yet");
+            case MOBILE_PAYMENT -> throw new BadRequestException("Mobile payment not implemented yet");
+            case GIFT_CARD -> throw new BadRequestException("Gift card payment not implemented yet");
+            default -> throw new BadRequestException("Unsupported payment method type");
+        };
+    }
+
+    private ProductCheckoutSessionEntity.PaymentIntent createWalletPaymentIntent(
+            PaymentMethodsEntity paymentMethod,
+            ProductCheckoutSessionEntity.PricingSummary pricing,
+            UUID accountId) throws BadRequestException, ItemNotFoundException {
+
+        WalletEntity wallet = walletService.getWalletByAccountId(accountId);
+
+        if (!wallet.getIsActive()) {
+            throw new BadRequestException("Wallet is not active");
+        }
+
+        BigDecimal walletBalance = walletService.getMyWalletBalance();
+
+        if (walletBalance.compareTo(pricing.getTotal()) < 0) {
+            throw new BadRequestException(
+                    String.format("Insufficient wallet balance. Required: %s TZS, Available: %s TZS",
+                            pricing.getTotal(), walletBalance)
+            );
+        }
+
+        return ProductCheckoutSessionEntity.PaymentIntent.builder()
+                .provider("WALLET")
+                .clientSecret(null)
+                .paymentMethods(List.of("WALLET"))
+                .status("READY")
+                .build();
+    }
+
+    private ProductCheckoutSessionEntity.PaymentIntent createCODPaymentIntent() {
+        return ProductCheckoutSessionEntity.PaymentIntent.builder()
+                .provider("CASH_ON_DELIVERY")
+                .clientSecret(null)
+                .paymentMethods(List.of("CASH"))
+                .status("PENDING")
+                .build();
+    }
+
+    // ========================================
+    // INVENTORY HOLD (PLACEHOLDER)
+    // ========================================
+
+    public void holdInventory(UUID productId, Integer quantity, LocalDateTime expiresAt) {
+        // Todo: Implement inventory hold logic
+        // This should decrement available stock temporarily
+    }
+
+    public void releaseInventory(UUID productId, Integer quantity) {
+        // Todo: Release held inventory
+    }
+
+    // ========================================
+    // SESSION EXPIRATION
+    // ========================================
+
+    public LocalDateTime calculateSessionExpiration() {
+        return LocalDateTime.now().plusMinutes(15);
+    }
+
+    public LocalDateTime calculateInventoryHoldExpiration() {
+        return calculateSessionExpiration();
+    }
+
+    public CreateCheckoutSessionRequest convertUpdateToCreateRequest(
+            UpdateCheckoutSessionRequest updateRequest) {
+        // Helper to convert update request to create request format
+        // Used for billing address determination
+        return CreateCheckoutSessionRequest.builder()
+                .shippingAddressId(updateRequest.getShippingAddressId())
+                .shippingMethodId(updateRequest.getShippingMethodId())
+                .paymentMethodId(updateRequest.getPaymentMethodId())
+                .metadata(updateRequest.getMetadata())
+                .build();
+    }
+
+// ========================================
+// PAYMENT METHOD RECONSTRUCTION
+// ========================================
+
+    public PaymentMethodsEntity getPaymentMethodFromIntent(
+            ProductCheckoutSessionEntity.PaymentIntent paymentIntent,
+            AccountEntity user) throws ItemNotFoundException, BadRequestException {
+
+        if (paymentIntent == null) {
+            throw new BadRequestException("Payment intent is null");
+        }
+
+        // Reconstruct payment method info from intent
+        String provider = paymentIntent.getProvider();
+
+        if (provider == null || provider.trim().isEmpty()) {
+            throw new BadRequestException("Payment provider is not specified in payment intent");
+        }
+
+        return switch (provider.toUpperCase()) {
+            case "WALLET" -> createVirtualWalletPaymentMethod(user);
+            case "CASH_ON_DELIVERY", "COD" -> createVirtualCODPaymentMethod(user);
+            case "CREDIT_CARD", "DEBIT_CARD" -> throw new BadRequestException(
+                    "Card payment method reconstruction not yet implemented. Please update payment method."
+            );
+            case "MNO_PAYMENT", "MPESA" -> throw new BadRequestException(
+                    "Mobile money payment method reconstruction not yet implemented. Please update payment method."
+            );
+            case "PAYPAL" -> throw new BadRequestException(
+                    "PayPal payment method reconstruction not yet implemented. Please update payment method."
+            );
+            case "BANK_TRANSFER" -> throw new BadRequestException(
+                    "Bank transfer payment method reconstruction not yet implemented. Please update payment method."
+            );
+            default -> throw new BadRequestException(
+                    "Unknown or unsupported payment provider: " + provider +
+                            ". Please update your payment method to continue."
+            );
+        };
+    }
+
+// ========================================
+// VIRTUAL PAYMENT METHOD CREATION
+// ========================================
+
+    public PaymentMethodsEntity createVirtualWalletPaymentMethod(AccountEntity user)
+            throws ItemNotFoundException, BadRequestException {
+
+        // Verify wallet exists and is active via WalletService
+        WalletEntity wallet = walletService.getWalletByAccountId(user.getAccountId());
+
+        if (!wallet.getIsActive()) {
+            throw new BadRequestException(
+                    "Your wallet is not active. Please activate your wallet or provide a payment method."
+            );
+        }
+
+        // Create virtual payment method entity (not persisted to DB)
+        return PaymentMethodsEntity.builder()
+                .paymentMethodId(null) // Virtual
+                .owner(user)
+                .paymentMethodType(PaymentMethodsType.WALLET)
+                .isActive(true)
+                .isDefault(false)
+                .isVerified(true)
+                .billingAddress(null) // Wallet doesn't need billing address
+                .build();
+    }
+
+    public PaymentMethodsEntity createVirtualCODPaymentMethod(AccountEntity user) {
+        // Create virtual COD payment method entity (not persisted to DB)
+        return PaymentMethodsEntity.builder()
+                .paymentMethodId(null) // Virtual
+                .owner(user)
+                .paymentMethodType(PaymentMethodsType.CASH_ON_DELIVERY)
+                .isActive(true)
+                .isDefault(false)
+                .isVerified(true)
+                .billingAddress(null) // COD doesn't need billing address
+                .build();
+    }
+
+    public List<ProductCheckoutSessionEntity.CheckoutItem> convertCartItemsToCheckoutItems(CartEntity cart)
+            throws ItemNotFoundException, BadRequestException {
+
+        List<ProductCheckoutSessionEntity.CheckoutItem> checkoutItems = new ArrayList<>();
+
+        for (CartItemEntity cartItem : cart.getCartItems()) {
+            ProductCheckoutSessionEntity.CheckoutItem checkoutItem = fetchAndBuildCheckoutItem(
+                    cartItem.getProduct().getProductId(),
+                    cartItem.getQuantity()
+            );
+            checkoutItems.add(checkoutItem);
+        }
+
+        return checkoutItems;
+    }
+
+    public void clearCartAfterCheckout(CartEntity cart) {
+        // Called AFTER successful payment
+        cart.getCartItems().clear();
+        cart.setUpdatedAt(LocalDateTime.now());
+        cartRepo.save(cart);
+    }
+
+    // ========================================
+// GROUP PURCHASE HELPERS
+// ========================================
+
+    public ProductCheckoutSessionEntity.CheckoutItem buildGroupPurchaseCheckoutItem(
+            ProductEntity product,
+            Integer quantity
+    ) throws BadRequestException {
+
+        log.debug("Building group purchase checkout item for product: {}, quantity: {}",
+                product.getProductId(), quantity);
+
+        // Use groupPrice instead of regular price
+        BigDecimal unitPrice = product.getGroupPrice();
+
+        // Calculate discount (regularPrice - groupPrice)
+        BigDecimal discountPerItem = product.getPrice().subtract(product.getGroupPrice());
+
+        BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
+
+        // Todo: Tax calculation
+        BigDecimal tax = subtotal.multiply(BigDecimal.valueOf(0.0)); // 0% for now
+
+        BigDecimal total = subtotal.add(tax);
+
+        return ProductCheckoutSessionEntity.CheckoutItem.builder()
+                .productId(product.getProductId())
+                .productName(product.getProductName())
+                .productSlug(product.getProductSlug())
+                .productImage(product.getProductImages() != null && !product.getProductImages().isEmpty()
+                        ? product.getProductImages().getFirst() : null)
+                .quantity(quantity)
+                .unitPrice(unitPrice) // Group price
+                .subtotal(subtotal)
+                .tax(tax)
+                .total(total)
+                .shopId(product.getShop().getShopId())
+                .shopName(product.getShop().getShopName())
+                .shopLogo(product.getShop().getLogoUrl())
+                .availableForCheckout(product.isInStock())
+                .availableQuantity(product.getStockQuantity())
+                .build();
+    }
+
+    public ProductCheckoutSessionEntity.PricingSummary calculateGroupPurchasePricing(
+            List<ProductCheckoutSessionEntity.CheckoutItem> items,
+            ProductCheckoutSessionEntity.ShippingMethod shippingMethod
+    ) {
+
+        log.debug("Calculating group purchase pricing for {} items", items.size());
+
+        BigDecimal subtotal = BigDecimal.ZERO;
+        BigDecimal totalTax = BigDecimal.ZERO;
+
+        for (ProductCheckoutSessionEntity.CheckoutItem item : items) {
+            subtotal = subtotal.add(item.getSubtotal());
+            totalTax = totalTax.add(item.getTax());
+        }
+
+        BigDecimal shippingCost = shippingMethod != null ?
+                shippingMethod.getCost() : BigDecimal.ZERO;
+
+        BigDecimal total = subtotal.add(shippingCost).add(totalTax);
+
+
+
+        return ProductCheckoutSessionEntity.PricingSummary.builder()
+                .subtotal(subtotal.setScale(2, RoundingMode.HALF_UP))
+                .shippingCost(shippingCost.setScale(2, RoundingMode.HALF_UP))
+                .tax(totalTax.setScale(2, RoundingMode.HALF_UP))
+                .total(total.setScale(2, RoundingMode.HALF_UP))
+                .currency("TZS")
+                .build();
+    }
+}

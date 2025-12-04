@@ -1,9 +1,9 @@
 package org.nextgate.nextgatebackend.financial_system.escrow.service.impl;
 
+import org.nextgate.nextgatebackend.financial_system.payment_processing.contract.PayableCheckoutSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
-import org.nextgate.nextgatebackend.checkout_session.entity.CheckoutSessionEntity;
 import org.nextgate.nextgatebackend.financial_system.escrow.entity.EscrowAccountEntity;
 import org.nextgate.nextgatebackend.financial_system.escrow.enums.EscrowStatus;
 import org.nextgate.nextgatebackend.financial_system.escrow.repo.EscrowAccountRepo;
@@ -17,6 +17,7 @@ import org.nextgate.nextgatebackend.financial_system.transaction_history.enums.T
 import org.nextgate.nextgatebackend.financial_system.transaction_history.service.TransactionHistoryService;
 import org.nextgate.nextgatebackend.financial_system.wallet.entity.WalletEntity;
 import org.nextgate.nextgatebackend.financial_system.wallet.service.WalletService;
+import org.nextgate.nextgatebackend.globe_enums.CheckoutSessionsDomains;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.RandomExceptions;
 import org.springframework.beans.factory.annotation.Value;
@@ -40,15 +41,19 @@ public class EscrowServiceImpl implements EscrowService {
     private final WalletService walletService;
     private final TransactionHistoryService transactionHistoryService;
 
-    @Value("${app.platform.fee-percentage:5.0}")
+    @Value("${app.platform.fee-percentage}")
     private BigDecimal platformFeePercentage;
 
     @Override
     @Transactional
-    public EscrowAccountEntity holdMoney(CheckoutSessionEntity checkoutSession, AccountEntity buyer, AccountEntity seller, BigDecimal amount) throws ItemNotFoundException, RandomExceptions {
+    public EscrowAccountEntity holdMoney(
+            PayableCheckoutSession session,
+            AccountEntity payer,
+            AccountEntity payee,
+            BigDecimal amount) throws ItemNotFoundException, RandomExceptions {
 
-        // Prevent duplicate escrow for same checkout session
-        if (escrowExistsForCheckoutSession(checkoutSession)) {
+        // Prevent duplicate escrow for same session
+        if (escrowExistsForSession(session.getSessionId(), session.getSessionDomain())) {
             throw new RandomExceptions("Escrow already exists for this checkout session");
         }
 
@@ -56,82 +61,65 @@ public class EscrowServiceImpl implements EscrowService {
             throw new RandomExceptions("Escrow amount must be greater than zero");
         }
 
-        // Generate unique escrow number (e.g., ESC-2025-000001)
         String escrowNumber = generateEscrowNumber();
 
-        // ========================================
-        // STEP 1: Create and save escrow entity FIRST
-        // ========================================
+        // Create escrow entity
         EscrowAccountEntity escrow = EscrowAccountEntity.builder()
                 .escrowNumber(escrowNumber)
-                .checkoutSession(checkoutSession)
-                .buyer(buyer)
-                .seller(seller)
+                .checkoutSessionId(session.getSessionId())
+                .sessionDomain(session.getSessionDomain())
+                .buyer(payer)
+                .seller(payee)
                 .totalAmount(amount)
                 .platformFeePercentage(platformFeePercentage)
                 .status(EscrowStatus.HELD)
+                .currency(session.getCurrency())
                 .build();
 
-        // Calculate platform fee and seller amount (e.g., 5% fee, 95% to seller)
         escrow.calculateFees();
 
-        // Save escrow to get the ID
         EscrowAccountEntity savedEscrow = escrowAccountRepo.save(escrow);
 
-        log.info("Escrow entity created with ID: {}", savedEscrow.getId());
+        log.info("Escrow entity created | ID: {} | Domain: {}", savedEscrow.getId(), session.getSessionDomain());
 
-        // ========================================
-        // STEP 2: Now create ledger account using escrow ID
-        // ========================================
+        // Create ledger account for escrow
         LedgerAccountEntity escrowLedgerAccount = ledgerService.createEscrowAccount(savedEscrow.getId());
-
-        // Update escrow with ledger account ID
         savedEscrow.setLedgerAccountId(escrowLedgerAccount.getId());
 
-        // ========================================
-        // STEP 3: Get buyer's wallet ledger account
-        // ========================================
-        WalletEntity buyerWallet = walletService.getWalletByAccountId(buyer.getAccountId());
-        LedgerAccountEntity buyerLedgerAccount = ledgerService.getOrCreateWalletAccount(buyerWallet);
+        // Get payer's wallet ledger account
+        WalletEntity payerWallet = walletService.getWalletByAccountId(payer.getAccountId());
+        LedgerAccountEntity payerLedgerAccount = ledgerService.getOrCreateWalletAccount(payerWallet);
 
-        // ========================================
-        // STEP 4: Move money from buyer wallet to escrow
-        // ========================================
+        // Move money from payer wallet to escrow
         LedgerEntryEntity ledgerEntry = ledgerService.createEntry(
-                buyerLedgerAccount,
+                payerLedgerAccount,
                 escrowLedgerAccount,
                 amount,
                 LedgerEntryType.PURCHASE,
-                "CHECKOUT_SESSION",
-                checkoutSession.getSessionId(),
-                String.format("Purchase escrow for checkout session %s", checkoutSession.getSessionId()),
-                buyer
+                session.getSessionDomain() + "_CHECKOUT",
+                session.getSessionId(),
+                String.format("%s purchase escrow for session %s", session.getSessionDomain(), session.getSessionId()),
+                payer
         );
 
-        // ========================================
-        // STEP 5: Save escrow again with ledger account ID
-        // ========================================
         savedEscrow = escrowAccountRepo.save(savedEscrow);
 
-        // ========================================
-        // STEP 6: Create transaction history
-        // ========================================
-        // Create transaction history for BUYER (PURCHASE)
+        // Create a transaction history for PAYER
         transactionHistoryService.createTransaction(
-                buyer,
+                payer,
                 TransactionType.PURCHASE,
                 TransactionDirection.DEBIT,
                 amount,
                 "Purchase Payment",
-                String.format("Payment for order (Escrow: %s)", savedEscrow.getEscrowNumber()),
+                String.format("Payment for %s (Escrow: %s)", session.getSessionDomain().name().toLowerCase(), savedEscrow.getEscrowNumber()),
                 ledgerEntry.getId(),
                 "ESCROW",
                 savedEscrow.getId()
         );
 
-        // Create transaction history for ADMIN tracking (ESCROW_HOLD)
+        // Create transaction history for ADMIN tracking
         transactionHistoryService.createTransaction(
-                buyer,
+                payer,
                 TransactionType.ESCROW_HOLD,
                 TransactionDirection.DEBIT,
                 amount,
@@ -142,8 +130,8 @@ public class EscrowServiceImpl implements EscrowService {
                 savedEscrow.getId()
         );
 
-        log.info("Escrow created: {} - Amount: {} TZS, Fee: {} TZS, Seller receives: {} TZS",
-                escrowNumber, amount, savedEscrow.getPlatformFeeAmount(), savedEscrow.getSellerAmount());
+        log.info("✅ Escrow created: {} | Domain: {} | Amount: {} | Fee: {} | Seller: {}",
+                escrowNumber, session.getSessionDomain(), amount, savedEscrow.getPlatformFeeAmount(), savedEscrow.getSellerAmount());
 
         return savedEscrow;
     }
@@ -154,28 +142,21 @@ public class EscrowServiceImpl implements EscrowService {
 
         EscrowAccountEntity escrow = getEscrowById(escrowId);
 
-        // Only HELD escrows can be released
         if (!escrow.canRelease()) {
             throw new RandomExceptions("Cannot release escrow - current status: " + escrow.getStatus());
         }
 
-        // Get escrow ledger account (source of money)
         LedgerAccountEntity escrowLedgerAccount = ledgerService.getAccountById(escrow.getLedgerAccountId());
 
-        // Get seller's wallet ledger account (destination 1)
         WalletEntity sellerWallet = walletService.getWalletByAccountIdInternalUse(escrow.getSeller().getAccountId());
         LedgerAccountEntity sellerLedgerAccount = ledgerService.getOrCreateWalletAccount(sellerWallet);
 
-        // Get platform revenue account (destination 2)
         LedgerAccountEntity platformRevenueAccount = ledgerService.getPlatformRevenueAccount();
 
-        // Split escrow money: seller gets 95%, platform gets 5%
         Map<LedgerAccountEntity, BigDecimal> creditAccounts = new HashMap<>();
         creditAccounts.put(sellerLedgerAccount, escrow.getSellerAmount());
         creditAccounts.put(platformRevenueAccount, escrow.getPlatformFeeAmount());
 
-
-        // Execute split: one debit (escrow), two credits (seller + platform)
         List<LedgerEntryEntity> ledgerEntries = ledgerService.createSplitEntry(
                 escrowLedgerAccount,
                 creditAccounts,
@@ -186,11 +167,9 @@ public class EscrowServiceImpl implements EscrowService {
                 null
         );
 
-        // Update escrow status and timestamp
         escrow.markAsReleased();
         escrowAccountRepo.save(escrow);
 
-        // Create transaction history for SELLER (SALE)
         transactionHistoryService.createTransaction(
                 escrow.getSeller(),
                 TransactionType.SALE,
@@ -203,8 +182,6 @@ public class EscrowServiceImpl implements EscrowService {
                 escrowId
         );
 
-        // Create transaction history for PLATFORM (PLATFORM_FEE_COLLECTED)
-        // Using buyer account temporarily - TODO: Replace with platform admin account
         transactionHistoryService.createTransaction(
                 escrow.getBuyer(),
                 TransactionType.PLATFORM_FEE_COLLECTED,
@@ -217,11 +194,8 @@ public class EscrowServiceImpl implements EscrowService {
                 escrowId
         );
 
-        log.info("Escrow released: {} - Seller received: {} TZS, Platform fee: {} TZS",
+        log.info("✅ Escrow released: {} | Seller: {} | Platform: {}",
                 escrow.getEscrowNumber(), escrow.getSellerAmount(), escrow.getPlatformFeeAmount());
-
-        //Todo: We need to send a notification to the seller
-
     }
 
     @Override
@@ -230,19 +204,15 @@ public class EscrowServiceImpl implements EscrowService {
 
         EscrowAccountEntity escrow = getEscrowById(escrowId);
 
-        // Only HELD or DISPUTED escrows can be refunded
         if (!escrow.canRefund()) {
             throw new RandomExceptions("Cannot refund escrow - current status: " + escrow.getStatus());
         }
 
-        // Get escrow ledger account (source)
         LedgerAccountEntity escrowLedgerAccount = ledgerService.getAccountById(escrow.getLedgerAccountId());
 
-        // Get buyer's wallet ledger account (destination)
         WalletEntity buyerWallet = walletService.getWalletByAccountId(escrow.getBuyer().getAccountId());
         LedgerAccountEntity buyerLedgerAccount = ledgerService.getOrCreateWalletAccount(buyerWallet);
 
-        // Return full amount to buyer (no fees deducted)
         LedgerEntryEntity ledgerEntry = ledgerService.createEntry(
                 escrowLedgerAccount,
                 buyerLedgerAccount,
@@ -254,11 +224,9 @@ public class EscrowServiceImpl implements EscrowService {
                 null
         );
 
-        // Update escrow status and timestamp
         escrow.markAsRefunded();
         escrowAccountRepo.save(escrow);
 
-        // Create transaction history for BUYER (PURCHASE_REFUND)
         transactionHistoryService.createTransaction(
                 escrow.getBuyer(),
                 TransactionType.PURCHASE_REFUND,
@@ -271,7 +239,6 @@ public class EscrowServiceImpl implements EscrowService {
                 escrowId
         );
 
-        // Create transaction history for SELLER (SALE_REFUND) - tracking only
         transactionHistoryService.createTransaction(
                 escrow.getSeller(),
                 TransactionType.SALE_REFUND,
@@ -284,10 +251,8 @@ public class EscrowServiceImpl implements EscrowService {
                 escrowId
         );
 
-        log.info("Escrow refunded: {} - Amount: {} TZS returned to buyer",
+        log.info("✅ Escrow refunded: {} | Amount: {} returned to buyer",
                 escrow.getEscrowNumber(), escrow.getTotalAmount());
-
-        //Todo: We need to send a notification to the buyer about the refund
     }
 
     @Override
@@ -296,12 +261,10 @@ public class EscrowServiceImpl implements EscrowService {
 
         EscrowAccountEntity escrow = getEscrowById(escrowId);
 
-        // Can only dispute HELD escrows
         if (!escrow.isHeld()) {
             throw new RandomExceptions("Cannot dispute escrow - current status: " + escrow.getStatus());
         }
 
-        // Mark as disputed but money stays in escrow (no ledger movement)
         escrow.markAsDisputed();
         escrowAccountRepo.save(escrow);
 
@@ -311,7 +274,7 @@ public class EscrowServiceImpl implements EscrowService {
     @Override
     public EscrowAccountEntity getEscrowById(UUID escrowId) throws ItemNotFoundException {
         return escrowAccountRepo.findById(escrowId)
-                .orElseThrow(() -> new ItemNotFoundException("Escrow not found with ID: " + escrowId));
+                .orElseThrow(() -> new ItemNotFoundException("Escrow not found: " + escrowId));
     }
 
     @Override
@@ -321,10 +284,9 @@ public class EscrowServiceImpl implements EscrowService {
     }
 
     @Override
-    public EscrowAccountEntity getEscrowByCheckoutSession(CheckoutSessionEntity checkoutSession)
-            throws ItemNotFoundException {
-        return escrowAccountRepo.findByCheckoutSession(checkoutSession)
-                .orElseThrow(() -> new ItemNotFoundException("Escrow not found for checkout session"));
+    public EscrowAccountEntity getEscrowBySessionId(UUID sessionId, CheckoutSessionsDomains sessionDomain) throws ItemNotFoundException {
+        return escrowAccountRepo.findByCheckoutSessionIdAndSessionDomain(sessionId, sessionDomain)
+                .orElseThrow(() -> new ItemNotFoundException("Escrow not found for session"));
     }
 
     @Override
@@ -343,8 +305,8 @@ public class EscrowServiceImpl implements EscrowService {
     }
 
     @Override
-    public boolean escrowExistsForCheckoutSession(CheckoutSessionEntity checkoutSession) {
-        return escrowAccountRepo.existsByCheckoutSession(checkoutSession);
+    public boolean escrowExistsForSession(UUID sessionId, CheckoutSessionsDomains sessionDomain) {
+        return escrowAccountRepo.existsByCheckoutSessionIdAndSessionDomain(sessionId, sessionDomain);
     }
 
     @Override
@@ -353,7 +315,6 @@ public class EscrowServiceImpl implements EscrowService {
         long count = escrowAccountRepo.count() + 1;
         String escrowNumber = String.format("ESC-%d-%06d", year, count);
 
-        // Ensure uniqueness by incrementing if exists
         while (escrowAccountRepo.existsByEscrowNumber(escrowNumber)) {
             count++;
             escrowNumber = String.format("ESC-%d-%06d", year, count);

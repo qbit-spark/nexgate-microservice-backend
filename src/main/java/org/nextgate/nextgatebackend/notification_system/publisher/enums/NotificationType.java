@@ -20,23 +20,15 @@ public enum NotificationType {
     WALLET_BALANCE_UPDATE,
 
     // Installment notifications
-
-    // Payment notifications
     INSTALLMENT_PAYMENT_SUCCESS,
     INSTALLMENT_PAYMENT_FAILED,
     INSTALLMENT_PAYMENT_REMINDER,
     INSTALLMENT_PAYMENT_OVERDUE,
-
-    // Lifecycle notifications
     INSTALLMENT_AGREEMENT_CREATED,
     INSTALLMENT_AGREEMENT_COMPLETED,
     INSTALLMENT_AGREEMENT_DEFAULTED,
-
-    // Special payment notifications
     INSTALLMENT_EARLY_PAYOFF_SUCCESS,
     INSTALLMENT_FLEXIBLE_PAYMENT_SUCCESS,
-
-    // Admin/Collections notifications
     INSTALLMENT_DEFAULT_ADMIN_ALERT,
     INSTALLMENT_COLLECTIONS_REQUIRED,
 
@@ -46,9 +38,10 @@ public enum NotificationType {
 
     // Group purchase notifications
     GROUP_PURCHASE_COMPLETE,
-
-    //Todo: we need template and consumer for this
     GROUP_PURCHASE_FAILED,
+    GROUP_PURCHASE_CREATED,
+    GROUP_MEMBER_JOINED,
+    GROUP_SEATS_TRANSFERRED,
 
     // User notifications
     WELCOME_EMAIL,
@@ -56,8 +49,10 @@ public enum NotificationType {
     // Promotional notifications
     PROMOTIONAL_OFFER,
 
-    GROUP_PURCHASE_CREATED,
-    GROUP_MEMBER_JOINED,
-    GROUP_SEATS_TRANSFERRED
-
+    // ✨ EVENT BOOKING NOTIFICATIONS (New!)
+    EVENT_BOOKING_CONFIRMED,           // ← For ticket buyer (always sent)
+    EVENT_TICKET_RECEIVED,             // ← For other attendees (conditional)
+    EVENT_ORGANIZER_NEW_BOOKING,       // ← For event organizer
+    EVENT_BOOKING_CANCELLED,           // ← When booking is cancelled
+    EVENT_BOOKING_REMINDER            // ← Reminder before event (optional, future)
 }
