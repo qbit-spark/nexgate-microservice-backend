@@ -3,7 +3,6 @@ package org.nextgate.nextgatebackend.e_social.posts_mng.utils;
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PostEntity;
 import org.nextgate.nextgatebackend.e_social.posts_mng.enums.PostType;
 import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.*;
-import org.nextgate.nextgatebackend.e_social.posts_mng.*;
 import org.springframework.stereotype.Component;
 
 import java.net.MalformedURLException;

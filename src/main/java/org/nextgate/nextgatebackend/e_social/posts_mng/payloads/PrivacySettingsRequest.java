@@ -4,7 +4,6 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.nextgate.nextgatebackend.e_social.posts_mng.*;
 import org.nextgate.nextgatebackend.e_social.posts_mng.enums.CommentPermission;
 import org.nextgate.nextgatebackend.e_social.posts_mng.enums.PostVisibility;
 import org.nextgate.nextgatebackend.e_social.posts_mng.enums.RepostPermission;
