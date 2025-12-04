@@ -30,7 +30,7 @@ public interface PostService {
 
     PostEntity attachInstallmentPlanToDraft(UUID planId);
 
-    PostEntity getCurrentDraft();
+    PostEntity getMyCurrentDraft();
 
     // Remove from draft
     PostEntity removeProductFromDraft(UUID productId);
@@ -52,9 +52,8 @@ public interface PostService {
 
     Page<PostEntity> getPublishedPosts(Pageable pageable);
 
-    List<PostEntity> getDraftsByAuthor(UUID authorId);
 
-    List<PostEntity> getScheduledPostsByAuthor(UUID authorId);
+    List<PostEntity> getMyScheduledPosts();
 
     // Update draft
     PostEntity updateDraft(UUID postId, UpdateDraftRequest request);

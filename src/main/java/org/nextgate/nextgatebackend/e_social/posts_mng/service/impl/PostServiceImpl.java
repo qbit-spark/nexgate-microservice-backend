@@ -230,7 +230,7 @@ public class PostServiceImpl implements PostService {
 
     @Override
     @Transactional(readOnly = true)
-    public PostEntity getCurrentDraft() {
+    public PostEntity getMyCurrentDraft() {
         AccountEntity author = getAuthenticatedAccount();
 
         return postRepository
@@ -258,7 +258,7 @@ public class PostServiceImpl implements PostService {
     @Transactional
     public PostEntity removeProductFromDraft(UUID productId) {
         AccountEntity author = getAuthenticatedAccount();
-        PostEntity draft = getCurrentDraft();
+        PostEntity draft = getMyCurrentDraft();
 
         if (draft == null) {
             throw new IllegalArgumentException("No draft post found");
@@ -282,7 +282,7 @@ public class PostServiceImpl implements PostService {
     @Transactional
     public PostEntity removeShopFromDraft(UUID shopId) {
         AccountEntity author = getAuthenticatedAccount();
-        PostEntity draft = getCurrentDraft();
+        PostEntity draft = getMyCurrentDraft();
 
         if (draft == null) {
             throw new IllegalArgumentException("No draft post found");
@@ -306,7 +306,7 @@ public class PostServiceImpl implements PostService {
     @Transactional
     public PostEntity removeEventFromDraft(UUID eventId) {
         AccountEntity author = getAuthenticatedAccount();
-        PostEntity draft = getCurrentDraft();
+        PostEntity draft = getMyCurrentDraft();
 
         if (draft == null) {
             throw new IllegalArgumentException("No draft post found");
@@ -330,7 +330,7 @@ public class PostServiceImpl implements PostService {
     @Transactional
     public PostEntity removeBuyTogetherGroupFromDraft(UUID groupId) {
         AccountEntity author = getAuthenticatedAccount();
-        PostEntity draft = getCurrentDraft();
+        PostEntity draft = getMyCurrentDraft();
 
         if (draft == null) {
             throw new IllegalArgumentException("No draft post found");
@@ -354,7 +354,7 @@ public class PostServiceImpl implements PostService {
     @Transactional
     public PostEntity removeInstallmentPlanFromDraft(UUID planId) {
         AccountEntity author = getAuthenticatedAccount();
-        PostEntity draft = getCurrentDraft();
+        PostEntity draft = getMyCurrentDraft();
 
         if (draft == null) {
             throw new IllegalArgumentException("No draft post found");
@@ -378,7 +378,7 @@ public class PostServiceImpl implements PostService {
     @Transactional
     public void discardDraft() {
         AccountEntity author = getAuthenticatedAccount();
-        PostEntity draft = getCurrentDraft();
+        PostEntity draft = getMyCurrentDraft();
 
         if (draft == null) {
             throw new IllegalArgumentException("No draft post found");
@@ -422,30 +422,11 @@ public class PostServiceImpl implements PostService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<PostEntity> getDraftsByAuthor(UUID authorId) {
+    public List<PostEntity> getMyScheduledPosts() {
         AccountEntity author = getAuthenticatedAccount();
 
-        if (!authorId.equals(author.getId())) {
-            throw new IllegalArgumentException("You can only view your own drafts");
-        }
-
-        PostEntity draft = postRepository
-                .findByAuthorIdAndStatusAndIsDeletedFalse(authorId, PostStatus.DRAFT)
-                .orElse(null);
-
-        return draft != null ? List.of(draft) : List.of();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<PostEntity> getScheduledPostsByAuthor(UUID authorId) {
-        AccountEntity author = getAuthenticatedAccount();
-
-        if (!authorId.equals(author.getId())) {
-            throw new IllegalArgumentException("You can only view your own scheduled posts");
-        }
-
-        return postRepository.findByStatusAndScheduledAtBeforeAndIsDeletedFalse(
+        return postRepository.findByAuthorIdAndStatusAndScheduledAtBeforeAndIsDeletedFalse(
+                author.getId(),
                 PostStatus.SCHEDULED,
                 LocalDateTime.now().plusYears(100)
         );

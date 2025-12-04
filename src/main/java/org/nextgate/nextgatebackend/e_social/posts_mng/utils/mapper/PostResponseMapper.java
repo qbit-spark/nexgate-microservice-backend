@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.authentication_service.repo.AccountRepo;
 import org.nextgate.nextgatebackend.e_commerce.group_purchase_mng.repo.GroupPurchaseInstanceRepo;
 import org.nextgate.nextgatebackend.e_commerce.installment_purchase.repo.InstallmentPlanRepo;
@@ -18,6 +19,9 @@ import org.nextgate.nextgatebackend.e_social.posts_mng.enums.LinkStatus;
 import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.MediaData;
 import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.PostResponse;
 import org.nextgate.nextgatebackend.e_social.posts_mng.repo.*;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -50,7 +54,7 @@ public class PostResponseMapper {
     private final GroupPurchaseInstanceRepo groupPurchaseInstanceRepo;
     private final InstallmentPlanRepo installmentPlanRepo;
 
-    public PostResponse toPostResponse(PostEntity post, UUID currentUserId) {
+    public PostResponse toPostResponse(PostEntity post) {
         PostResponse response = new PostResponse();
         response.setId(post.getId());
         response.setAuthor(mapAuthor(post));
@@ -64,7 +68,7 @@ public class PostResponseMapper {
         response.setCollaboration(mapCollaboration(post));
         response.setPrivacySettings(mapPrivacySettings(post));
         response.setEngagement(mapEngagement(post));
-        response.setUserInteraction(mapUserInteraction(post, currentUserId));
+        response.setUserInteraction(mapUserInteraction(post, getAuthenticatedAccount().getId()));
         response.setCreatedAt(post.getCreatedAt());
         response.setPublishedAt(post.getPublishedAt());
         response.setScheduledAt(post.getScheduledAt());
@@ -478,11 +482,22 @@ public class PostResponseMapper {
         return interaction;
     }
 
-    public List<PostResponse> toPostResponseList(List<PostEntity> posts, UUID currentUserId) {
+    public List<PostResponse> toPostResponseList(List<PostEntity> posts) {
         List<PostResponse> responses = new ArrayList<>();
         for (PostEntity post : posts) {
-            responses.add(toPostResponse(post, currentUserId));
+            responses.add(toPostResponse(post));
         }
         return responses;
+    }
+
+    private AccountEntity getAuthenticatedAccount() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated()) {
+            UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+            String userName = userDetails.getUsername();
+            return accountRepo.findByUserName(userName)
+                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        }
+        throw new IllegalArgumentException("User not authenticated");
     }
 }

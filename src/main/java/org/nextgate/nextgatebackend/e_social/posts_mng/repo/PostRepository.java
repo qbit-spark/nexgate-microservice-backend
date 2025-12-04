@@ -29,7 +29,7 @@ public interface PostRepository extends JpaRepository<PostEntity, UUID> {
 
     Page<PostEntity> findByPostTypeAndStatusAndIsDeletedFalse(PostType postType, PostStatus status, Pageable pageable);
 
-    List<PostEntity> findByStatusAndScheduledAtBeforeAndIsDeletedFalse(PostStatus status, LocalDateTime scheduledAt);
+    List<PostEntity> findByAuthorIdAndStatusAndScheduledAtBeforeAndIsDeletedFalse(UUID authorId, PostStatus status, LocalDateTime scheduledAt);
 
     long countByAuthorIdAndIsDeletedFalse(UUID authorId);
 
