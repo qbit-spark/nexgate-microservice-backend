@@ -38,6 +38,9 @@ public class PollEntity {
     @Column(nullable = false)
     private boolean isAnonymous = true;
 
+    @Column(nullable = false)
+    private long totalVotes = 0;  // ADD THIS ✅
+
     private LocalDateTime expiresAt;
 
     @Column(nullable = false, updatable = false)

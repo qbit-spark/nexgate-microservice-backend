@@ -9,15 +9,17 @@ import java.util.UUID;
 
 public interface PollVoteRepository extends JpaRepository<PollVoteEntity, UUID> {
 
-    boolean existsByPollIdAndUserId(UUID pollId, UUID userId);
+    boolean existsByPollIdAndVoterId(UUID pollId, UUID voterId);
 
-    boolean existsByPollIdAndUserIdAndOptionId(UUID pollId, UUID userId, UUID optionId);
+    boolean existsByPollIdAndVoterIdAndOptionId(UUID pollId, UUID voterId, UUID optionId);
 
-    List<PollVoteEntity> findByPollIdAndUserId(UUID pollId, UUID userId);
+    List<PollVoteEntity> findByPollIdAndVoterId(UUID pollId, UUID voterId);
 
     long countByOptionId(UUID optionId);
 
     void deleteByPollId(UUID pollId);
 
-    void deleteByPollIdAndUserId(UUID pollId, UUID userId);
+    void deleteByPollIdAndVoterId(UUID pollId, UUID voderId);
+
+    boolean existsByOptionIdAndVoterId(UUID optionId, UUID voterId);
 }

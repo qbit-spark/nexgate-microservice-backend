@@ -64,9 +64,7 @@ public class PostValidationUtil {
             throw new IllegalArgumentException("Post content is required before publishing");
         }
 
-        if (post.getPostType() == PostType.POLL) {
-            throw new IllegalArgumentException("Poll posts not yet implemented");
-        }
+        // Poll posts are now fully supported - no error needed
     }
 
     // Validates post type matches data (poll posts must have poll data)

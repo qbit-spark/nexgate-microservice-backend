@@ -12,10 +12,13 @@ import org.nextgate.nextgatebackend.e_commerce.products_mng_service.products.rep
 import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng.enums.ShopStatus;
 import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng.repo.ShopRepo;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.repo.EventsRepo;
+import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PollEntity;
+import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PollOptionEntity;
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PostEntity;
 import org.nextgate.nextgatebackend.e_social.posts_mng.enums.CollaboratorStatus;
 import org.nextgate.nextgatebackend.e_social.posts_mng.enums.ContentEntityType;
 import org.nextgate.nextgatebackend.e_social.posts_mng.enums.LinkStatus;
+import org.nextgate.nextgatebackend.e_social.posts_mng.enums.PostType;
 import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.MediaData;
 import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.PostResponse;
 import org.nextgate.nextgatebackend.e_social.posts_mng.repo.*;
@@ -25,9 +28,11 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -47,6 +52,10 @@ public class PostResponseMapper {
     private final PostEventRepository postEventRepository;
     private final PostBuyTogetherGroupRepository postBuyTogetherGroupRepository;
     private final PostInstallmentPlanRepository postInstallmentPlanRepository;
+
+    private final PollRepository pollRepository;
+    private final PollOptionRepository pollOptionRepository;
+    private final PollVoteRepository pollVoteRepository;
 
     private final ProductRepo productRepo;
     private final ShopRepo shopRepo;
@@ -68,7 +77,10 @@ public class PostResponseMapper {
         response.setCollaboration(mapCollaboration(post));
         response.setPrivacySettings(mapPrivacySettings(post));
         response.setEngagement(mapEngagement(post));
-        response.setUserInteraction(mapUserInteraction(post, getAuthenticatedAccount().getId()));
+
+        AccountEntity currentUser = getAuthenticatedAccountOrNull();
+        response.setUserInteraction(mapUserInteraction(post, currentUser != null ? currentUser.getId() : null));
+
         response.setCreatedAt(post.getCreatedAt());
         response.setPublishedAt(post.getPublishedAt());
         response.setScheduledAt(post.getScheduledAt());
@@ -83,7 +95,9 @@ public class PostResponseMapper {
             author.setUserName(account.getUserName());
             author.setFirstName(account.getFirstName());
             author.setLastName(account.getLastName());
-            author.setProfilePictureUrl(account.getProfilePictureUrls().getFirst());
+            author.setProfilePictureUrl(account.getProfilePictureUrls() != null && !account.getProfilePictureUrls().isEmpty()
+                    ? account.getProfilePictureUrls().getFirst()
+                    : null);
             author.setVerified(account.getIsVerified());
         });
 
@@ -108,7 +122,9 @@ public class PostResponseMapper {
                 mentionedUser.setUserName(user.getUserName());
                 mentionedUser.setFirstName(user.getFirstName());
                 mentionedUser.setLastName(user.getLastName());
-                mentionedUser.setProfilePictureUrl(user.getProfilePictureUrls().getFirst());
+                mentionedUser.setProfilePictureUrl(user.getProfilePictureUrls() != null && !user.getProfilePictureUrls().isEmpty()
+                        ? user.getProfilePictureUrls().getFirst()
+                        : null);
                 entity.setUser(mentionedUser);
 
                 entities.add(entity);
@@ -183,8 +199,61 @@ public class PostResponseMapper {
     }
 
     private PostResponse.Poll mapPoll(PostEntity post) {
-        // TODO: Implement poll mapping when poll entities are created
-        return null;
+        if (post.getPostType() != PostType.POLL) {
+            return null;
+        }
+
+        return pollRepository.findByPostId(post.getId()).map(poll -> {
+            PostResponse.Poll pollResponse = new PostResponse.Poll();
+            pollResponse.setId(poll.getId());
+            pollResponse.setTitle(poll.getTitle());
+            pollResponse.setDescription(poll.getDescription());
+            pollResponse.setTotalVotes(poll.getTotalVotes());
+            pollResponse.setAllowMultipleVotes(poll.isAllowMultipleVotes());
+            pollResponse.setAnonymous(poll.isAnonymous());
+            pollResponse.setExpiresAt(poll.getExpiresAt());
+            pollResponse.setHasExpired(poll.getExpiresAt() != null && LocalDateTime.now().isAfter(poll.getExpiresAt()));
+
+            List<PollOptionEntity> options = pollOptionRepository.findByPollIdOrderByOptionOrder(poll.getId());
+
+            AccountEntity currentUser = getAuthenticatedAccountOrNull();
+            UUID currentUserId = currentUser != null ? currentUser.getId() : null;
+
+            boolean userHasVoted = currentUserId != null && pollVoteRepository.existsByPollIdAndVoterId(poll.getId(), currentUserId);
+            pollResponse.setUserHasVoted(userHasVoted);
+
+            List<UUID> userVotedOptions = currentUserId != null
+                    ? pollVoteRepository.findByPollIdAndVoterId(poll.getId(), currentUserId)
+                    .stream()
+                    .map(vote -> vote.getOptionId())
+                    .collect(Collectors.toList())
+                    : new ArrayList<>();
+            pollResponse.setUserVotedOptions(userVotedOptions);
+
+            List<PostResponse.PollOption> pollOptions = options.stream()
+                    .map(option -> {
+                        PostResponse.PollOption pollOption = new PostResponse.PollOption();
+                        pollOption.setId(option.getId());
+                        pollOption.setOptionText(option.getOptionText());
+                        pollOption.setOptionImageUrl(option.getOptionImageUrl());
+                        pollOption.setOptionOrder(option.getOptionOrder());
+                        pollOption.setVotesCount(option.getVotesCount());
+
+                        double percentage = poll.getTotalVotes() > 0
+                                ? (option.getVotesCount() * 100.0) / poll.getTotalVotes()
+                                : 0.0;
+                        pollOption.setPercentage(Math.round(percentage * 10.0) / 10.0);
+
+                        pollOption.setHasVoted(userVotedOptions.contains(option.getId()));
+
+                        return pollOption;
+                    })
+                    .collect(Collectors.toList());
+
+            pollResponse.setOptions(pollOptions);
+
+            return pollResponse;
+        }).orElse(null);
     }
 
     private PostResponse.Attachments mapAttachments(PostEntity post) {
@@ -209,11 +278,12 @@ public class PostResponseMapper {
                 attachedProduct.setId(product.getProductId());
                 attachedProduct.setName(product.getProductName());
                 attachedProduct.setPrice(product.getPrice());
-                //attachedProduct.setDiscountPrice(product.getDiscountPrice());
-                attachedProduct.setImageUrl(product.getProductImages().getFirst());
+                attachedProduct.setImageUrl(product.getProductImages() != null && !product.getProductImages().isEmpty()
+                        ? product.getProductImages().getFirst()
+                        : null);
                 attachedProduct.setInStock(product.getStockQuantity() > 0);
 
-                if (product.getShop().getShopId() != null) {
+                if (product.getShop() != null && product.getShop().getShopId() != null) {
                     shopRepo.findByShopIdAndIsDeletedFalseAndStatus(product.getShop().getShopId(), ShopStatus.ACTIVE).ifPresent(shop -> {
                         attachedProduct.setShopName(shop.getShopName());
                         attachedProduct.setShopId(shop.getShopId());
@@ -238,8 +308,6 @@ public class PostResponseMapper {
                 attachedShop.setName(shop.getShopName());
                 attachedShop.setLogoUrl(shop.getLogoUrl());
                 attachedShop.setDescription(shop.getShopDescription());
-               // attachedShop.setRating(shop.getRating());
-                //attachedShop.setTotalProducts(shop.getTotalProducts());
                 attachedShop.setVerified(shop.getIsVerified());
                 shops.add(attachedShop);
             });
@@ -257,15 +325,11 @@ public class PostResponseMapper {
                 attachedEvent.setId(event.getId());
                 attachedEvent.setTitle(event.getTitle());
                 attachedEvent.setDescription(event.getDescription());
-                attachedEvent.setImageUrl(event.getMedia().getBanner());
-                attachedEvent.setDate(event.getStartDateTime().toLocalDateTime());
-                attachedEvent.setEndDate(event.getEndDateTime().toLocalDateTime());
-                attachedEvent.setLocation(event.getVenue().getName());
-                attachedEvent.setAddress(event.getVenue().getAddress());
-                //attachedEvent.setTicketPrice(event.getTicketPrice());
-                //attachedEvent.setTicketsAvailable(event.getAvailableTickets() > 0);
-                //attachedEvent.setAttendeesCount(event.getAttendeesCount());
-                //attachedEvent.setMaxAttendees(event.getMaxAttendees());
+                attachedEvent.setImageUrl(event.getMedia() != null ? event.getMedia().getBanner() : null);
+                attachedEvent.setDate(event.getStartDateTime() != null ? event.getStartDateTime().toLocalDateTime() : null);
+                attachedEvent.setEndDate(event.getEndDateTime() != null ? event.getEndDateTime().toLocalDateTime() : null);
+                attachedEvent.setLocation(event.getVenue() != null ? event.getVenue().getName() : null);
+                attachedEvent.setAddress(event.getVenue() != null ? event.getVenue().getAddress() : null);
                 attachedEvent.setSocialContext(null);
                 events.add(attachedEvent);
             });
@@ -297,10 +361,12 @@ public class PostResponseMapper {
                 attachedGroup.setExpiresAt(group.getExpiresAt());
                 attachedGroup.setStatus(group.getStatus().name());
 
-                if (group.getProduct().getProductId() != null) {
+                if (group.getProduct() != null && group.getProduct().getProductId() != null) {
                     productRepo.findById(group.getProduct().getProductId()).ifPresent(product -> {
                         attachedGroup.setProductName(product.getProductName());
-                        attachedGroup.setProductImageUrl(product.getProductImages().getFirst());
+                        attachedGroup.setProductImageUrl(product.getProductImages() != null && !product.getProductImages().isEmpty()
+                                ? product.getProductImages().getFirst()
+                                : null);
                     });
                 }
 
@@ -319,18 +385,14 @@ public class PostResponseMapper {
             installmentPlanRepo.findById(postPlan.getPlanId()).ifPresent(plan -> {
                 PostResponse.AttachedInstallmentPlan attachedPlan = new PostResponse.AttachedInstallmentPlan();
                 attachedPlan.setId(plan.getPlanId());
-                attachedPlan.setProductId(plan.getProduct().getProductId());
-              //  attachedPlan.setMonthlyAmount(plan.getMonthlyAmount());
-               // attachedPlan.setDuration(plan.getDuration());
-              //  attachedPlan.setTotalAmount(plan.getTotalAmount());
-              //  attachedPlan.setInterestRate(plan.getInterestRate());
-             //   attachedPlan.setDownPayment(plan.getDownPayment());
-              //  attachedPlan.setInterestFree(plan.getInterestRate() == 0);
+                attachedPlan.setProductId(plan.getProduct() != null ? plan.getProduct().getProductId() : null);
 
-                if (plan.getProduct().getProductId() != null) {
+                if (plan.getProduct() != null && plan.getProduct().getProductId() != null) {
                     productRepo.findById(plan.getProduct().getProductId()).ifPresent(product -> {
                         attachedPlan.setProductName(product.getProductName());
-                        attachedPlan.setProductImageUrl(product.getProductImages().getFirst());
+                        attachedPlan.setProductImageUrl(product.getProductImages() != null && !product.getProductImages().isEmpty()
+                                ? product.getProductImages().getFirst()
+                                : null);
                     });
                 }
 
@@ -389,7 +451,9 @@ public class PostResponseMapper {
                 collabUser.setUserName(user.getUserName());
                 collabUser.setFirstName(user.getFirstName());
                 collabUser.setLastName(user.getLastName());
-                collabUser.setProfilePictureUrl(user.getProfilePictureUrls().getFirst());
+                collabUser.setProfilePictureUrl(user.getProfilePictureUrls() != null && !user.getProfilePictureUrls().isEmpty()
+                        ? user.getProfilePictureUrls().getFirst()
+                        : null);
                 collaborator.setUser(collabUser);
             });
 
@@ -499,5 +563,13 @@ public class PostResponseMapper {
                     .orElseThrow(() -> new IllegalArgumentException("User not found"));
         }
         throw new IllegalArgumentException("User not authenticated");
+    }
+
+    private AccountEntity getAuthenticatedAccountOrNull() {
+        try {
+            return getAuthenticatedAccount();
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

@@ -62,11 +62,14 @@ public class PostServiceImpl implements PostService {
     private final PostShopMentionRepository postShopMentionRepository;
     private final PostHashtagRepository postHashtagRepository;
     private final PostLinkRepository postLinkRepository;
+    private final PollRepository pollRepository;
+    private final PollOptionRepository pollOptionRepository;
 
     @Override
     @Transactional
     public PostEntity createPost(CreatePostRequest request) {
-        validationUtil.validateCreatePostRequest(request, false); // Lenient validation for draft
+        boolean isStrictValidation = request.getPostType() == PostType.POLL;
+        validationUtil.validateCreatePostRequest(request, isStrictValidation);
 
         AccountEntity author = getAuthenticatedAccount();
 
@@ -83,6 +86,10 @@ public class PostServiceImpl implements PostService {
         }
 
         PostEntity savedPost = postRepository.save(post);
+
+        if (request.getPostType() == PostType.POLL && request.getPoll() != null) {
+            createPoll(savedPost, request);
+        }
 
         if (request.getContent() != null && !request.getContent().trim().isEmpty()) {
             parseAndSaveContent(savedPost, request.getContent());
@@ -917,6 +924,32 @@ public class PostServiceImpl implements PostService {
             collaborator.setPostId(post.getId());
             collaborator.setUserId(collaboratorId);
             postCollaboratorRepository.save(collaborator);
+        }
+    }
+
+    private void createPoll(PostEntity post, CreatePostRequest request) {
+        PollEntity poll = new PollEntity();
+        poll.setPostId(post.getId());
+        poll.setTitle(request.getPoll().getTitle());
+        poll.setDescription(request.getPoll().getDescription());
+        poll.setAllowMultipleVotes(request.getPoll().getAllowMultipleVotes());
+        poll.setAnonymous(request.getPoll().getIsAnonymous());
+        poll.setExpiresAt(request.getPoll().getExpiresAt());
+        poll.setTotalVotes(0L);
+
+        PollEntity savedPoll = pollRepository.save(poll);
+
+        if (request.getPoll().getOptions() != null) {
+            for (int i = 0; i < request.getPoll().getOptions().size(); i++) {
+                var optionRequest = request.getPoll().getOptions().get(i);
+                PollOptionEntity option = new PollOptionEntity();
+                option.setPollId(savedPoll.getId());
+                option.setOptionText(optionRequest.getOptionText());
+                option.setOptionImageUrl(optionRequest.getOptionImageUrl());
+                option.setOptionOrder(i + 1);
+                option.setVotesCount(0L);
+                pollOptionRepository.save(option);
+            }
         }
     }
 

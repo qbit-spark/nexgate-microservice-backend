@@ -35,7 +35,7 @@ public class PollVoteEntity {
     private UUID optionId;
 
     @Column(nullable = false)
-    private UUID userId;
+    private UUID voterId;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;

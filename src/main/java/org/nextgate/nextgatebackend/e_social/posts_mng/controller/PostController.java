@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PostEntity;
 import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.*;
+import org.nextgate.nextgatebackend.e_social.posts_mng.service.PollService;
 import org.nextgate.nextgatebackend.e_social.posts_mng.service.PostService;
 import org.nextgate.nextgatebackend.e_social.posts_mng.utils.mapper.PostResponseMapper;
 import org.nextgate.nextgatebackend.globeresponsebody.GlobeSuccessResponseBuilder;
@@ -25,6 +26,7 @@ public class PostController {
 
     private final PostService postService;
     private final PostResponseMapper postResponseMapper;
+    private final PollService pollService;
 
     @PostMapping
     public ResponseEntity<GlobeSuccessResponseBuilder> createPost(
@@ -431,6 +433,51 @@ public class PostController {
 
         GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
                 "Collaborator removed successfully"
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+      // ============================================
+      // POLL ENDPOINTS
+     // ============================================
+
+    @PostMapping("/{postId}/vote")
+    public ResponseEntity<GlobeSuccessResponseBuilder> voteOnPoll(
+            @PathVariable UUID postId,
+            @Valid @RequestBody VotePollRequest request) {
+
+        pollService.voteOnPoll(postId, request.getOptionIds());
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Vote recorded successfully",
+                "Vote recorded successfully"
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @DeleteMapping("/{postId}/vote")
+    public ResponseEntity<GlobeSuccessResponseBuilder> removeVote(@PathVariable UUID postId) {
+
+        pollService.removeVote(postId);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Vote removed successfully",
+                "Vote removed successfully"
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @GetMapping("/{postId}/poll-results")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getPollResults(@PathVariable UUID postId) {
+
+        PollResultsResponse results = pollService.getPollResults(postId);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Poll results retrieved successfully",
+                results
         );
 
         return ResponseEntity.ok(successResponse);
