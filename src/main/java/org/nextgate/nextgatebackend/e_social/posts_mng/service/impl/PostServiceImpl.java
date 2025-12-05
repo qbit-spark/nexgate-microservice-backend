@@ -149,7 +149,7 @@ public class PostServiceImpl implements PostService {
         PostEntity draft = getOrCreateDraft();
 
         if (postProductRepository.existsByPostIdAndProductId(draft.getId(), productId)) {
-            throw new IllegalArgumentException("Product already attached to this draft");
+            throw new IllegalArgumentException("Product already attached to my draft");
         }
 
         PostProductEntity postProduct = new PostProductEntity();
