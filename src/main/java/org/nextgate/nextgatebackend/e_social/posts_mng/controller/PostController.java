@@ -16,7 +16,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -87,6 +89,7 @@ public class PostController {
         return ResponseEntity.ok(successResponse);
     }
 
+    //Todo: This needs a lot of optimisation for now its fine for development
     @GetMapping
     public ResponseEntity<GlobeSuccessResponseBuilder> getPublishedPosts(
             @RequestParam(defaultValue = "1") int page,
@@ -96,15 +99,15 @@ public class PostController {
         Page<PostEntity> postsPage = postService.getPublishedPosts(pageable);
         List<PostResponse> responses = postResponseMapper.toPostResponseList(postsPage.getContent());
 
-
         GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
                 "Posts retrieved successfully",
                 responses
         );
-
+    
         return ResponseEntity.ok(successResponse);
     }
 
+    //Todo: This needs a lot of optimisation for now its fine for development
     @GetMapping("/author/{authorId}")
     public ResponseEntity<GlobeSuccessResponseBuilder> getPostsByAuthor(
             @PathVariable UUID authorId,

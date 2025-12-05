@@ -49,8 +49,9 @@ public class ProductController {
         return ResponseEntity.ok(response);
     }
 
+    //Todo: change method name to getProductsByMyShop ("/my-shop-all")
     @GetMapping("/all")
-    public  ResponseEntity<GlobeSuccessResponseBuilder> getAllProducts(@PathVariable UUID shopId) throws RandomExceptions, ItemNotFoundException {
+    public  ResponseEntity<GlobeSuccessResponseBuilder> getAllProductsInMyShop(@PathVariable UUID shopId) throws RandomExceptions, ItemNotFoundException {
         GlobeSuccessResponseBuilder response = productService.getProductsByMyShop(shopId);
 
         return ResponseEntity.ok(response);

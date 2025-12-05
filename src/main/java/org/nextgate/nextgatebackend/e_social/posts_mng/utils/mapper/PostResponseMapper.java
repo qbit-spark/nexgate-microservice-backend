@@ -64,6 +64,11 @@ public class PostResponseMapper {
     private final InstallmentPlanRepo installmentPlanRepo;
 
     public PostResponse toPostResponse(PostEntity post) {
+        // Handle null post
+        if (post == null) {
+            return null;
+        }
+
         PostResponse response = new PostResponse();
         response.setId(post.getId());
         response.setAuthor(mapAuthor(post));

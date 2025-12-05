@@ -20,6 +20,7 @@ import org.nextgate.nextgatebackend.e_social.posts_mng.service.PostService;
 import org.nextgate.nextgatebackend.e_social.posts_mng.utils.ContentParsingUtil;
 import org.nextgate.nextgatebackend.e_social.posts_mng.utils.LinkProcessingUtil;
 import org.nextgate.nextgatebackend.e_social.posts_mng.utils.PostValidationUtil;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
@@ -32,6 +33,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -68,10 +70,17 @@ public class PostServiceImpl implements PostService {
     @Override
     @Transactional
     public PostEntity createPost(CreatePostRequest request) {
+
+        //We have to check if any draft exists
+        AccountEntity author = getAuthenticatedAccount();
+        postRepository.findByAuthorIdAndStatusAndIsDeletedFalse(author.getId(), PostStatus.DRAFT)
+                .ifPresent(existingDraft -> {
+                    throw new IllegalStateException("You already have a draft post. " +
+                            "Please update or publish your existing draft before creating a new one. ");
+                });
+
         boolean isStrictValidation = request.getPostType() == PostType.POLL;
         validationUtil.validateCreatePostRequest(request, isStrictValidation);
-
-        AccountEntity author = getAuthenticatedAccount();
 
         PostEntity post = new PostEntity();
         post.setAuthorId(author.getId());
@@ -734,8 +743,8 @@ public class PostServiceImpl implements PostService {
             post.setStatus(PostStatus.SCHEDULED);
             post.setScheduledAt(request.getScheduledAt());
         } else {
-            post.setStatus(PostStatus.PUBLISHED);
-            post.setPublishedAt(LocalDateTime.now());
+            post.setStatus(PostStatus.DRAFT);
+            // post.setPublishedAt(LocalDateTime.now());
         }
     }
 
@@ -814,14 +823,24 @@ public class PostServiceImpl implements PostService {
     }
 
     private void saveProductAttachments(PostEntity post, List<UUID> productIds) {
-        for (UUID productId : productIds) {
+        // Remove duplicates from the input list
+        List<UUID> uniqueProductIds = productIds.stream()
+                .distinct()
+                .toList();
+
+        for (UUID productId : uniqueProductIds) {
+            // Validate product exists
             if (!productRepo.existsById(productId)) {
-                throw new IllegalArgumentException("Product not found: " + productId);
+                throw new IllegalArgumentException("Product not found, " + productId);
             }
-            PostProductEntity postProduct = new PostProductEntity();
-            postProduct.setPostId(post.getId());
-            postProduct.setProductId(productId);
-            postProductRepository.save(postProduct);
+
+            // Check if this product is already attached to the post
+            if (!postProductRepository.existsByPostIdAndProductId(post.getId(), productId)) {
+                PostProductEntity postProduct = new PostProductEntity();
+                postProduct.setPostId(post.getId());
+                postProduct.setProductId(productId);
+                postProductRepository.save(postProduct);
+            }
         }
     }
 
