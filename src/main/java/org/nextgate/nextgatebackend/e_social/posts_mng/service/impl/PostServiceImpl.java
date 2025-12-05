@@ -170,7 +170,7 @@ public class PostServiceImpl implements PostService {
         PostEntity draft = getOrCreateDraft();
 
         if (postShopRepository.existsByPostIdAndShopId(draft.getId(), shopId)) {
-            throw new IllegalArgumentException("Shop already attached to this draft");
+            throw new IllegalArgumentException("Shop already attached to my draft");
         }
 
         PostShopEntity postShop = new PostShopEntity();
