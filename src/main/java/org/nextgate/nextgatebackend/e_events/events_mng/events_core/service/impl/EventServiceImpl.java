@@ -486,7 +486,7 @@ public class EventServiceImpl implements EventsService {
                 .replaceAll("-+", "-")
                 .replaceAll("^-|-$", "");
 
-        // Add short UUID to ensure uniqueness
+        // Add a short UUID to ensure uniqueness
         String uniqueSuffix = UUID.randomUUID().toString().substring(0, 8);
         String slug = baseSlug + "-" + uniqueSuffix;
 
