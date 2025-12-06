@@ -19,6 +19,7 @@ import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.*;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.utils.MediaJsonConverter;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.entity.TicketEntity;
 import org.nextgate.nextgatebackend.globe_crypto.RSAKeys;
+import org.nextgate.nextgatebackend.globe_crypto.utils.RSAKeysJsonConverter;
 
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
@@ -222,8 +223,8 @@ public class EventEntity {
     @Builder.Default
     private List<String> completedStages = new ArrayList<>();
 
-    @Type(JsonBinaryType.class)  // ← This does ALL the work!
     @Column(name = "rsa_keys", columnDefinition = "jsonb")
+    @Convert(converter = RSAKeysJsonConverter.class)
     private RSAKeys rsaKeys;
 
 
