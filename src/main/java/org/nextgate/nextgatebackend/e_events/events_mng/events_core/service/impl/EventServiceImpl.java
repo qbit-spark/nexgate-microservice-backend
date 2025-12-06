@@ -97,56 +97,78 @@ public class EventServiceImpl implements EventsService {
     public EventEntity publishEvent(UUID eventId)
             throws ItemNotFoundException, AccessDeniedException, EventValidationException {
 
-        log.info("Publishing event: {}", eventId);
+        try {
+            log.info("Publishing event: {}", eventId);
 
-        AccountEntity currentUser = getAuthenticatedAccount();
+            // Validate input
+            if (eventId == null) {
+                throw new IllegalArgumentException("Event ID cannot be null");
+            }
 
-        EventEntity event = eventsRepo.findByIdAndIsDeletedFalse(eventId)
-                .orElseThrow(() -> new ItemNotFoundException("Event not found with ID: " + eventId));
+            AccountEntity currentUser = getAuthenticatedAccount();
 
-        if (!event.getOrganizer().getId().equals(currentUser.getId())) {
-            throw new AccessDeniedException("Only event organizer can publish the event");
+            EventEntity event = eventsRepo.findByIdAndIsDeletedFalse(eventId)
+                    .orElseThrow(() -> new ItemNotFoundException("Event not found with ID: " + eventId));
+
+            if (!event.getOrganizer().getId().equals(currentUser.getId())) {
+                throw new AccessDeniedException("Only event organizer can publish the event");
+            }
+
+            if (event.getStatus() == EventStatus.PUBLISHED) {
+                throw new EventValidationException("Event is already published", EventCreationStage.REVIEW);
+            }
+
+            // Validate event before publishing
+            eventValidations.validateEventEntityForPublish(event);
+
+            DuplicateValidationResult duplicateCheck = duplicateValidator.validateNoDuplicateForEntity(event);
+
+            if (duplicateCheck.isBlocked()) {
+                log.warn("Duplicate event detected for user: {}", currentUser.getUserName());
+                throw new EventValidationException(
+                        duplicateCheck.getMessage(),
+                        EventCreationStage.BASIC_INFO
+                );
+            }
+
+            // Generate RSA keys if needed
+            try {
+                if (event.getRsaKeys() == null) {
+                    log.info("Generating RSA key pair for event: {}", eventId);
+                    RSAKeys rsaKeys = rsaKeyService.generateKeys();
+                    event.setRsaKeys(rsaKeys);
+                    log.info("RSA keys generated successfully for event: {}", eventId);
+                } else {
+                    log.info("Event already has RSA keys, skipping generation");
+                }
+            } catch (Exception e) {
+                log.error("Error generating RSA keys for event: {}", eventId, e);
+                throw new EventValidationException("Failed to generate security keys for the event", EventCreationStage.REVIEW);
+            }
+
+            // Update event status and metadata
+            event.setStatus(EventStatus.PUBLISHED);
+            event.setUpdatedBy(currentUser);
+
+            // Update category count
+            EventsCategoryEntity category = event.getCategory();
+            category.setEventCount(category.getEventCount() + 1);
+            categoryRepository.save(category);
+
+            // Save the event
+            EventEntity publishedEvent = eventsRepo.save(event);
+
+            log.info("Event published successfully with ID: {}", eventId);
+            return publishedEvent;
+
+        } catch (IllegalArgumentException e) {
+            log.error("Invalid argument while publishing event: {}", eventId, e);
+            throw e;
+        } catch (Exception e) {
+            log.error("Unexpected error while publishing event: {}", eventId, e);
+            throw new EventValidationException("Failed to publish event: " + e.getMessage(), EventCreationStage.REVIEW);
         }
-
-        if (event.getStatus() == EventStatus.PUBLISHED) {
-            throw new EventValidationException("Event is already published", EventCreationStage.REVIEW);
-        }
-
-        eventValidations.validateEventEntityForPublish(event);
-
-        DuplicateValidationResult duplicateCheck = duplicateValidator.validateNoDuplicateForEntity(event);
-
-        if (duplicateCheck.isBlocked()) {
-            log.warn("Duplicate event detected for user: {}", currentUser.getUserName());
-            throw new EventValidationException(
-                    duplicateCheck.getMessage(),
-                    EventCreationStage.BASIC_INFO
-            );
-        }
-
-        // 🎯 GENERATE RSA KEYS FOR EVENT (NEW CODE)
-        if (event.getRsaKeys() == null) {
-            log.info("Generating RSA key pair for event: {}", eventId);
-            RSAKeys rsaKeys = rsaKeyService.generateKeys();
-            event.setRsaKeys(rsaKeys);
-            log.info("RSA keys generated successfully for event: {}", eventId);
-        } else {
-            log.info("Event already has RSA keys, skipping generation");
-        }
-
-        event.setStatus(EventStatus.PUBLISHED);
-        event.setUpdatedBy(currentUser);
-
-        EventsCategoryEntity category = event.getCategory();
-        category.setEventCount(category.getEventCount() + 1);
-        categoryRepository.save(category);
-
-        EventEntity publishedEvent = eventsRepo.save(event);
-
-        log.info("Event published successfully with ID: {}", eventId);
-        return publishedEvent;
     }
-
     @Override
     @Transactional(readOnly = true)
     public EventEntity getEventById(UUID eventId) throws ItemNotFoundException, AccessDeniedException {
