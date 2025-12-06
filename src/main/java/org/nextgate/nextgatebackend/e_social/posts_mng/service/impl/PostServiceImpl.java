@@ -9,6 +9,8 @@ import org.nextgate.nextgatebackend.e_commerce.group_purchase_mng.repo.GroupPurc
 import org.nextgate.nextgatebackend.e_commerce.installment_purchase.repo.InstallmentPlanRepo;
 import org.nextgate.nextgatebackend.e_commerce.products_mng_service.products.repo.ProductRepo;
 import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng.repo.ShopRepo;
+import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.EventEntity;
+import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventStatus;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.repo.EventsRepo;
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.*;
 import org.nextgate.nextgatebackend.e_social.posts_mng.enums.CollaboratorStatus;
@@ -184,14 +186,18 @@ public class PostServiceImpl implements PostService {
     @Override
     @Transactional
     public PostEntity attachEventToDraft(UUID eventId) {
-        if (!eventsRepo.existsById(eventId)) {
-            throw new IllegalArgumentException("Event not found: " + eventId);
+
+        EventEntity event= eventsRepo.findByIdAndIsDeletedFalse(eventId)
+                .orElseThrow(() -> new IllegalArgumentException("Event not found "));
+
+        if (event.getStatus().equals(EventStatus.DRAFT)){
+            throw new IllegalArgumentException("Event is not published yet");
         }
 
         PostEntity draft = getOrCreateDraft();
 
         if (postEventRepository.existsByPostIdAndEventId(draft.getId(), eventId)) {
-            throw new IllegalArgumentException("Event already attached to this draft");
+            throw new IllegalArgumentException("Event already attached to my draft");
         }
 
         PostEventEntity postEvent = new PostEventEntity();

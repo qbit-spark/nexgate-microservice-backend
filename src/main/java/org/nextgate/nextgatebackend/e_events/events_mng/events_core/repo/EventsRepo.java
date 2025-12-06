@@ -79,4 +79,6 @@ public interface EventsRepo extends JpaRepository<EventEntity, UUID> {
     );
 
     List<EventEntity> findByOrganizerAndIsDeletedFalse(AccountEntity organizer);
+
+    Optional<EventEntity> findByIdAndStatusAndIsDeletedFalse(UUID id, EventStatus eventStatus);
 }
