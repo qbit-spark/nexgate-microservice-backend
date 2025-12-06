@@ -486,14 +486,9 @@ public class EventServiceImpl implements EventsService {
                 .replaceAll("-+", "-")
                 .replaceAll("^-|-$", "");
 
-        // Check if slug exists
-        String slug = baseSlug;
-        int counter = 1;
-
-        while (eventsRepo.existsBySlugAndIsDeletedFalse(slug)) {
-            slug = baseSlug + "-" + counter;
-            counter++;
-        }
+        // Add short UUID to ensure uniqueness
+        String uniqueSuffix = UUID.randomUUID().toString().substring(0, 8);
+        String slug = baseSlug + "-" + uniqueSuffix;
 
         log.debug("Generated unique slug: {}", slug);
         return slug;
