@@ -554,10 +554,6 @@ public class PostServiceImpl implements PostService {
 
         PostEntity post = getMyCurrentDraft();
 
-        if (post.getStatus() != PostStatus.DRAFT) {
-            throw new IllegalArgumentException("Only draft posts can be updated");
-        }
-
         updatePrivacySettings(post, settings);
 
         return postRepository.save(post);
