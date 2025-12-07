@@ -582,25 +582,36 @@ public class PostServiceImpl implements PostService {
         // Remove existing collaborators
         postCollaboratorRepository.deleteByPostId(post.getId());
 
-        validationUtil.validateCollaboration(collaboration);
+        // ✅ ADD THIS - Force flush to a database before inserting new ones
+        postCollaboratorRepository.flush();
 
-        // Convert list to Set to remove duplicates
-        Set<UUID> uniqueCollaboratorIds = new HashSet<>(collaboration.getCollaboratorIds());
+        // Auto-detect if collaborative based on an array
+        boolean isCollaborative = collaboration.getCollaboratorIds() != null
+                && !collaboration.getCollaboratorIds().isEmpty();
 
-        for (UUID collaboratorId : uniqueCollaboratorIds) {
-            if (collaboratorId.equals(post.getAuthorId())) {
-                throw new IllegalArgumentException("You cannot add yourself as a collaborator");
+        post.setCollaborative(isCollaborative);
+
+        if (isCollaborative) {
+            validationUtil.validateCollaboration(collaboration);
+
+            // Convert list to Set to remove duplicates
+            Set<UUID> uniqueCollaboratorIds = new HashSet<>(collaboration.getCollaboratorIds());
+
+            for (UUID collaboratorId : uniqueCollaboratorIds) {
+                if (collaboratorId.equals(post.getAuthorId())) {
+                    throw new IllegalArgumentException("You cannot add yourself as a collaborator");
+                }
+
+                if (!accountRepo.existsById(collaboratorId)) {
+                    throw new IllegalArgumentException("Collaborator not found: " + collaboratorId);
+                }
+
+                PostCollaboratorEntity collaborator = new PostCollaboratorEntity();
+                collaborator.setPostId(post.getId());
+                collaborator.setUserId(collaboratorId);
+                collaborator.setStatus(CollaboratorStatus.PENDING);
+                postCollaboratorRepository.save(collaborator);
             }
-
-            if (!accountRepo.existsById(collaboratorId)) {
-                throw new IllegalArgumentException("Collaborator not found; " + collaboratorId);
-            }
-
-            PostCollaboratorEntity collaborator = new PostCollaboratorEntity();
-            collaborator.setPostId(post.getId());
-            collaborator.setUserId(collaboratorId);
-            collaborator.setStatus(CollaboratorStatus.PENDING);
-            postCollaboratorRepository.save(collaborator);
         }
 
         return postRepository.save(post);
