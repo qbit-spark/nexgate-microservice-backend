@@ -106,7 +106,7 @@ public class PostServiceImpl implements PostService {
             saveAttachments(savedPost, request);
         }
 
-        if (request.getCollaboration() != null ) {
+        if (request.getCollaboration() != null) {
             saveCollaborators(savedPost, request);
         }
 
@@ -183,10 +183,10 @@ public class PostServiceImpl implements PostService {
     @Transactional
     public PostEntity attachEventToDraft(UUID eventId) {
 
-        EventEntity event= eventsRepo.findByIdAndIsDeletedFalse(eventId)
+        EventEntity event = eventsRepo.findByIdAndIsDeletedFalse(eventId)
                 .orElseThrow(() -> new IllegalArgumentException("Event not found "));
 
-        if (event.getStatus().equals(EventStatus.DRAFT)){
+        if (event.getStatus().equals(EventStatus.DRAFT)) {
             throw new IllegalArgumentException("Event is not published yet");
         }
 
@@ -582,35 +582,27 @@ public class PostServiceImpl implements PostService {
         // Remove existing collaborators
         postCollaboratorRepository.deleteByPostId(post.getId());
 
-        // Auto-detect if collaborative based on array
-        boolean isCollaborative = collaboration.getCollaboratorIds() != null
-                && !collaboration.getCollaboratorIds().isEmpty();
+        validationUtil.validateCollaboration(collaboration);
 
-        post.setCollaborative(isCollaborative);
+        // Convert list to Set to remove duplicates
+        Set<UUID> uniqueCollaboratorIds = new HashSet<>(collaboration.getCollaboratorIds());
 
-        if (isCollaborative) {
-            validationUtil.validateCollaboration(collaboration);
-
-            // Convert list to Set to remove duplicates
-            Set<UUID> uniqueCollaboratorIds = new HashSet<>(collaboration.getCollaboratorIds());
-
-            for (UUID collaboratorId : uniqueCollaboratorIds) {
-                if (collaboratorId.equals(post.getAuthorId())) {
-                    throw new IllegalArgumentException("You cannot add yourself as a collaborator");
-                }
-
-                if (!accountRepo.existsById(collaboratorId)) {
-                    throw new IllegalArgumentException("Collaborator not found: " + collaboratorId);
-                }
-
-                PostCollaboratorEntity collaborator = new PostCollaboratorEntity();
-                collaborator.setPostId(post.getId());
-                collaborator.setUserId(collaboratorId);
-                collaborator.setStatus(CollaboratorStatus.PENDING);
-                postCollaboratorRepository.save(collaborator);
+        for (UUID collaboratorId : uniqueCollaboratorIds) {
+            if (collaboratorId.equals(post.getAuthorId())) {
+                throw new IllegalArgumentException("You cannot add yourself as a collaborator");
             }
+
+            if (!accountRepo.existsById(collaboratorId)) {
+                throw new IllegalArgumentException("Collaborator not found: " + collaboratorId);
+            }
+
+            PostCollaboratorEntity collaborator = new PostCollaboratorEntity();
+            collaborator.setPostId(post.getId());
+            collaborator.setUserId(collaboratorId);
+            collaborator.setStatus(CollaboratorStatus.PENDING);
+            postCollaboratorRepository.save(collaborator);
         }
-    
+
         return postRepository.save(post);
     }
 
@@ -948,20 +940,24 @@ public class PostServiceImpl implements PostService {
     }
 
     private void saveCollaborators(PostEntity post, CreatePostRequest request) {
-        post.setCollaborative(true);
+        validationUtil.validateCollaboration(request.getCollaboration());
 
-        for (UUID collaboratorId : request.getCollaboration().getCollaboratorIds()) {
-            if (!accountRepo.existsById(collaboratorId)) {
-                throw new IllegalArgumentException("Collaborator not found: " + collaboratorId);
+        // Convert list to Set to remove duplicates
+        Set<UUID> uniqueCollaboratorIds = new HashSet<>(request.getCollaboration().getCollaboratorIds());
+
+        for (UUID collaboratorId : uniqueCollaboratorIds) {
+            if (collaboratorId.equals(post.getAuthorId())) {
+                throw new IllegalArgumentException("You cannot add yourself as a collaborator");
             }
 
-            if (collaboratorId.equals(post.getAuthorId())) {
-                throw new IllegalArgumentException("Cannot add yourself as collaborator");
+            if (!accountRepo.existsById(collaboratorId)) {
+                throw new IllegalArgumentException("Collaborator not found: " + collaboratorId);
             }
 
             PostCollaboratorEntity collaborator = new PostCollaboratorEntity();
             collaborator.setPostId(post.getId());
             collaborator.setUserId(collaboratorId);
+            collaborator.setStatus(CollaboratorStatus.PENDING);
             postCollaboratorRepository.save(collaborator);
         }
     }
