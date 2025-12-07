@@ -10,6 +10,9 @@ import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.authentication_service.repo.AccountRepo;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.ProductCheckoutSessionEntity;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.repo.ProductCheckoutSessionRepo;
+import org.nextgate.nextgatebackend.e_commerce.group_purchase_mng.events.GroupCreatedNotificationEvent;
+import org.nextgate.nextgatebackend.e_commerce.group_purchase_mng.events.MemberJoinedNotificationEvent;
+import org.nextgate.nextgatebackend.e_commerce.group_purchase_mng.events.SeatsTransferredNotificationEvent;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
 import org.nextgate.nextgatebackend.e_commerce.group_purchase_mng.entity.GroupParticipantEntity;
 import org.nextgate.nextgatebackend.e_commerce.group_purchase_mng.entity.GroupPurchaseInstanceEntity;
@@ -160,14 +163,30 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
         log.info("  Seats: {}/{}", savedGroup.getSeatsOccupied(), savedGroup.getTotalSeats());
         log.info("  Full: {}", isGroupFull);
 
-        // 11. Send notification (only if group NOT completed)
+        // 11. ✅ Publish notification event (only if NOT completed)
         if (!isGroupFull) {
-            sendGroupCreatedNotification(savedGroup, customer, quantity);
+            try {
+                GroupCreatedNotificationEvent notificationEvent = new GroupCreatedNotificationEvent(
+                        this,
+                        savedGroup,
+                        customer,
+                        quantity
+                );
+
+                eventPublisher.publishEvent(notificationEvent);
+
+                log.info("✓ Group created notification event published");
+
+            } catch (Exception e) {
+                // ✅ Just log - don't throw
+                // Transaction will commit anyway
+                log.error("Failed to publish notification event (non-critical)", e);
+            }
         }
 
         log.info("╚════════════════════════════════════════════════════════╝");
 
-        // Transaction commits here - all data persisted
+        // Transaction commits here - notifications sent AFTER commit
     }
 
     @Override
@@ -290,14 +309,26 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
         log.info("  Seats: {}/{}", savedGroup.getSeatsOccupied(), savedGroup.getTotalSeats());
         log.info("  Full: {}", isGroupFull);
 
-        // 12. Send notifications (only if NOT completed)
+        // 12. ✅ Publish notification event (only if NOT completed)
         if (!isGroupFull) {
-            sendMemberJoinedNotifications(savedGroup, customer, quantity);
+            try {
+                MemberJoinedNotificationEvent notificationEvent = new MemberJoinedNotificationEvent(
+                        this,
+                        savedGroup,
+                        customer,
+                        quantity
+                );
+
+                eventPublisher.publishEvent(notificationEvent);
+
+                log.info("✓ Member joined notification event published");
+
+            } catch (Exception e) {
+                log.error("Failed to publish notification event (non-critical)", e);
+            }
         }
 
         log.info("╚════════════════════════════════════════════════════════╝");
-
-        // Transaction commits here
     }
 
     @Override
@@ -507,14 +538,28 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
                 targetGroup.getSeatsOccupied(),
                 targetGroup.getTotalSeats());
 
-        sendSeatsTransferredNotification(sourceGroup, targetGroup, authenticatedUser, quantity);
 
         boolean isTargetFull = checkAndCompleteGroupInSameTransaction(targetGroup);
 
         log.info("Transfer complete. Target group full: {}", isTargetFull);
 
         if (!isTargetFull) {
-            sendSeatsTransferredNotification(sourceGroup, targetGroup, authenticatedUser, quantity);
+            try {
+                SeatsTransferredNotificationEvent notificationEvent = new SeatsTransferredNotificationEvent(
+                        this,
+                        sourceGroup,
+                        targetGroup,
+                        authenticatedUser,
+                        quantity
+                );
+
+                eventPublisher.publishEvent(notificationEvent);
+
+                log.info("✓ Seats transferred notification event published");
+
+            } catch (Exception e) {
+                log.error("Failed to publish notification event (non-critical)", e);
+            }
         }
 
         return targetParticipant;
@@ -746,125 +791,6 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
 
 
     /**
-     * Checks if group is full and handles completion.
-     * Publishes GroupCompletedEvent if group just became full.
-     * <p>
-     * IMPORTANT: This method is idempotent - safe to call multiple times.
-     * <p>
-     * Call this after any operation that changes seatsOccupied:
-     * - createGroupInstance()
-     * - joinGroup()
-     * - transferToGroup()
-     */
-    private void checkAndCompleteGroup(GroupPurchaseInstanceEntity group) {
-
-        // ========================================
-        // 1. CHECK IF GROUP IS FULL
-        // ========================================
-        if (!group.isFull()) {
-            log.debug("Group {} not full yet: {}/{}",
-                    group.getGroupCode(),
-                    group.getSeatsOccupied(),
-                    group.getTotalSeats());
-            return;
-        }
-
-        // ========================================
-        // 2. CHECK IF ALREADY PROCESSED (IDEMPOTENCY)
-        // ========================================
-        // Allow processing if:
-        // - Status is OPEN (group just became full)
-        // - Status is COMPLETED but completedAt is null (edge case: status set but not saved)
-
-        if (group.getStatus() == GroupStatus.COMPLETED && group.getCompletedAt() != null) {
-            // Already completed AND saved - event already published
-            log.debug("Group {} already completed and processed at {}, skipping",
-                    group.getGroupCode(), group.getCompletedAt());
-            return;
-        }
-
-        if (group.getStatus() != GroupStatus.OPEN && group.getStatus() != GroupStatus.COMPLETED) {
-            // Status is FAILED or DELETED - don't process
-            log.debug("Group {} has status {}, cannot complete",
-                    group.getGroupCode(), group.getStatus());
-            return;
-        }
-
-        // ========================================
-        // 3. LOG COMPLETION
-        // ========================================
-        log.info("╔════════════════════════════════════════════════════════╗");
-        log.info("║         GROUP COMPLETED                                ║");
-        log.info("╚════════════════════════════════════════════════════════╝");
-        log.info("Group ID: {}", group.getGroupInstanceId());
-        log.info("Group Code: {}", group.getGroupCode());
-        log.info("Product: {}", group.getProductName());
-        log.info("Participants: {}", group.getTotalParticipants());
-        log.info("Total Seats: {}/{}", group.getSeatsOccupied(), group.getTotalSeats());
-        log.info("Previous Status: {}", group.getStatus());
-
-        // ========================================
-        // 4. MARK AS COMPLETED
-        // ========================================
-        LocalDateTime now = LocalDateTime.now();
-        group.setStatus(GroupStatus.COMPLETED);
-        group.setCompletedAt(now);
-        group.setUpdatedAt(now);
-
-        // ========================================
-        // 5. SAVE IMMEDIATELY
-        // ========================================
-        try {
-            groupPurchaseInstanceRepo.save(group);
-            log.info("✓ Group marked as COMPLETED");
-            log.info("  Completed At: {}", now);
-
-        } catch (Exception e) {
-            log.error("Failed to save completed group", e);
-            // This is critical - if we can't save, don't publish event
-            return;
-        }
-
-        // ========================================
-        // 6. PUBLISH EVENT FOR ASYNC PROCESSING
-        // ========================================
-        try {
-            GroupCompletedEvent event = new GroupCompletedEvent(
-                    this,
-                    group.getGroupInstanceId(),
-                    group,
-                    now
-            );
-
-            eventPublisher.publishEvent(event);
-
-            log.info("✓ GroupCompletedEvent published");
-            log.info("  Event will trigger:");
-            log.info("    - Order creation for {} participants",
-                    group.getTotalParticipants());
-            log.info("    - Notification to all participants");
-            log.info("    - Analytics tracking");
-
-        } catch (Exception e) {
-            log.error("Failed to publish GroupCompletedEvent", e);
-
-            // Don't throw - group is still marked as completed
-            // Event listeners can pick this up via scheduled job
-
-            // TODO: Create admin task for manual intervention
-            log.error("⚠️  MANUAL ACTION REQUIRED:");
-            log.error("   Group: {} ({})", group.getGroupCode(), group.getGroupInstanceId());
-            log.error("   Status: COMPLETED but event not published");
-            log.error("   Action: Run scheduled job to process completed groups");
-        }
-
-        log.info("╔════════════════════════════════════════════════════════╗");
-        log.info("║   GROUP COMPLETION PROCESSING COMPLETE                ║");
-        log.info("╚════════════════════════════════════════════════════════╝");
-    }
-
-
-    /**
      * Check if group is complete and publish event if needed.
      * Called from ProductPaymentCompletedListener AFTER transaction commits.
      *
@@ -901,260 +827,6 @@ public class GroupPurchaseServiceImpl implements GroupPurchaseService {
             log.error("Error in safety completion check for group: {}", groupInstanceId, e);
         }
     }
-
-
-    /**
-     * Send notification to shop owner when new group is created
-     */
-    private void sendGroupCreatedNotification(
-            GroupPurchaseInstanceEntity group,
-            AccountEntity creator,
-            Integer initialSeats) {
-
-        log.info("📧 Sending group creation notification to shop owner");
-
-        AccountEntity shopOwner = group.getShop().getOwner();
-
-        if (shopOwner == null) {
-            log.warn("⚠️ Cannot send notification - shop has no owner");
-            return;
-        }
-
-        // 1. Prepare notification data using EventCategoryMapper
-        Map<String, Object> data = GroupNotificationMapper.mapNewGroupCreated(
-                group, creator, initialSeats);
-
-        // 2. Build recipient (shop owner)
-        Recipient recipient = Recipient.builder()
-                .userId(shopOwner.getId().toString())
-                .email(shopOwner.getEmail())
-                .phone(shopOwner.getPhoneNumber())
-                .name(shopOwner.getFirstName())
-                .language("en")
-                .build();
-
-        // 3. Create notification event
-        NotificationEvent event = NotificationEvent.builder()
-                .type(NotificationType.GROUP_PURCHASE_CREATED)
-                .recipients(List.of(recipient))
-                .channels(List.of(
-                        NotificationChannel.EMAIL,
-                        NotificationChannel.SMS,
-                        NotificationChannel.IN_APP
-                ))
-                .priority(NotificationPriority.NORMAL)
-                .data(data)
-                .build();
-
-        // 4. Publish notification
-        notificationPublisher.publish(event);
-
-        log.info("✅ Group creation notification sent to shop owner: {}", shopOwner.getUserName());
-    }
-
-    /**
-     * Send notifications when member joins group
-     * Notifies: 1) Shop owner, 2) Existing group members
-     */
-    private void sendMemberJoinedNotifications(
-            GroupPurchaseInstanceEntity group,
-            AccountEntity newMember,
-            Integer quantity) {
-
-        log.info("📧 Sending member joined notifications for group: {}", group.getGroupCode());
-
-        // 1. Notify shop owner
-        sendMemberJoinedToShopOwner(group, newMember, quantity);
-
-        // 2. Notify existing members
-        sendMemberJoinedToExistingMembers(group, newMember, quantity);
-    }
-
-    /**
-     * Notify shop owner about new member
-     */
-    private void sendMemberJoinedToShopOwner(
-            GroupPurchaseInstanceEntity group,
-            AccountEntity newMember,
-            Integer quantity) {
-
-        try {
-            AccountEntity shopOwner = group.getShop().getOwner();
-
-            if (shopOwner == null) {
-                log.warn("⚠️ Cannot notify shop owner - shop has no owner");
-                return;
-            }
-
-            // Prepare data
-            Map<String, Object> data = GroupNotificationMapper.mapMemberJoinedForShopOwner(
-                    group, newMember, quantity);
-
-            // Build recipient
-            Recipient recipient = Recipient.builder()
-                    .userId(shopOwner.getId().toString())
-                    .email(shopOwner.getEmail())
-                    .phone(shopOwner.getPhoneNumber())
-                    .name(shopOwner.getFirstName())
-                    .language("en")
-                    .build();
-
-            // Create event
-            NotificationEvent event = NotificationEvent.builder()
-                    .type(NotificationType.GROUP_MEMBER_JOINED)
-                    .recipients(List.of(recipient))
-                    .channels(List.of(
-                            NotificationChannel.EMAIL,
-                            NotificationChannel.IN_APP
-                    ))
-                    .priority(NotificationPriority.NORMAL)
-                    .data(data)
-                    .build();
-
-            // Publish
-            notificationPublisher.publish(event);
-
-            log.info("✅ Shop owner notified about new member: {}", newMember.getUserName());
-
-        } catch (Exception e) {
-            log.error("Failed to notify shop owner about new member", e);
-        }
-    }
-
-    /**
-     * Notify existing members about new member joining
-     */
-    private void sendMemberJoinedToExistingMembers(
-            GroupPurchaseInstanceEntity group,
-            AccountEntity newMember,
-            Integer quantity) {
-
-        try {
-            UUID newMemberId = newMember.getId(); // Get ID once
-
-            // Get all active participants except the new member
-            List<GroupParticipantEntity> existingParticipants =
-                    groupParticipantRepo.findByGroupInstanceOrderByJoinedAtAsc(group)
-                            .stream()
-                            .filter(p -> p.getStatus() == ParticipantStatus.ACTIVE)
-                            .filter(p -> {
-                                UUID participantUserId = p.getUser().getId();
-                                boolean isNewMember = participantUserId.equals(newMemberId);
-                                if (isNewMember) {
-                                    log.debug("Excluding new member from notification: {}", p.getUser().getUserName());
-                                }
-                                return !isNewMember; // Exclude if it's the new member
-                            })
-                            .toList();
-
-            log.info("Found {} existing members (excluding new member)", existingParticipants.size());
-
-            if (existingParticipants.isEmpty()) {
-                log.info("No existing members to notify (first member in group)");
-                return;
-            }
-
-            log.info("Notifying {} existing members about new join", existingParticipants.size());
-
-            // Send notification to each existing member
-            for (GroupParticipantEntity participant : existingParticipants) {
-                try {
-                    log.info("Notifying existing member: {}", participant.getUser().getUserName());
-                    sendMemberJoinedToExistingMember(group, participant.getUser(), newMember, quantity);
-                } catch (Exception e) {
-                    log.error("Failed to notify existing member: {}",
-                            participant.getUser().getUserName(), e);
-                }
-            }
-
-            log.info("✅ Existing members notified about new join");
-
-        } catch (Exception e) {
-            log.error("Failed to notify existing members", e);
-        }
-    }
-
-    /**
-     * Send notification to a single existing member
-     */
-    private void sendMemberJoinedToExistingMember(
-            GroupPurchaseInstanceEntity group,
-            AccountEntity existingMember,
-            AccountEntity newMember,
-            Integer quantity) {
-
-        // Prepare data
-        Map<String, Object> data = GroupNotificationMapper.mapMemberJoinedForExistingMembers(
-                group, existingMember, newMember, quantity);
-
-        // Build recipient
-        Recipient recipient = Recipient.builder()
-                .userId(existingMember.getId().toString())
-                .email(existingMember.getEmail())
-                .phone(existingMember.getPhoneNumber())
-                .name(existingMember.getFirstName())
-                .language("en")
-                .build();
-
-        // Create event
-        NotificationEvent event = NotificationEvent.builder()
-                .type(NotificationType.GROUP_MEMBER_JOINED)
-                .recipients(List.of(recipient))
-                .channels(List.of(
-                        NotificationChannel.PUSH,
-                        NotificationChannel.IN_APP
-                ))
-                .priority(NotificationPriority.LOW)
-                .data(data)
-                .build();
-
-        // Publish
-        notificationPublisher.publish(event);
-    }
-
-    /**
-     * Send notification when seats are transferred between groups
-     */
-    private void sendSeatsTransferredNotification(
-            GroupPurchaseInstanceEntity sourceGroup,
-            GroupPurchaseInstanceEntity targetGroup,
-            AccountEntity user,
-            Integer quantity) {
-
-        log.info("📧 Sending seats transferred notification to user: {}", user.getUserName());
-
-        // 1. Prepare notification data using EventCategoryMapper
-        Map<String, Object> data = GroupNotificationMapper.mapSeatsTransferred(
-                sourceGroup, targetGroup, user, quantity);
-
-        // 2. Build recipient (the user who transferred)
-        Recipient recipient = Recipient.builder()
-                .userId(user.getId().toString())
-                .email(user.getEmail())
-                .phone(user.getPhoneNumber())
-                .name(user.getFirstName())
-                .language("en")
-                .build();
-
-        // 3. Create notification event
-        NotificationEvent event = NotificationEvent.builder()
-                .type(NotificationType.GROUP_SEATS_TRANSFERRED)
-                .recipients(List.of(recipient))
-                .channels(List.of(
-                        NotificationChannel.EMAIL,
-                        NotificationChannel.PUSH,
-                        NotificationChannel.IN_APP
-                ))
-                .priority(NotificationPriority.NORMAL)
-                .data(data)
-                .build();
-
-        // 4. Publish notification
-        notificationPublisher.publish(event);
-
-        log.info("✅ Seats transferred notification sent to: {}", user.getUserName());
-    }
-
 
 
     private void scheduleExpirationJob(GroupPurchaseInstanceEntity group) {
