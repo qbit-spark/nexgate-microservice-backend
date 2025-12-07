@@ -354,13 +354,13 @@ public class PostResponseMapper {
                 attachedGroup.setTotalSlots(group.getTotalSeats());
                 attachedGroup.setOriginalPrice(group.getRegularPrice());
                 attachedGroup.setDiscountPrice(group.getGroupPrice());
+                attachedGroup.setRemainingSlots(group.getSeatsRemaining());
 
                 if (group.getRegularPrice() != null && group.getGroupPrice() != null) {
                     BigDecimal savings = group.getRegularPrice().subtract(group.getGroupPrice());
                     attachedGroup.setSavingsAmount(savings);
                     attachedGroup.setSavingsPercentage(
-                            savings.multiply(new BigDecimal("100"))
-                                    .divide(group.getRegularPrice(), 2, BigDecimal.ROUND_HALF_UP)
+                            savings.multiply(new BigDecimal("100")).divide(group.getRegularPrice(), 2, BigDecimal.ROUND_HALF_UP)
                     );
                 }
                 attachedGroup.setExpiresAt(group.getExpiresAt());

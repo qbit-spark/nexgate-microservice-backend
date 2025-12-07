@@ -221,6 +221,7 @@ public class PostResponse {
         private String productImageUrl;
         private int currentCount;
         private int totalSlots;
+        private int remainingSlots;
         private BigDecimal originalPrice;
         private BigDecimal discountPrice;
         private BigDecimal savingsAmount;

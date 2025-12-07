@@ -218,7 +218,7 @@ public class PostServiceImpl implements PostService {
         PostEntity draft = getOrCreateDraft();
 
         if (postBuyTogetherGroupRepository.existsByPostIdAndGroupId(draft.getId(), groupId)) {
-            throw new IllegalArgumentException("Buy together group already attached to this draft");
+            throw new IllegalArgumentException("This buy together group already attached to your draft");
         }
 
         PostBuyTogetherGroupEntity postGroup = new PostBuyTogetherGroupEntity();
