@@ -344,12 +344,11 @@ public class PostController {
         return ResponseEntity.ok(successResponse);
     }
 
-    @PutMapping("/{postId}/content")
+    @PutMapping("/content")
     public ResponseEntity<GlobeSuccessResponseBuilder> updateDraftContent(
-            @PathVariable UUID postId,
             @RequestBody String content) {
 
-        PostEntity draft = postService.updateDraftContent(postId, content);
+        PostEntity draft = postService.updateDraftContent(content);
 
         PostResponse response = postResponseMapper.toPostResponse(draft);
 

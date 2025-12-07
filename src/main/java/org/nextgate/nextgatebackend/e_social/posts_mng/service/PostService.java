@@ -55,7 +55,7 @@ public interface PostService {
     // Update draft
     PostEntity updateDraft(UpdateDraftRequest request);
 
-    PostEntity updateDraftContent(UUID postId, String content);
+    PostEntity updateDraftContent(String content);
 
     PostEntity addMediaToDraft(List<MediaRequest> media);
 
