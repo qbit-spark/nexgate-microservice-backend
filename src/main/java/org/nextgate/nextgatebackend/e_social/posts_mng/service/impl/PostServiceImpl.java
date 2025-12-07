@@ -593,7 +593,7 @@ public class PostServiceImpl implements PostService {
             }
 
             if (!accountRepo.existsById(collaboratorId)) {
-                throw new IllegalArgumentException("Collaborator not found: " + collaboratorId);
+                throw new IllegalArgumentException("Collaborator not found; " + collaboratorId);
             }
 
             PostCollaboratorEntity collaborator = new PostCollaboratorEntity();
