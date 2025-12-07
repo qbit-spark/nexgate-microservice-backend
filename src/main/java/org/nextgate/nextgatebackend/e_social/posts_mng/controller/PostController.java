@@ -378,7 +378,7 @@ public class PostController {
         return ResponseEntity.ok(successResponse);
     }
 
-    @PutMapping("/{postId}/privacy")
+    @PutMapping("/privacy")
     public ResponseEntity<GlobeSuccessResponseBuilder> updateDraftPrivacySettings(
             @PathVariable UUID postId,
             @Valid @RequestBody PrivacySettingsRequest settings) {
