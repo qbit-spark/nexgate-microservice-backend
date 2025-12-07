@@ -201,11 +201,6 @@ public class PostValidationUtil {
 
     // Validates collaboration settings
     public void validateCollaboration(CollaborationRequest collaboration) {
-        if (collaboration.getIsCollaborative() &&
-                (collaboration.getCollaboratorIds() == null || collaboration.getCollaboratorIds().isEmpty())) {
-            throw new IllegalArgumentException("Collaborative posts must have at least one collaborator");
-        }
-
         if (collaboration.getCollaboratorIds() != null &&
                 collaboration.getCollaboratorIds().size() > MAX_COLLABORATORS) {
             throw new IllegalArgumentException("Maximum " + MAX_COLLABORATORS + " collaborators allowed per post");

@@ -31,9 +31,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -108,7 +106,7 @@ public class PostServiceImpl implements PostService {
             saveAttachments(savedPost, request);
         }
 
-        if (request.getCollaboration() != null && request.getCollaboration().getIsCollaborative()) {
+        if (request.getCollaboration() != null ) {
             saveCollaborators(savedPost, request);
         }
 
@@ -578,31 +576,26 @@ public class PostServiceImpl implements PostService {
     @Override
     @Transactional
     public PostEntity updateDraftCollaboration(CollaborationRequest collaboration) {
-        AccountEntity author = getAuthenticatedAccount();
-
 
         PostEntity post = getMyCurrentDraft();
-
-        if (!post.getAuthorId().equals(author.getId())) {
-            throw new IllegalArgumentException("You can only update your own posts");
-        }
-
-        if (post.getStatus() != PostStatus.DRAFT) {
-            throw new IllegalArgumentException("Only draft posts can be updated");
-        }
-
-        validationUtil.validateCollaboration(collaboration);
 
         // Remove existing collaborators
         postCollaboratorRepository.deleteByPostId(post.getId());
 
-        // Update collaborative flag
-        post.setCollaborative(collaboration.getIsCollaborative());
+        // Auto-detect if collaborative based on array
+        boolean isCollaborative = collaboration.getCollaboratorIds() != null
+                && !collaboration.getCollaboratorIds().isEmpty();
 
-        // Add new collaborators if collaborative
-        if (collaboration.getIsCollaborative() && collaboration.getCollaboratorIds() != null) {
-            for (UUID collaboratorId : collaboration.getCollaboratorIds()) {
-                if (collaboratorId.equals(author.getId())) {
+        post.setCollaborative(isCollaborative);
+
+        if (isCollaborative) {
+            validationUtil.validateCollaboration(collaboration);
+
+            // Convert list to Set to remove duplicates
+            Set<UUID> uniqueCollaboratorIds = new HashSet<>(collaboration.getCollaboratorIds());
+
+            for (UUID collaboratorId : uniqueCollaboratorIds) {
+                if (collaboratorId.equals(post.getAuthorId())) {
                     throw new IllegalArgumentException("You cannot add yourself as a collaborator");
                 }
 
@@ -617,7 +610,7 @@ public class PostServiceImpl implements PostService {
                 postCollaboratorRepository.save(collaborator);
             }
         }
-
+    
         return postRepository.save(post);
     }
 
