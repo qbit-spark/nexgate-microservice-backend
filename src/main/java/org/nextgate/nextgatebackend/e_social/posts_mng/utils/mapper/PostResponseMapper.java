@@ -71,7 +71,7 @@ public class PostResponseMapper {
     private final PostBookmarkRepository postBookmarkRepository;
     private final PostRepostRepository postRepostRepository;
     private final PostViewRepository postViewRepository;
-
+    private final PostCommentRepository commentRepository;
     public PostResponse toPostResponse(PostEntity post) {
         // Handle null post
         if (post == null) {
@@ -554,8 +554,7 @@ public class PostResponseMapper {
         interaction.setHasLiked(postLikeRepository.existsByPostIdAndUserId(post.getId(), currentUserId));
         interaction.setHasBookmarked(postBookmarkRepository.existsByPostIdAndUserId(post.getId(), currentUserId));
         interaction.setHasReposted(postRepostRepository.existsByPostIdAndUserId(post.getId(), currentUserId));
-        interaction.setHasCommented(false); // TODO: Implement when comments are added
-        interaction.setHasViewed(postViewRepository.existsByPostIdAndUserId(post.getId(), currentUserId));
+        interaction.setHasCommented(commentRepository.existsByPostIdAndUserIdAndIsDeletedFalse(post.getId(), currentUserId));        interaction.setHasViewed(postViewRepository.existsByPostIdAndUserId(post.getId(), currentUserId));
 
         return interaction;
     }
