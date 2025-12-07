@@ -2,10 +2,7 @@ package org.nextgate.nextgatebackend.e_social.posts_mng.service;
 
 
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PostEntity;
-import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.CreatePostRequest;
-import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.MediaRequest;
-import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.PrivacySettingsRequest;
-import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.UpdateDraftRequest;
+import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -66,6 +63,8 @@ public interface PostService {
 
     // Delete post
     void deletePost(UUID postId);
+
+    PostEntity updateDraftCollaboration(CollaborationRequest collaboration);
 
     // Collaboration
     PostEntity acceptCollaboration(UUID postId);

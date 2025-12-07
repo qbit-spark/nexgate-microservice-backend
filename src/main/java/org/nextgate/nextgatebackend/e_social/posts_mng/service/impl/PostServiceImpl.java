@@ -612,6 +612,52 @@ public class PostServiceImpl implements PostService {
 
     @Override
     @Transactional
+    public PostEntity updateDraftCollaboration(CollaborationRequest collaboration) {
+        AccountEntity author = getAuthenticatedAccount();
+
+
+        PostEntity post = getMyCurrentDraft();
+
+        if (!post.getAuthorId().equals(author.getId())) {
+            throw new IllegalArgumentException("You can only update your own posts");
+        }
+
+        if (post.getStatus() != PostStatus.DRAFT) {
+            throw new IllegalArgumentException("Only draft posts can be updated");
+        }
+
+        validationUtil.validateCollaboration(collaboration);
+
+        // Remove existing collaborators
+        postCollaboratorRepository.deleteByPostId(post.getId());
+
+        // Update collaborative flag
+        post.setCollaborative(collaboration.getIsCollaborative());
+
+        // Add new collaborators if collaborative
+        if (collaboration.getIsCollaborative() && collaboration.getCollaboratorIds() != null) {
+            for (UUID collaboratorId : collaboration.getCollaboratorIds()) {
+                if (collaboratorId.equals(author.getId())) {
+                    throw new IllegalArgumentException("You cannot add yourself as a collaborator");
+                }
+
+                if (!accountRepo.existsById(collaboratorId)) {
+                    throw new IllegalArgumentException("Collaborator not found: " + collaboratorId);
+                }
+
+                PostCollaboratorEntity collaborator = new PostCollaboratorEntity();
+                collaborator.setPostId(post.getId());
+                collaborator.setUserId(collaboratorId);
+                collaborator.setStatus(CollaboratorStatus.PENDING);
+                postCollaboratorRepository.save(collaborator);
+            }
+        }
+
+        return postRepository.save(post);
+    }
+
+    @Override
+    @Transactional
     public PostEntity acceptCollaboration(UUID postId) {
         AccountEntity collaborator = getAuthenticatedAccount();
 

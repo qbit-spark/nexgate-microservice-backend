@@ -395,6 +395,22 @@ public class PostController {
         return ResponseEntity.ok(successResponse);
     }
 
+    @PutMapping("/collaboration")
+    public ResponseEntity<GlobeSuccessResponseBuilder> updateDraftCollaboration(
+            @Valid @RequestBody CollaborationRequest collaboration) {
+
+        PostEntity draft = postService.updateDraftCollaboration(collaboration);
+
+        PostResponse response = postResponseMapper.toPostResponse(draft);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Collaboration settings updated successfully",
+                response
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
     @PostMapping("/{postId}/collaboration/accept")
     public ResponseEntity<GlobeSuccessResponseBuilder> acceptCollaboration(
             @PathVariable UUID postId) {

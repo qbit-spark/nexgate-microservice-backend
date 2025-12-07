@@ -16,6 +16,7 @@ public class UpdateDraftRequest {
 
     private String content;
 
+
     private List<MediaRequest> media;
 
     @Valid
