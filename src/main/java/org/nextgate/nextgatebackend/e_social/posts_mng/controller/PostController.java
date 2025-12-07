@@ -380,7 +380,6 @@ public class PostController {
 
     @PutMapping("/privacy")
     public ResponseEntity<GlobeSuccessResponseBuilder> updateDraftPrivacySettings(
-            @PathVariable UUID postId,
             @Valid @RequestBody PrivacySettingsRequest settings) {
 
         PostEntity draft = postService.updateDraftPrivacySettings(postId, settings);
