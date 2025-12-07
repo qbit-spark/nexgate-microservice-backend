@@ -2,6 +2,7 @@ package org.nextgate.nextgatebackend.e_social.posts_mng.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.nextgate.nextgatebackend.e_social.interactions.service.PostInteractionService;
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PostEntity;
 import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.*;
 import org.nextgate.nextgatebackend.e_social.posts_mng.service.PollService;
@@ -29,6 +30,7 @@ public class PostController {
     private final PostService postService;
     private final PostResponseMapper postResponseMapper;
     private final PollService pollService;
+    private final PostInteractionService interactionService;
 
     @PostMapping
     public ResponseEntity<GlobeSuccessResponseBuilder> createPost(
@@ -509,6 +511,104 @@ public class PostController {
         GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
                 "Voters retrieved successfully",
                 voters
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    // ============================================
+// INTERACTION ENDPOINTS
+// ============================================
+
+    @PostMapping("/{postId}/like")
+    public ResponseEntity<GlobeSuccessResponseBuilder> likePost(@PathVariable UUID postId) {
+
+        interactionService.likePost(postId);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Post liked successfully",
+                null
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @DeleteMapping("/{postId}/like")
+    public ResponseEntity<GlobeSuccessResponseBuilder> unlikePost(@PathVariable UUID postId) {
+
+        interactionService.unlikePost(postId);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Post unliked successfully",
+                null
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @PostMapping("/{postId}/bookmark")
+    public ResponseEntity<GlobeSuccessResponseBuilder> bookmarkPost(@PathVariable UUID postId) {
+
+        interactionService.bookmarkPost(postId);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Post bookmarked successfully",
+                null
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @DeleteMapping("/{postId}/bookmark")
+    public ResponseEntity<GlobeSuccessResponseBuilder> unbookmarkPost(@PathVariable UUID postId) {
+
+        interactionService.unbookmarkPost(postId);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Bookmark removed successfully",
+                null
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @PostMapping("/{postId}/repost")
+    public ResponseEntity<GlobeSuccessResponseBuilder> repostPost(
+            @PathVariable UUID postId,
+            @RequestBody(required = false) RepostRequest request) {
+
+        String comment = request != null ? request.getComment() : null;
+        interactionService.repostPost(postId, comment);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Post reposted successfully",
+                null
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @DeleteMapping("/{postId}/repost")
+    public ResponseEntity<GlobeSuccessResponseBuilder> unrepostPost(@PathVariable UUID postId) {
+
+        interactionService.unrepostPost(postId);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Repost removed successfully",
+                null
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @PostMapping("/{postId}/view")
+    public ResponseEntity<GlobeSuccessResponseBuilder> recordView(@PathVariable UUID postId) {
+
+        interactionService.recordView(postId);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "View recorded successfully",
+                null
         );
 
         return ResponseEntity.ok(successResponse);

@@ -33,4 +33,7 @@ public interface FollowRepository extends JpaRepository<FollowEntity, UUID> {
     long countByFollowerIdAndStatus(UUID followerId, FollowStatus status);
 
     List<FollowEntity> findByFollowingIdAndStatusOrderByCreatedAtDesc(UUID followingId, FollowStatus status);
+
+    boolean existsByFollowerIdAndFollowingIdAndStatus(UUID followerId, UUID followingId, FollowStatus status);
+
 }

@@ -12,6 +12,10 @@ import org.nextgate.nextgatebackend.e_commerce.products_mng_service.products.rep
 import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng.enums.ShopStatus;
 import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng.repo.ShopRepo;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.repo.EventsRepo;
+import org.nextgate.nextgatebackend.e_social.interactions.repo.PostBookmarkRepository;
+import org.nextgate.nextgatebackend.e_social.interactions.repo.PostLikeRepository;
+import org.nextgate.nextgatebackend.e_social.interactions.repo.PostRepostRepository;
+import org.nextgate.nextgatebackend.e_social.interactions.repo.PostViewRepository;
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PollEntity;
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PollOptionEntity;
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PollVoteEntity;
@@ -63,6 +67,10 @@ public class PostResponseMapper {
     private final EventsRepo eventsRepo;
     private final GroupPurchaseInstanceRepo groupPurchaseInstanceRepo;
     private final InstallmentPlanRepo installmentPlanRepo;
+    private final PostLikeRepository postLikeRepository;
+    private final PostBookmarkRepository postBookmarkRepository;
+    private final PostRepostRepository postRepostRepository;
+    private final PostViewRepository postViewRepository;
 
     public PostResponse toPostResponse(PostEntity post) {
         // Handle null post
@@ -542,12 +550,12 @@ public class PostResponseMapper {
             return interaction;
         }
 
-        // TODO: Query interaction tables when implemented
-        interaction.setHasLiked(false);
-        interaction.setHasBookmarked(false);
-        interaction.setHasReposted(false);
-        interaction.setHasCommented(false);
-        interaction.setHasViewed(false);
+        // ✅ Query actual interaction tables
+        interaction.setHasLiked(postLikeRepository.existsByPostIdAndUserId(post.getId(), currentUserId));
+        interaction.setHasBookmarked(postBookmarkRepository.existsByPostIdAndUserId(post.getId(), currentUserId));
+        interaction.setHasReposted(postRepostRepository.existsByPostIdAndUserId(post.getId(), currentUserId));
+        interaction.setHasCommented(false); // TODO: Implement when comments are added
+        interaction.setHasViewed(postViewRepository.existsByPostIdAndUserId(post.getId(), currentUserId));
 
         return interaction;
     }
