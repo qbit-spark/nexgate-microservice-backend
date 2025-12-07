@@ -57,7 +57,7 @@ public interface PostService {
 
     PostEntity updateDraftContent(UUID postId, String content);
 
-    PostEntity addMediaToDraft(UUID postId, List<MediaRequest> media);
+    PostEntity addMediaToDraft(List<MediaRequest> media);
 
     PostEntity updateDraftPrivacySettings(PrivacySettingsRequest settings);
 

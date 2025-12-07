@@ -361,12 +361,11 @@ public class PostController {
         return ResponseEntity.ok(successResponse);
     }
 
-    @PutMapping("/{postId}/media")
+    @PutMapping("/media")
     public ResponseEntity<GlobeSuccessResponseBuilder> addMediaToDraft(
-            @PathVariable UUID postId,
             @Valid @RequestBody List<MediaRequest> media) {
 
-        PostEntity draft = postService.addMediaToDraft(postId, media);
+        PostEntity draft = postService.addMediaToDraft( media);
 
         PostResponse response = postResponseMapper.toPostResponse(draft);
 

@@ -525,19 +525,9 @@ public class PostServiceImpl implements PostService {
 
     @Override
     @Transactional
-    public PostEntity addMediaToDraft(UUID postId, List<MediaRequest> media) {
-        AccountEntity author = getAuthenticatedAccount();
+    public PostEntity addMediaToDraft(List<MediaRequest> media) {
 
-        PostEntity post = postRepository.findByIdAndIsDeletedFalse(postId)
-                .orElseThrow(() -> new IllegalArgumentException("Post not found"));
-
-        if (!post.getAuthorId().equals(author.getId())) {
-            throw new IllegalArgumentException("You can only update your own posts");
-        }
-
-        if (post.getStatus() != PostStatus.DRAFT) {
-            throw new IllegalArgumentException("Only draft posts can be updated");
-        }
+        PostEntity post = getMyCurrentDraft();
 
         validationUtil.validateMedia(media);
 
