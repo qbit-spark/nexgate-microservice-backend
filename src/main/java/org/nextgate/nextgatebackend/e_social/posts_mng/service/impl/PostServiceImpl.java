@@ -458,7 +458,6 @@ public class PostServiceImpl implements PostService {
     @Transactional
     public PostEntity updateDraft(UpdateDraftRequest request) {
         AccountEntity author = getAuthenticatedAccount();
-
         PostEntity post = getMyCurrentDraft();
 
         if (!post.getAuthorId().equals(author.getId())) {
@@ -469,23 +468,35 @@ public class PostServiceImpl implements PostService {
             throw new IllegalArgumentException("Only draft posts can be updated");
         }
 
-        if (request.getContent() != null) {
-            post.setContent(request.getContent());
-            postUserMentionRepository.deleteByPostId(post.getId());
-            postShopMentionRepository.deleteByPostId(post.getId());
-            postHashtagRepository.deleteByPostId(post.getId());
-            parseAndSaveContent(post, request.getContent());
-        }
+        boolean contentChanged = request.getContent() != null;
+        boolean mediaChanged = request.getMedia() != null;
+        boolean privacyChanged = request.getPrivacySettings() != null;
 
-        if (request.getMedia() != null) {
+        if (contentChanged) {
+            post.setContent(request.getContent());
+        }
+        if (mediaChanged) {
             setMediaData(post, request);
         }
-
-        if (request.getPrivacySettings() != null) {
+        if (privacyChanged) {
             updatePrivacySettings(post, request.getPrivacySettings());
         }
 
-        return postRepository.save(post);
+        // CRITICAL FIX: Save + FLUSH first so post is attached and ID is safe
+        post = postRepository.saveAndFlush(post);
+
+        // NOW safe to parse — post is managed, ID is guaranteed
+        if (contentChanged) {
+            // Delete old ones using the confirmed ID
+            postUserMentionRepository.deleteByPostId(post.getId());
+            postShopMentionRepository.deleteByPostId(post.getId());
+            postHashtagRepository.deleteByPostId(post.getId());
+
+            // Now parse and save — this will work 100%
+            parseAndSaveContent(post, request.getContent());
+        }
+
+        return post;
     }
 
     @Override

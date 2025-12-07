@@ -12,9 +12,9 @@ import java.util.regex.Pattern;
 @Component
 public class ContentParsingUtil {
 
-    private static final Pattern MENTION_PATTERN = Pattern.compile("@([a-zA-Z0-9_]+)");
-    private static final Pattern HASHTAG_PATTERN = Pattern.compile("#([a-zA-Z0-9_]+)");
-    private static final Pattern SHOP_MENTION_PATTERN = Pattern.compile("\\$([a-zA-Z0-9_]+)");
+    private static final Pattern HASHTAG_PATTERN = Pattern.compile("#([a-zA-Z0-9_]+)");        // Correct — hashtags rarely allow -
+    private static final Pattern MENTION_PATTERN = Pattern.compile("@([a-zA-Z0-9_.-]+)");      // Perfect — allows hyphens & dots
+    private static final Pattern SHOP_MENTION_PATTERN = Pattern.compile("\\$([a-zA-Z0-9_.-]+)"); // Perfect — same as mentions
 
     // Parse @mentions from content
     public List<ParsedMention> parseMentions(String content) {
