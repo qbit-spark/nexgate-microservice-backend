@@ -456,11 +456,10 @@ public class PostServiceImpl implements PostService {
 
     @Override
     @Transactional
-    public PostEntity updateDraft(UUID postId, UpdateDraftRequest request) {
+    public PostEntity updateDraft(UpdateDraftRequest request) {
         AccountEntity author = getAuthenticatedAccount();
 
-        PostEntity post = postRepository.findByIdAndIsDeletedFalse(postId)
-                .orElseThrow(() -> new IllegalArgumentException("Post not found"));
+        PostEntity post = getMyCurrentDraft();
 
         if (!post.getAuthorId().equals(author.getId())) {
             throw new IllegalArgumentException("You can only update your own posts");

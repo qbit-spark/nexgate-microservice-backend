@@ -56,7 +56,7 @@ public interface PostService {
     List<PostEntity> getMyScheduledPosts();
 
     // Update draft
-    PostEntity updateDraft(UUID postId, UpdateDraftRequest request);
+    PostEntity updateDraft(UpdateDraftRequest request);
 
     PostEntity updateDraftContent(UUID postId, String content);
 

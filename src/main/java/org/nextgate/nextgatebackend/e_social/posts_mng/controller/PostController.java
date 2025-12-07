@@ -233,6 +233,7 @@ public class PostController {
         return ResponseEntity.ok(successResponse);
     }
 
+    //Todo: The installment plan response is not cool
     @PostMapping("/draft/attach-plan/{planId}")
     public ResponseEntity<GlobeSuccessResponseBuilder> attachInstallmentPlanToDraft(
             @PathVariable UUID planId) {
@@ -296,7 +297,7 @@ public class PostController {
     }
 
     @DeleteMapping("/draft/remove-group/{groupId}")
-    public ResponseEntity<GlobeSuccessResponseBuilder> removeBuyTogetherGroupFromDraft(
+        public ResponseEntity<GlobeSuccessResponseBuilder> removeBuyTogetherGroupFromDraft(
             @PathVariable UUID groupId) {
 
         PostEntity draft = postService.removeBuyTogetherGroupFromDraft(groupId);
@@ -327,12 +328,11 @@ public class PostController {
         return ResponseEntity.ok(successResponse);
     }
 
-    @PutMapping("/{postId}")
+    @PutMapping()
     public ResponseEntity<GlobeSuccessResponseBuilder> updateDraft(
-            @PathVariable UUID postId,
             @Valid @RequestBody UpdateDraftRequest request) {
 
-        PostEntity draft = postService.updateDraft(postId, request);
+        PostEntity draft = postService.updateDraft(request);
 
         PostResponse response = postResponseMapper.toPostResponse(draft);
 
