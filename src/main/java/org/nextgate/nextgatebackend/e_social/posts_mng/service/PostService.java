@@ -14,7 +14,7 @@ public interface PostService {
     // Create and manage posts
     PostEntity createPost(CreatePostRequest request);
 
-    PostEntity publishPost(UUID postId);
+    PostEntity publishPost();
 
     // Attach to draft (discovery flow)
     PostEntity attachProductToDraft(UUID productId);

@@ -45,11 +45,10 @@ public class PostController {
         return ResponseEntity.ok(successResponse);
     }
 
-    @PostMapping("/{postId}/publish")
-    public ResponseEntity<GlobeSuccessResponseBuilder> publishPost(
-            @PathVariable UUID postId) {
+    @PostMapping("/publish")
+    public ResponseEntity<GlobeSuccessResponseBuilder> publishDraftPost() {
 
-        PostEntity post = postService.publishPost(postId);
+        PostEntity post = postService.publishPost();
 
         PostResponse response = postResponseMapper.toPostResponse(post);
 
