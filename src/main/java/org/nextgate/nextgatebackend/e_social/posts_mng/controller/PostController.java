@@ -3,10 +3,13 @@ package org.nextgate.nextgatebackend.e_social.posts_mng.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.nextgate.nextgatebackend.e_social.interactions.service.PostInteractionService;
+import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PostCommentEntity;
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PostEntity;
 import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.*;
+import org.nextgate.nextgatebackend.e_social.posts_mng.service.CommentService;
 import org.nextgate.nextgatebackend.e_social.posts_mng.service.PollService;
 import org.nextgate.nextgatebackend.e_social.posts_mng.service.PostService;
+import org.nextgate.nextgatebackend.e_social.posts_mng.utils.mapper.CommentResponseMapper;
 import org.nextgate.nextgatebackend.e_social.posts_mng.utils.mapper.PostResponseMapper;
 import org.nextgate.nextgatebackend.globeresponsebody.GlobeSuccessResponseBuilder;
 import org.springframework.data.domain.Page;
@@ -31,6 +34,8 @@ public class PostController {
     private final PostResponseMapper postResponseMapper;
     private final PollService pollService;
     private final PostInteractionService interactionService;
+    private final CommentService commentService;
+    private final CommentResponseMapper commentResponseMapper;
 
     @PostMapping
     public ResponseEntity<GlobeSuccessResponseBuilder> createPost(
@@ -608,6 +613,163 @@ public class PostController {
 
         GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
                 "View recorded successfully",
+                null
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    // ============================================
+   // COMMENT ENDPOINTS
+   // ============================================
+
+    @PostMapping("/{postId}/comments")
+    public ResponseEntity<GlobeSuccessResponseBuilder> createComment(
+            @PathVariable UUID postId,
+            @Valid @RequestBody CreateCommentRequest request) {
+
+        PostCommentEntity comment = commentService.createComment(postId, request);
+        CommentResponse response = commentResponseMapper.toCommentResponse(comment);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Comment created successfully",
+                response
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @GetMapping("/{postId}/comments")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getComments(
+            @PathVariable UUID postId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        Pageable pageable = PageRequest.of(page - 1, size, Sort.by("createdAt").descending());
+        Page<PostCommentEntity> commentsPage = commentService.getComments(postId, pageable);
+
+        List<CommentResponse> responses = commentResponseMapper.toCommentResponseList(commentsPage.getContent());
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Comments retrieved successfully",
+                responses
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @GetMapping("/comments/{commentId}")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getComment(@PathVariable UUID commentId) {
+
+        PostCommentEntity comment = commentService.getCommentById(commentId);
+        CommentResponse response = commentResponseMapper.toCommentResponse(comment);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Comment retrieved successfully",
+                response
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @GetMapping("/comments/{commentId}/replies")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getReplies(
+            @PathVariable UUID commentId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        Pageable pageable = PageRequest.of(page - 1, size, Sort.by("createdAt").ascending());
+        Page<PostCommentEntity> repliesPage = commentService.getReplies(commentId, pageable);
+
+        List<CommentResponse> responses = commentResponseMapper.toCommentResponseList(repliesPage.getContent());
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Replies retrieved successfully",
+                responses
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @PutMapping("/comments/{commentId}")
+    public ResponseEntity<GlobeSuccessResponseBuilder> updateComment(
+            @PathVariable UUID commentId,
+            @Valid @RequestBody UpdateCommentRequest request) {
+
+        PostCommentEntity comment = commentService.updateComment(commentId, request);
+        CommentResponse response = commentResponseMapper.toCommentResponse(comment);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Comment updated successfully",
+                response
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @DeleteMapping("/comments/{commentId}")
+    public ResponseEntity<GlobeSuccessResponseBuilder> deleteComment(@PathVariable UUID commentId) {
+
+        commentService.deleteComment(commentId);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Comment deleted successfully",
+                null
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @PostMapping("/{postId}/comments/{commentId}/pin")
+    public ResponseEntity<GlobeSuccessResponseBuilder> pinComment(
+            @PathVariable UUID postId,
+            @PathVariable UUID commentId) {
+
+        PostCommentEntity comment = commentService.pinComment(postId, commentId);
+        CommentResponse response = commentResponseMapper.toCommentResponse(comment);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Comment pinned successfully",
+                response
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @DeleteMapping("/comments/{commentId}/pin")
+    public ResponseEntity<GlobeSuccessResponseBuilder> unpinComment(@PathVariable UUID commentId) {
+
+        PostCommentEntity comment = commentService.unpinComment(commentId);
+        CommentResponse response = commentResponseMapper.toCommentResponse(comment);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Comment unpinned successfully",
+                response
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @PostMapping("/comments/{commentId}/like")
+    public ResponseEntity<GlobeSuccessResponseBuilder> likeComment(@PathVariable UUID commentId) {
+
+        commentService.likeComment(commentId);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Comment liked successfully",
+                null
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @DeleteMapping("/comments/{commentId}/like")
+    public ResponseEntity<GlobeSuccessResponseBuilder> unlikeComment(@PathVariable UUID commentId) {
+
+        commentService.unlikeComment(commentId);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Comment unliked successfully",
                 null
         );
 
