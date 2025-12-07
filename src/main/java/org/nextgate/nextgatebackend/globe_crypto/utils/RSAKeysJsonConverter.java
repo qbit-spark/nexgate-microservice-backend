@@ -33,7 +33,7 @@ public class RSAKeysJsonConverter implements AttributeConverter<RSAKeys, String>
         try {
             return objectMapper.readValue(dbData, RSAKeys.class);
         } catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("Error converting JSON to RSAKeys", e);
+            throw new IllegalArgumentException("Error converting JSON to RSAKeys: " + dbData, e);
         }
     }
 }
