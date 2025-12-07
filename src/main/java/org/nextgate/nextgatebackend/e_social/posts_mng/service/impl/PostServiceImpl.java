@@ -277,16 +277,13 @@ public class PostServiceImpl implements PostService {
     @Override
     @Transactional
     public PostEntity removeProductFromDraft(UUID productId) {
-        AccountEntity author = getAuthenticatedAccount();
+
         PostEntity draft = getMyCurrentDraft();
 
         if (draft == null) {
             throw new IllegalArgumentException("No draft post found");
         }
 
-        if (!draft.getAuthorId().equals(author.getId())) {
-            throw new IllegalArgumentException("You can only modify your own draft");
-        }
 
         PostProductEntity postProduct = postProductRepository.findByPostId(draft.getId())
                 .stream()
@@ -554,10 +551,8 @@ public class PostServiceImpl implements PostService {
     @Override
     @Transactional
     public PostEntity updateDraftPrivacySettings(PrivacySettingsRequest settings) {
-        AccountEntity author = getAuthenticatedAccount();
 
         PostEntity post = getMyCurrentDraft();
-
 
         if (post.getStatus() != PostStatus.DRAFT) {
             throw new IllegalArgumentException("Only draft posts can be updated");
