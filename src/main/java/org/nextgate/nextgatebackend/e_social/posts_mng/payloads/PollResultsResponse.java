@@ -22,6 +22,7 @@ public class PollResultsResponse {
     private long totalVotes;
     private boolean allowMultipleVotes;
     private boolean isAnonymous;
+    private boolean allowVoteChange;
     private LocalDateTime expiresAt;
     private boolean hasExpired;
     private boolean userHasVoted;

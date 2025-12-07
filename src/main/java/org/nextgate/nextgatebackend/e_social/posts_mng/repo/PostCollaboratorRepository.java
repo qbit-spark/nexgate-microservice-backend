@@ -21,5 +21,7 @@ public interface PostCollaboratorRepository extends JpaRepository<PostCollaborat
 
     boolean existsByPostIdAndUserId(UUID postId, UUID userId);
 
+    boolean existsByPostIdAndUserIdAndStatus(UUID postId, UUID userId, CollaboratorStatus status);
+
     void deleteByPostId(UUID postId);
 }

@@ -38,6 +38,10 @@ public class PollEntity {
     @Column(nullable = false)
     private boolean isAnonymous = true;
 
+    //Todo: New field to allow vote changes later will be nullable = true after testing
+    @Column(nullable = true)
+    private boolean allowVoteChange = true;
+
     @Column(nullable = false)
     private long totalVotes = 0;  // ADD THIS ✅
 

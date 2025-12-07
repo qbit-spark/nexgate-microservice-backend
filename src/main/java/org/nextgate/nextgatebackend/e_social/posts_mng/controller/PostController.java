@@ -462,14 +462,15 @@ public class PostController {
             @PathVariable UUID postId,
             @Valid @RequestBody VotePollRequest request) {
 
-        pollService.voteOnPoll(postId, request.getOptionIds());
+            pollService.voteOnPoll(postId, request.getOptionIds());
 
-        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
-                "Vote recorded successfully",
-                "Vote recorded successfully"
-        );
+            GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                    "Vote recorded successfully",
+                    "Vote recorded successfully"
+            );
 
-        return ResponseEntity.ok(successResponse);
+            return ResponseEntity.ok(successResponse);
+
     }
 
     @DeleteMapping("/{postId}/vote")
@@ -493,6 +494,21 @@ public class PostController {
         GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
                 "Poll results retrieved successfully",
                 results
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @GetMapping("/{postId}/poll-voters/{optionId}")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getOptionVoters(
+            @PathVariable UUID postId,
+            @PathVariable UUID optionId) {
+
+        List<VoterInfo> voters = pollService.getOptionVoters(postId, optionId);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Voters retrieved successfully",
+                voters
         );
 
         return ResponseEntity.ok(successResponse);

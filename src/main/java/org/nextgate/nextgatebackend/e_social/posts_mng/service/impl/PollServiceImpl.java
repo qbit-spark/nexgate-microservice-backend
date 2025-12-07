@@ -7,12 +7,11 @@ import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PollEntity;
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PollOptionEntity;
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PollVoteEntity;
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PostEntity;
+import org.nextgate.nextgatebackend.e_social.posts_mng.enums.CollaboratorStatus;
 import org.nextgate.nextgatebackend.e_social.posts_mng.enums.PostType;
 import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.PollResultsResponse;
-import org.nextgate.nextgatebackend.e_social.posts_mng.repo.PollOptionRepository;
-import org.nextgate.nextgatebackend.e_social.posts_mng.repo.PollRepository;
-import org.nextgate.nextgatebackend.e_social.posts_mng.repo.PollVoteRepository;
-import org.nextgate.nextgatebackend.e_social.posts_mng.repo.PostRepository;
+import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.VoterInfo;
+import org.nextgate.nextgatebackend.e_social.posts_mng.repo.*;
 import org.nextgate.nextgatebackend.e_social.posts_mng.service.PollService;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -21,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -33,6 +33,7 @@ public class PollServiceImpl implements PollService {
     private final PollOptionRepository pollOptionRepository;
     private final PollVoteRepository pollVoteRepository;
     private final AccountRepo accountRepo;
+    private final PostCollaboratorRepository postCollaboratorRepository;
 
     @Override
     @Transactional
@@ -63,6 +64,8 @@ public class PollServiceImpl implements PollService {
             throw new IllegalArgumentException("This poll only allows voting for one option");
         }
 
+        int votesAdded = 0;
+
         for (UUID optionId : optionIds) {
             PollOptionEntity option = pollOptionRepository.findById(optionId)
                     .orElseThrow(() -> new IllegalArgumentException("Poll option not found: " + optionId));
@@ -83,9 +86,11 @@ public class PollServiceImpl implements PollService {
 
             option.setVotesCount(option.getVotesCount() + 1);
             pollOptionRepository.save(option);
+
+            votesAdded++;
         }
 
-        poll.setTotalVotes(poll.getTotalVotes() + 1);
+        poll.setTotalVotes(poll.getTotalVotes() + votesAdded);
         pollRepository.save(poll);
     }
 
@@ -104,6 +109,10 @@ public class PollServiceImpl implements PollService {
         PollEntity poll = pollRepository.findByPostId(postId)
                 .orElseThrow(() -> new IllegalArgumentException("Poll not found"));
 
+        if (!poll.isAllowVoteChange()) {
+            throw new IllegalArgumentException("Vote removal is not allowed for this poll");
+        }
+
         if (poll.getExpiresAt() != null && LocalDateTime.now().isAfter(poll.getExpiresAt())) {
             throw new IllegalArgumentException("Cannot remove vote from expired poll");
         }
@@ -114,6 +123,8 @@ public class PollServiceImpl implements PollService {
             throw new IllegalArgumentException("You have not voted on this poll");
         }
 
+        int votesRemoved = 0;
+
         for (PollVoteEntity vote : votes) {
             PollOptionEntity option = pollOptionRepository.findById(vote.getOptionId())
                     .orElseThrow(() -> new IllegalArgumentException("Poll option not found"));
@@ -122,9 +133,10 @@ public class PollServiceImpl implements PollService {
             pollOptionRepository.save(option);
 
             pollVoteRepository.delete(vote);
+            votesRemoved++;
         }
 
-        poll.setTotalVotes(Math.max(0, poll.getTotalVotes() - 1));
+        poll.setTotalVotes(Math.max(0, poll.getTotalVotes() - votesRemoved));
         pollRepository.save(poll);
     }
 
@@ -152,6 +164,7 @@ public class PollServiceImpl implements PollService {
         response.setTotalVotes(poll.getTotalVotes());
         response.setAllowMultipleVotes(poll.isAllowMultipleVotes());
         response.setAnonymous(poll.isAnonymous());
+        response.setAllowVoteChange(poll.isAllowVoteChange());
         response.setExpiresAt(poll.getExpiresAt());
         response.setHasExpired(poll.getExpiresAt() != null && LocalDateTime.now().isAfter(poll.getExpiresAt()));
 
@@ -211,16 +224,88 @@ public class PollServiceImpl implements PollService {
                 .collect(Collectors.toList());
     }
 
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<VoterInfo> getOptionVoters(UUID postId, UUID optionId) {
+        AccountEntity currentUser = getAuthenticatedAccount();
+
+        PostEntity post = postRepository.findByIdAndIsDeletedFalse(postId)
+                .orElseThrow(() -> new IllegalArgumentException("Post not found"));
+
+        if (post.getPostType() != PostType.POLL) {
+            throw new IllegalArgumentException("This post is not a poll");
+        }
+
+        // Check if current user is author
+        boolean isAuthor = post.getAuthorId().equals(currentUser.getId());
+
+        // Check if current user is an ACCEPTED collaborator
+        boolean isAcceptedCollaborator = postCollaboratorRepository
+                .existsByPostIdAndUserIdAndStatus(postId, currentUser.getId(), CollaboratorStatus.ACCEPTED);
+
+        if (!isAuthor && !isAcceptedCollaborator) {
+            throw new IllegalArgumentException("Only authors and accepted collaborators can view voter information");
+        }
+
+        PollEntity poll = pollRepository.findByPostId(postId)
+                .orElseThrow(() -> new IllegalArgumentException("Poll not found"));
+
+        // Check if poll is anonymous
+        if (poll.isAnonymous()) {
+            throw new IllegalArgumentException("This poll is anonymous. Voter information is not available.");
+        }
+
+        // Verify option belongs to this poll
+        PollOptionEntity option = pollOptionRepository.findById(optionId)
+                .orElseThrow(() -> new IllegalArgumentException("Poll option not found"));
+
+        if (!option.getPollId().equals(poll.getId())) {
+            throw new IllegalArgumentException("Option does not belong to this poll");
+        }
+
+        // Get all votes for this option
+        List<PollVoteEntity> votes = pollVoteRepository.findByOptionIdOrderByCreatedAtDesc(optionId);
+
+        // Map to VoterInfo
+        return votes.stream()
+                .map(vote -> {
+                    AccountEntity voter = accountRepo.findById(vote.getVoterId())
+                            .orElse(null);
+
+                    if (voter == null) {
+                        return null;
+                    }
+
+                    VoterInfo voterInfo = new VoterInfo();
+                    voterInfo.setVoterId(voter.getId());
+                    voterInfo.setUserName(voter.getUserName());
+                    voterInfo.setDisplayName(voter.getFirstName());
+
+                    // Safe handling of a profile picture
+                    if (voter.getProfilePictureUrls() != null && !voter.getProfilePictureUrls().isEmpty()) {
+                        voterInfo.setProfileImageUrl(voter.getProfilePictureUrls().getFirst());
+                    }
+
+                    voterInfo.setVotedAt(vote.getCreatedAt());
+
+                    return voterInfo;
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+    }
+
+
     private AccountEntity getAuthenticatedAccount() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
-            throw new IllegalStateException("User not authenticated");
+            throw new IllegalStateException("No authenticated user found");
         }
-        UUID userId = UUID.fromString(authentication.getName());
-        return accountRepo.findById(userId)
-                .orElseThrow(() -> new IllegalStateException("Authenticated user not found"));
-    }
 
+        String username = authentication.getName();
+        return accountRepo.findByUserName(username)
+                .orElseThrow(() -> new IllegalStateException("Authenticated user not found in database"));
+    }
     private AccountEntity getAuthenticatedAccountOrNull() {
         try {
             return getAuthenticatedAccount();

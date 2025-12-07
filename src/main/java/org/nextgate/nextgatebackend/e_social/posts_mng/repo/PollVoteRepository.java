@@ -22,4 +22,8 @@ public interface PollVoteRepository extends JpaRepository<PollVoteEntity, UUID> 
     void deleteByPollIdAndVoterId(UUID pollId, UUID voderId);
 
     boolean existsByOptionIdAndVoterId(UUID optionId, UUID voterId);
+
+    List<PollVoteEntity> findByOptionId(UUID optionId);
+
+    List<PollVoteEntity> findByOptionIdOrderByCreatedAtDesc(UUID optionId);
 }

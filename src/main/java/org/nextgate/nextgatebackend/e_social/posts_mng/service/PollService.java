@@ -2,6 +2,7 @@ package org.nextgate.nextgatebackend.e_social.posts_mng.service;
 
 
 import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.PollResultsResponse;
+import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.VoterInfo;
 
 import java.util.List;
 import java.util.UUID;
@@ -17,4 +18,6 @@ public interface PollService {
     boolean hasUserVoted(UUID postId, UUID userId);
 
     List<UUID> getUserVotedOptions(UUID postId, UUID userId);
+
+    List<VoterInfo> getOptionVoters(UUID postId, UUID optionId);
 }
