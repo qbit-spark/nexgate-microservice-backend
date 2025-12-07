@@ -7,6 +7,7 @@ import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PostCommentEntity;
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PostEntity;
 import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.*;
 import org.nextgate.nextgatebackend.e_social.posts_mng.service.CommentService;
+import org.nextgate.nextgatebackend.e_social.posts_mng.service.FeedService;
 import org.nextgate.nextgatebackend.e_social.posts_mng.service.PollService;
 import org.nextgate.nextgatebackend.e_social.posts_mng.service.PostService;
 import org.nextgate.nextgatebackend.e_social.posts_mng.utils.mapper.CommentResponseMapper;
@@ -36,6 +37,7 @@ public class PostController {
     private final PostInteractionService interactionService;
     private final CommentService commentService;
     private final CommentResponseMapper commentResponseMapper;
+    private final FeedService feedService;
 
     @PostMapping
     public ResponseEntity<GlobeSuccessResponseBuilder> createPost(
@@ -771,6 +773,59 @@ public class PostController {
         GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
                 "Comment unliked successfully",
                 null
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    // ============================================
+    // FEED/TIMELINE ENDPOINTS
+    // ============================================
+
+    @GetMapping("/users/{userId}/timeline")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getUserTimeline(
+            @PathVariable UUID userId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        Pageable pageable = PageRequest.of(page - 1, size);
+        Page<TimelineItemResponse> timelinePage = feedService.getUserTimeline(userId, pageable);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Timeline retrieved successfully",
+                timelinePage
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @GetMapping("/feed/following")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getFollowingFeed(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        Pageable pageable = PageRequest.of(page - 1, size);
+        Page<TimelineItemResponse> feedPage = feedService.getFollowingFeed(pageable);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Following feed retrieved successfully",
+                feedPage
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @GetMapping("/feed/explore")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getExploreFeed(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        Pageable pageable = PageRequest.of(page - 1, size);
+        Page<TimelineItemResponse> feedPage = feedService.getExploreFeed(pageable);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Explore feed retrieved successfully",
+                feedPage
         );
 
         return ResponseEntity.ok(successResponse);

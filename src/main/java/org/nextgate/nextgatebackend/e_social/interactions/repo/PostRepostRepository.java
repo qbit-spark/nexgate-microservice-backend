@@ -4,6 +4,7 @@ import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PostRepostEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -17,4 +18,8 @@ public interface PostRepostRepository extends JpaRepository<PostRepostEntity, UU
     long countByPostId(UUID postId);
 
     void deleteByPostId(UUID postId);
+
+    List<PostRepostEntity> findAllByUserId(UUID userId);
+
+    List<PostRepostEntity>findByUserIdIn(List<UUID> userIds);
 }
