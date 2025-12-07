@@ -624,6 +624,10 @@ public class PostServiceImpl implements PostService {
         PostEntity post = postRepository.findByIdAndIsDeletedFalse(postId)
                 .orElseThrow(() -> new IllegalArgumentException("Post not found"));
 
+        if (post.getStatus().equals(PostStatus.DRAFT)) {
+            throw new IllegalArgumentException("You can only accept collaboration on published posts");
+        }
+
         PostCollaboratorEntity collaboration = postCollaboratorRepository
                 .findByPostIdAndUserId(postId, collaborator.getId())
                 .orElseThrow(() -> new IllegalArgumentException("Collaboration invitation not found"));
@@ -646,6 +650,10 @@ public class PostServiceImpl implements PostService {
 
         PostEntity post = postRepository.findByIdAndIsDeletedFalse(postId)
                 .orElseThrow(() -> new IllegalArgumentException("Post not found"));
+
+        if (post.getStatus().equals(PostStatus.DRAFT)) {
+            throw new IllegalArgumentException("You can only accept collaboration on published posts");
+        }
 
         PostCollaboratorEntity collaboration = postCollaboratorRepository
                 .findByPostIdAndUserId(postId, collaborator.getId())
@@ -670,6 +678,10 @@ public class PostServiceImpl implements PostService {
         PostEntity post = postRepository.findByIdAndIsDeletedFalse(postId)
                 .orElseThrow(() -> new IllegalArgumentException("Post not found"));
 
+        if (post.getStatus() != PostStatus.PUBLISHED) {
+            throw new IllegalArgumentException("Collaborators removal can only work on PUBLISHED posts!");
+        }
+
         PostCollaboratorEntity collaboration = postCollaboratorRepository
                 .findByPostIdAndUserId(postId, collaboratorId)
                 .orElseThrow(() -> new IllegalArgumentException("Collaborator not found"));
@@ -690,7 +702,7 @@ public class PostServiceImpl implements PostService {
         long remainingCollaborators = postCollaboratorRepository
                 .findByPostIdAndStatus(postId, CollaboratorStatus.ACCEPTED)
                 .size();
-
+    
         if (remainingCollaborators == 0) {
             post.setCollaborative(false);
             postRepository.save(post);
