@@ -524,8 +524,8 @@ public class PostController {
     }
 
     // ============================================
-// INTERACTION ENDPOINTS
-// ============================================
+   // INTERACTION ENDPOINTS
+  // ============================================
 
     @PostMapping("/{postId}/like")
     public ResponseEntity<GlobeSuccessResponseBuilder> likePost(@PathVariable UUID postId) {
