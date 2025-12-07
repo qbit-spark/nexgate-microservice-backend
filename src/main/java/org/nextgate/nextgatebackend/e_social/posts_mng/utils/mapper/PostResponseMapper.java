@@ -14,6 +14,7 @@ import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.repo.EventsRepo;
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PollEntity;
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PollOptionEntity;
+import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PollVoteEntity;
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PostEntity;
 import org.nextgate.nextgatebackend.e_social.posts_mng.enums.CollaboratorStatus;
 import org.nextgate.nextgatebackend.e_social.posts_mng.enums.ContentEntityType;
@@ -230,7 +231,7 @@ public class PostResponseMapper {
             List<UUID> userVotedOptions = currentUserId != null
                     ? pollVoteRepository.findByPollIdAndVoterId(poll.getId(), currentUserId)
                     .stream()
-                    .map(vote -> vote.getOptionId())
+                    .map(PollVoteEntity::getOptionId)
                     .collect(Collectors.toList())
                     : new ArrayList<>();
             pollResponse.setUserVotedOptions(userVotedOptions);
