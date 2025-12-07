@@ -207,7 +207,7 @@ public class PostController {
 
         PostEntity draft = postService.attachEventToDraft(eventId);
 
-        //PostResponse response = postResponseMapper.toPostResponse(draft);
+       // PostResponse response = postResponseMapper.toPostResponse(draft);
 
         GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
                 "Event attached to draft successfully",

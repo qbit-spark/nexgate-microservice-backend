@@ -9,7 +9,6 @@ import org.nextgate.nextgatebackend.e_commerce.checkout_session.enums.CheckoutSe
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.enums.CheckoutSessionType;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.utils.*;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.utils.PaymentAttemptsJsonConverter;
-import org.nextgate.nextgatebackend.financial_system.payment_processing.utils.PaymentIntentJsonConverter;
 import org.nextgate.nextgatebackend.financial_system.payment_processing.utils.PricingDetailsJsonConverter;
 import org.nextgate.nextgatebackend.globe_enums.CheckoutSessionsDomains;
 import org.nextgate.nextgatebackend.payment_methods.utils.BillingAddressJsonConverter;
@@ -165,7 +164,7 @@ public class ProductCheckoutSessionEntity implements PayableCheckoutSession {
      * Stored as JSONB
      */
     @Column(name = "payment_intent", columnDefinition = "jsonb")
-    @Convert(converter = PaymentIntentJsonConverter.class)
+    @Convert(converter = ProductPaymentIntentJsonConverter.class)
     private PaymentIntent paymentIntent;
 
     // ========================================

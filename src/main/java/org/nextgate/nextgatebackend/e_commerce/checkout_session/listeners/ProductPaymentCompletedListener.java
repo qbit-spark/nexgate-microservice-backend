@@ -1,6 +1,5 @@
 package org.nextgate.nextgatebackend.e_commerce.checkout_session.listeners;
 
-
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.nextgate.nextgatebackend.e_commerce.checkout_session.entity.ProductCheckoutSessionEntity;
@@ -32,107 +31,102 @@ public class ProductPaymentCompletedListener {
     @Transactional
     public void onPaymentCompleted(PaymentCompletedEvent event) {
 
-        // Filter: Only handle PRODUCT domain
+        // ========================================
+        // 1. FILTER: ONLY HANDLE PRODUCT DOMAIN
+        // ========================================
         if (!event.isProductDomain()) {
             return;
         }
 
-        if (event.getEscrow() == null) {
-            log.info("🆓 FREE product order detected - proceeding with order creation");
-        }
-
-        log.info("╔════════════════════════════════════════════════════════════╗");
-        log.info("║   PRODUCT PAYMENT COMPLETED - ORDER CREATION               ║");
-        log.info("╚════════════════════════════════════════════════════════════╝");
-        log.info("Session: {} | Escrow: {}",
-                event.getCheckoutSessionId(), event.getEscrow().getEscrowNumber());
+        log.info("╔════════════════════════════════════════════════════════╗");
+        log.info("║   PRODUCT PAYMENT COMPLETED LISTENER                  ║");
+        log.info("╚════════════════════════════════════════════════════════╝");
+        log.info("Session: {}", event.getCheckoutSessionId());
 
         try {
+            // ========================================
+            // 2. VALIDATE SESSION TYPE
+            // ========================================
             if (!(event.getSession() instanceof ProductCheckoutSessionEntity productSession)) {
                 log.error("Invalid session type for ProductPaymentCompletedListener");
                 return;
             }
 
-            // Skip installment - handled in callback
-            if (productSession.getSessionType() == CheckoutSessionType.INSTALLMENT) {
-                log.info("INSTALLMENT - order handled by InstallmentService");
-                return;
-            }
+            log.info("Session Type: {}", productSession.getSessionType());
+            log.info("Session Status: {}", productSession.getStatus());
 
-            // Check if order already exists
-            if (productSession.getOrderId() != null) {
-                log.warn("Order already exists: {}", productSession.getOrderId());
-                return;
-            }
+            // ========================================
+            // 3. HANDLE BY SESSION TYPE
+            // ========================================
+            switch (productSession.getSessionType()) {
 
-            // Determine if order should be created now
-            boolean shouldCreateOrder = shouldCreateOrderNow(productSession);
-
-            if (!shouldCreateOrder) {
-                log.info("Order creation deferred for: {}", productSession.getSessionType());
-
-                // Check group completion
-                if (productSession.getSessionType() == CheckoutSessionType.GROUP_PURCHASE) {
-                    handleGroupPurchaseCompletion(productSession);
+                case INSTALLMENT -> {
+                    log.info("INSTALLMENT - order handled by InstallmentService");
+                    // Do nothing - InstallmentService creates order after agreement
                 }
 
-                return;
-            }
+                case GROUP_PURCHASE -> {
+                    log.info("GROUP_PURCHASE - completion already checked in service");
 
-            log.info("Creating order...");
+                    // ✅ NO LONGER CALL checkAndPublishGroupCompletion HERE
+                    // Group completion is now handled within the same transaction
+                    // in GroupPurchaseServiceImpl.createGroupInstance() / joinGroup()
 
-            // Create order with retry
-            boolean orderCreated = createOrderWithRetry(
-                    productSession.getSessionId(),
-                    productSession.getSessionType().name(),
-                    3
-            );
-
-            if (orderCreated) {
-                log.info("✓ Order created successfully");
-
-                ProductCheckoutSessionEntity updatedSession = productCheckoutSessionRepo
-                        .findById(productSession.getSessionId())
-                        .orElse(null);
-
-                if (updatedSession != null && updatedSession.getStatus() == CheckoutSessionStatus.PAYMENT_COMPLETED) {
-                    updatedSession.setStatus(CheckoutSessionStatus.COMPLETED);
-                    productCheckoutSessionRepo.save(updatedSession);
-                    log.info("✓ Session status updated to COMPLETED");
+                    log.info("Group purchase payment completed successfully");
+                    log.info("  Group completion was checked in GroupPurchaseService");
+                    log.info("  No further action needed here");
                 }
 
-            } else {
-                log.error("✗ Failed to create order after retries");
+                case REGULAR_DIRECTLY, REGULAR_CART -> {
+                    log.info("Regular purchase - creating order immediately");
+
+                    // Check if order already exists
+                    if (productSession.getOrderId() != null) {
+                        log.warn("Order already exists: {}", productSession.getOrderId());
+                        return;
+                    }
+
+                    // Create order with retry
+                    boolean orderCreated = createOrderWithRetry(
+                            productSession.getSessionId(),
+                            productSession.getSessionType().name(),
+                            3
+                    );
+
+                    if (orderCreated) {
+                        log.info("✓ Order created successfully");
+
+                        // Update session status to COMPLETED
+                        ProductCheckoutSessionEntity updatedSession = productCheckoutSessionRepo
+                                .findById(productSession.getSessionId())
+                                .orElse(null);
+
+                        if (updatedSession != null &&
+                                updatedSession.getStatus() == CheckoutSessionStatus.PAYMENT_COMPLETED) {
+                            updatedSession.setStatus(CheckoutSessionStatus.COMPLETED);
+                            productCheckoutSessionRepo.save(updatedSession);
+                            log.info("✓ Session status updated to COMPLETED");
+                        }
+                    } else {
+                        log.error("✗ Failed to create order after retries");
+                    }
+                }
             }
 
-            log.info("✓ Product payment handling complete");
+            log.info("✓ Payment handling complete");
+            log.info("╚════════════════════════════════════════════════════════╝");
 
         } catch (Exception e) {
-            log.error("Error in product payment listener", e);
+            log.error("╔════════════════════════════════════════════════════════╗");
+            log.error("║   ERROR IN PAYMENT LISTENER                           ║");
+            log.error("╚════════════════════════════════════════════════════════╝");
+            log.error("Session: {}", event.getCheckoutSessionId(), e);
         }
     }
 
-    private boolean shouldCreateOrderNow(ProductCheckoutSessionEntity session) {
-        return switch (session.getSessionType()) {
-            case REGULAR_DIRECTLY, REGULAR_CART -> true;
-            case GROUP_PURCHASE, INSTALLMENT -> false;
-        };
-    }
-
-    private void handleGroupPurchaseCompletion(ProductCheckoutSessionEntity session) {
-        UUID groupInstanceId = session.getGroupIdToBeJoined();
-
-        if (groupInstanceId != null) {
-            log.info("Checking group completion: {}", groupInstanceId);
-
-            try {
-                groupPurchaseService.checkAndPublishGroupCompletion(groupInstanceId);
-            } catch (Exception e) {
-                log.error("Error checking group completion", e);
-            }
-        }
-    }
-
+    /**
+     * Create order with retry logic
+     */
     private boolean createOrderWithRetry(UUID sessionId, String sessionType, int maxAttempts) {
 
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -143,7 +137,6 @@ public class ProductPaymentCompletedListener {
                 UUID orderId = orderIds.getFirst();
 
                 log.info("✓ Order created: {}", orderId);
-
                 return true;
 
             } catch (Exception e) {
