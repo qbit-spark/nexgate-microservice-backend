@@ -579,7 +579,6 @@ public class PostServiceImpl implements PostService {
 
         PostEntity post = getMyCurrentDraft();
 
-        // Remove existing collaborators
         postCollaboratorRepository.deleteByPostId(post.getId());
 
         // ✅ ADD THIS - Force flush to a database before inserting new ones
