@@ -59,7 +59,7 @@ public interface PostService {
 
     PostEntity addMediaToDraft(UUID postId, List<MediaRequest> media);
 
-    PostEntity updateDraftPrivacySettings(UUID postId, PrivacySettingsRequest settings);
+    PostEntity updateDraftPrivacySettings(PrivacySettingsRequest settings);
 
     // Delete post
     void deletePost(UUID postId);

@@ -22,7 +22,6 @@ import org.nextgate.nextgatebackend.e_social.posts_mng.service.PostService;
 import org.nextgate.nextgatebackend.e_social.posts_mng.utils.ContentParsingUtil;
 import org.nextgate.nextgatebackend.e_social.posts_mng.utils.LinkProcessingUtil;
 import org.nextgate.nextgatebackend.e_social.posts_mng.utils.PostValidationUtil;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
@@ -35,7 +34,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -555,7 +553,7 @@ public class PostServiceImpl implements PostService {
 
     @Override
     @Transactional
-    public PostEntity updateDraftPrivacySettings(UUID postId, PrivacySettingsRequest settings) {
+    public PostEntity updateDraftPrivacySettings(PrivacySettingsRequest settings) {
         AccountEntity author = getAuthenticatedAccount();
 
         PostEntity post = postRepository.findByIdAndIsDeletedFalse(postId)

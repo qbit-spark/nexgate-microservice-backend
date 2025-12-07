@@ -382,7 +382,7 @@ public class PostController {
     public ResponseEntity<GlobeSuccessResponseBuilder> updateDraftPrivacySettings(
             @Valid @RequestBody PrivacySettingsRequest settings) {
 
-        PostEntity draft = postService.updateDraftPrivacySettings(postId, settings);
+        PostEntity draft = postService.updateDraftPrivacySettings(settings);
 
         PostResponse response = postResponseMapper.toPostResponse(draft);
 
