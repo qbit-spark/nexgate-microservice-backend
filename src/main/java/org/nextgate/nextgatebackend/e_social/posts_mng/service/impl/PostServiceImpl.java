@@ -556,12 +556,8 @@ public class PostServiceImpl implements PostService {
     public PostEntity updateDraftPrivacySettings(PrivacySettingsRequest settings) {
         AccountEntity author = getAuthenticatedAccount();
 
-        PostEntity post = postRepository.findByIdAndIsDeletedFalse(postId)
-                .orElseThrow(() -> new IllegalArgumentException("Post not found"));
+        PostEntity post = getMyCurrentDraft();
 
-        if (!post.getAuthorId().equals(author.getId())) {
-            throw new IllegalArgumentException("You can only update your own posts");
-        }
 
         if (post.getStatus() != PostStatus.DRAFT) {
             throw new IllegalArgumentException("Only draft posts can be updated");
