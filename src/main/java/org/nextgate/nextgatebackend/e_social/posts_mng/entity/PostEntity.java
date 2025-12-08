@@ -94,7 +94,8 @@ public class PostEntity {
     @Column(nullable = false)
     private long viewsCount = 0;
 
-    @Column(nullable = false)
+    //Todo:True for now only
+    @Column(nullable = true)
     private long quotesCount = 0;
 
 
