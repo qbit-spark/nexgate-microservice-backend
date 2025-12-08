@@ -14,6 +14,7 @@ public interface PostService {
     // Create and manage posts
     PostEntity createPost(CreatePostRequest request);
 
+    PostEntity createQuotePost(UUID quotedPostId, CreateQuotePostRequest request);
     PostEntity publishPost();
 
     // Attach to draft (discovery flow)

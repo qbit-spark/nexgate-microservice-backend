@@ -115,6 +115,56 @@ public class PostServiceImpl implements PostService {
 
     @Override
     @Transactional
+    public PostEntity createQuotePost(UUID quotedPostId, CreateQuotePostRequest request) {
+        AccountEntity author = getAuthenticatedAccount();
+
+        // Validate quoted post exists and is published
+        PostEntity quotedPost = postRepository.findByIdAndIsDeletedFalse(quotedPostId)
+                .orElseThrow(() -> new IllegalArgumentException("Quoted post not found"));
+
+        if (quotedPost.getStatus() != PostStatus.PUBLISHED) {
+            throw new IllegalArgumentException("Can only quote published posts");
+        }
+
+        // Create the quote post (always REGULAR type)
+        PostEntity post = new PostEntity();
+        post.setAuthorId(author.getId());
+        post.setContent(request.getContent());
+        post.setPostType(PostType.REGULAR); // Quote posts are always REGULAR
+        post.setQuotedPostId(quotedPostId); // Set the quoted post ID
+
+        // Set privacy settings
+        if (request.getPrivacySettings() != null) {
+            post.setVisibility(request.getPrivacySettings().getVisibility());
+            post.setWhoCanComment(request.getPrivacySettings().getWhoCanComment());
+            post.setWhoCanRepost(request.getPrivacySettings().getWhoCanRepost());
+            post.setHideLikesCount(request.getPrivacySettings().getHideLikesCount());
+            post.setHideCommentsCount(request.getPrivacySettings().getHideCommentsCount());
+        }
+
+        post.setStatus(PostStatus.PUBLISHED);
+
+        // Set media if provided
+        if (request.getMedia() != null && !request.getMedia().isEmpty()) {
+            setMediaDataForQuotePost(post, request);
+        }
+
+        PostEntity savedPost = postRepository.save(post);
+
+        if (request.getContent() != null && !request.getContent().trim().isEmpty()) {
+            parseAndSaveContent(savedPost, request.getContent());
+        }
+
+        if (request.getAttachments() != null) {
+            saveAttachmentsForQuotePost(savedPost, request);
+        }
+
+        return savedPost;
+    }
+
+
+    @Override
+    @Transactional
     public PostEntity publishPost() {
 
         PostEntity post = getMyCurrentDraft();
@@ -561,6 +611,17 @@ public class PostServiceImpl implements PostService {
             throw new IllegalArgumentException("You can only delete your own posts");
         }
 
+        // If this post quoted another post, decrement the quoted post's count
+        if (post.getQuotedPostId() != null) {
+            PostEntity quotedPost = postRepository.findByIdAndIsDeletedFalse(post.getQuotedPostId())
+                    .orElse(null);
+            if (quotedPost != null && quotedPost.getStatus() == PostStatus.PUBLISHED) {
+                quotedPost.setQuotesCount(Math.max(0, quotedPost.getQuotesCount() - 1));
+                postRepository.save(quotedPost);
+            }
+        }
+
+
         post.setDeleted(true);
         post.setDeletedAt(LocalDateTime.now());
 
@@ -822,7 +883,58 @@ public class PostServiceImpl implements PostService {
         }
     }
 
+    private void setMediaDataForQuotePost(PostEntity post, CreateQuotePostRequest request) {
+        try {
+            List<MediaData> mediaDataList = new ArrayList<>();
+            for (int i = 0; i < request.getMedia().size(); i++) {
+                var mediaRequest = request.getMedia().get(i);
+                MediaData mediaData = new MediaData();
+                mediaData.setId(UUID.randomUUID().toString());
+                mediaData.setMediaType(mediaRequest.getMediaType());
+                mediaData.setOriginalUrl(mediaRequest.getMediaUrl());
+                mediaData.setPlaceholderBase64(mediaRequest.getPlaceholderBase64());
+                mediaData.setWidth(mediaRequest.getWidth());
+                mediaData.setHeight(mediaRequest.getHeight());
+                mediaData.setDuration(mediaRequest.getDuration());
+                mediaData.setOrder(i + 1);
+                mediaData.setImageTags(new ArrayList<>());
+                mediaDataList.add(mediaData);
+            }
+            post.setMediaData(objectMapper.writeValueAsString(mediaDataList));
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to serialize media data", e);
+        }
+    }
+
     private void saveAttachments(PostEntity post, CreatePostRequest request) {
+        var attachments = request.getAttachments();
+
+        if (attachments.getProductIds() != null) {
+            saveProductAttachments(post, attachments.getProductIds());
+        }
+
+        if (attachments.getShopIds() != null) {
+            saveShopAttachments(post, attachments.getShopIds());
+        }
+
+        if (attachments.getBuyTogetherGroupIds() != null) {
+            saveBuyTogetherGroupAttachments(post, attachments.getBuyTogetherGroupIds());
+        }
+
+        if (attachments.getInstallmentPlanIds() != null) {
+            saveInstallmentPlanAttachments(post, attachments.getInstallmentPlanIds());
+        }
+
+        if (attachments.getEventIds() != null) {
+            saveEventAttachments(post, attachments.getEventIds());
+        }
+
+        if (attachments.getExternalLink() != null) {
+            saveExternalLink(post, attachments.getExternalLink().getUrl());
+        }
+    }
+
+    private void saveAttachmentsForQuotePost(PostEntity post, CreateQuotePostRequest request) {
         var attachments = request.getAttachments();
 
         if (attachments.getProductIds() != null) {

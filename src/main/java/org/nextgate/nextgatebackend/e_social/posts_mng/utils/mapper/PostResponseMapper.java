@@ -20,10 +20,7 @@ import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PollEntity;
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PollOptionEntity;
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PollVoteEntity;
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PostEntity;
-import org.nextgate.nextgatebackend.e_social.posts_mng.enums.CollaboratorStatus;
-import org.nextgate.nextgatebackend.e_social.posts_mng.enums.ContentEntityType;
-import org.nextgate.nextgatebackend.e_social.posts_mng.enums.LinkStatus;
-import org.nextgate.nextgatebackend.e_social.posts_mng.enums.PostType;
+import org.nextgate.nextgatebackend.e_social.posts_mng.enums.*;
 import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.MediaData;
 import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.PostResponse;
 import org.nextgate.nextgatebackend.e_social.posts_mng.repo.*;
@@ -33,8 +30,10 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -72,6 +71,8 @@ public class PostResponseMapper {
     private final PostRepostRepository postRepostRepository;
     private final PostViewRepository postViewRepository;
     private final PostCommentRepository commentRepository;
+    private final PostRepository postRepository;
+
     public PostResponse toPostResponse(PostEntity post) {
         // Handle null post
         if (post == null) {
@@ -80,6 +81,7 @@ public class PostResponseMapper {
 
         PostResponse response = new PostResponse();
         response.setId(post.getId());
+        response.setQuotedPost(mapQuotedPost(post));
         response.setAuthor(mapAuthor(post));
         response.setContent(post.getContent());
         response.setContentParsed(mapContentParsed(post));
@@ -266,6 +268,56 @@ public class PostResponseMapper {
 
             pollResponse.setOptions(pollOptions);
 
+            return pollResponse;
+        }).orElse(null);
+    }
+
+    private PostResponse.Poll mapQuotedPoll(PostEntity post) {
+        if (post.getPostType() != PostType.POLL) {
+            return null;
+        }
+
+        return pollRepository.findByPostId(post.getId()).map(poll -> {
+            PostResponse.Poll pollResponse = new PostResponse.Poll();
+            pollResponse.setId(poll.getId());
+            pollResponse.setTitle(poll.getTitle());
+            pollResponse.setDescription(poll.getDescription());
+            pollResponse.setTotalVotes(poll.getTotalVotes());
+            pollResponse.setAllowMultipleVotes(poll.isAllowMultipleVotes());
+            pollResponse.setAnonymous(poll.isAnonymous());
+            pollResponse.setExpiresAt(poll.getExpiresAt());
+            pollResponse.setHasExpired(poll.getExpiresAt() != null &&
+                    LocalDateTime.now().isAfter(poll.getExpiresAt()));
+
+            // IMPORTANT: In quoted polls → NEVER reveal current user's votes
+            pollResponse.setUserHasVoted(false);
+            pollResponse.setUserVotedOptions(Collections.emptyList());
+
+            List<PollOptionEntity> options = pollOptionRepository
+                    .findByPollIdOrderByOptionOrder(poll.getId());
+
+            List<PostResponse.PollOption> pollOptions = options.stream()
+                    .map(option -> {
+                        PostResponse.PollOption opt = new PostResponse.PollOption();
+                        opt.setId(option.getId());
+                        opt.setOptionText(option.getOptionText());
+                        opt.setOptionImageUrl(option.getOptionImageUrl());
+                        opt.setOptionOrder(option.getOptionOrder());
+                        opt.setVotesCount(option.getVotesCount());
+
+                        double percentage = poll.getTotalVotes() > 0
+                                ? (option.getVotesCount() * 100.0) / poll.getTotalVotes()
+                                : 0.0;
+                        opt.setPercentage(Math.round(percentage * 10.0) / 10.0);
+
+                        // Never highlight user's vote in quoted poll
+                        opt.setHasVoted(false);
+
+                        return opt;
+                    })
+                    .collect(Collectors.toList());
+
+            pollResponse.setOptions(pollOptions);
             return pollResponse;
         }).orElse(null);
     }
@@ -526,6 +578,7 @@ public class PostResponseMapper {
         PostResponse.Engagement engagement = new PostResponse.Engagement();
         engagement.setLikesCount(post.getLikesCount());
         engagement.setCommentsCount(post.getCommentsCount());
+        engagement.setQuotesCount(post.getQuotesCount());
         engagement.setRepostsCount(post.getRepostsCount());
         engagement.setQuotesCount(0);
         engagement.setBookmarksCount(post.getBookmarksCount());
@@ -537,6 +590,75 @@ public class PostResponseMapper {
         engagement.setCanShare(true);
         return engagement;
     }
+
+    private PostResponse.QuotedPost mapQuotedPost(PostEntity post) {
+        // 1. No quote at all → genuinely nothing to show
+        if (post.getQuotedPostId() == null) {
+            return null;
+        }
+
+        UUID quotedPostId = post.getQuotedPostId();
+
+        // 2. Try to fetch the quoted post (respecting soft-delete)
+        PostEntity quotedPost = postRepository.findByIdAndIsDeletedFalse(quotedPostId)
+                .orElse(null);
+
+        //Todo: Here we will fetch curret or null user if needed for privacy checks
+   //AccountEntity currentUser = getAuthenticatedAccountOrNull();
+
+        // 3. PRIVACY + VISIBILITY CHECKS
+        // TODO: extend this block for more privacy rules (suspended account, muted, etc.)
+        if (quotedPost != null) {
+            if (quotedPost.getStatus() != PostStatus.PUBLISHED) {
+                quotedPost = null;
+            }
+
+            // — Current user is blocked by quoted post author → hide entirely
+//            else if (currentUser != null && blockRepository.existsByBlockerIdAndBlockedId(
+//                    quotedPost.getAuthorId(), currentUser.getId())) {
+//                quotedPost = null;
+//
+//            — Quoted post is from private account + current user doesn't follow → hide
+//            else if (quotedPost.getAuthor().isPrivate() && currentUser != null &&
+//                    !followRepository.existsByFollowerIdAndFollowingId(currentUser.getId(), quotedPost.getAuthorId())) {
+//                quotedPost = null;
+//            }
+            // — Current user blocked the author? Still show (personal choice), or hide if you prefer
+            // else if (currentUser != null && blockRepository.existsByBlockerIdAndBlockedId(currentUser.getId(), quotedPost.getAuthorId())) { quotedPost = null; }
+        }
+
+        // 4. If quoted post is unavailable for ANY reason → tombstone
+        if (quotedPost == null) {
+            return PostResponse.QuotedPost.builder()
+                    .id(quotedPostId)
+                    .content("This post is no longer available.")
+                    .author(null)
+                    .postType(null)
+                    .status(PostStatus.DELETED)
+                    .unavailable(true)
+                    .build();
+        }
+
+        // 5. Fully visible & published → return rich quoted post
+        PostResponse.QuotedPost response = new PostResponse.QuotedPost();
+        response.setId(quotedPost.getId());
+        response.setAuthor(mapAuthor(quotedPost));
+        response.setContent(quotedPost.getContent());
+        response.setContentParsed(mapContentParsed(quotedPost));
+        response.setPostType(quotedPost.getPostType());
+        response.setStatus(quotedPost.getStatus());
+        response.setMedia(mapMedia(quotedPost));
+        response.setCreatedAt(Instant.from(quotedPost.getCreatedAt()));
+        response.setPublishedAt(Instant.from(quotedPost.getPublishedAt()));
+        response.setEngagement(mapEngagement(quotedPost));
+
+        if (quotedPost.getPostType() == PostType.POLL) {
+            response.setPoll(mapQuotedPoll(quotedPost));
+        }
+
+        return response;
+    }
+
 
     private PostResponse.UserInteraction mapUserInteraction(PostEntity post, UUID currentUserId) {
         PostResponse.UserInteraction interaction = new PostResponse.UserInteraction();

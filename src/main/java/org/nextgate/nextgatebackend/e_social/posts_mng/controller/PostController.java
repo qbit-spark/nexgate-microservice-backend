@@ -830,4 +830,20 @@ public class PostController {
 
         return ResponseEntity.ok(successResponse);
     }
+
+    @PostMapping("/quote/{quotedPostId}")
+    public ResponseEntity<GlobeSuccessResponseBuilder> createQuotePost(
+            @PathVariable UUID quotedPostId,
+            @Valid @RequestBody CreateQuotePostRequest request) {
+
+        PostEntity post = postService.createQuotePost(quotedPostId, request);
+        PostResponse response = postResponseMapper.toPostResponse(post);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Quote post created successfully",
+                response
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
 }
