@@ -401,6 +401,7 @@ public class CheckoutSessionHelper {
     public void holdInventory(UUID productId, Integer quantity, LocalDateTime expiresAt) {
         // Todo: Implement inventory hold logic
         // This should decrement available stock temporarily
+        log.warn("---- Inventory hold not implemented yet ---");
     }
 
     public void releaseInventory(UUID productId, Integer quantity) {

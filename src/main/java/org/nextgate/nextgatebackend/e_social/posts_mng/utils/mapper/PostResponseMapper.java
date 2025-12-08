@@ -12,10 +12,15 @@ import org.nextgate.nextgatebackend.e_commerce.products_mng_service.products.rep
 import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng.enums.ShopStatus;
 import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng.repo.ShopRepo;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.repo.EventsRepo;
+import org.nextgate.nextgatebackend.e_social.interactions.repo.PostBookmarkRepository;
+import org.nextgate.nextgatebackend.e_social.interactions.repo.PostLikeRepository;
+import org.nextgate.nextgatebackend.e_social.interactions.repo.PostRepostRepository;
+import org.nextgate.nextgatebackend.e_social.interactions.repo.PostViewRepository;
+import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PollEntity;
+import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PollOptionEntity;
+import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PollVoteEntity;
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PostEntity;
-import org.nextgate.nextgatebackend.e_social.posts_mng.enums.CollaboratorStatus;
-import org.nextgate.nextgatebackend.e_social.posts_mng.enums.ContentEntityType;
-import org.nextgate.nextgatebackend.e_social.posts_mng.enums.LinkStatus;
+import org.nextgate.nextgatebackend.e_social.posts_mng.enums.*;
 import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.MediaData;
 import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.PostResponse;
 import org.nextgate.nextgatebackend.e_social.posts_mng.repo.*;
@@ -25,9 +30,13 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -48,15 +57,31 @@ public class PostResponseMapper {
     private final PostBuyTogetherGroupRepository postBuyTogetherGroupRepository;
     private final PostInstallmentPlanRepository postInstallmentPlanRepository;
 
+    private final PollRepository pollRepository;
+    private final PollOptionRepository pollOptionRepository;
+    private final PollVoteRepository pollVoteRepository;
+
     private final ProductRepo productRepo;
     private final ShopRepo shopRepo;
     private final EventsRepo eventsRepo;
     private final GroupPurchaseInstanceRepo groupPurchaseInstanceRepo;
     private final InstallmentPlanRepo installmentPlanRepo;
+    private final PostLikeRepository postLikeRepository;
+    private final PostBookmarkRepository postBookmarkRepository;
+    private final PostRepostRepository postRepostRepository;
+    private final PostViewRepository postViewRepository;
+    private final PostCommentRepository commentRepository;
+    private final PostRepository postRepository;
 
     public PostResponse toPostResponse(PostEntity post) {
+        // Handle null post
+        if (post == null) {
+            return null;
+        }
+
         PostResponse response = new PostResponse();
         response.setId(post.getId());
+        response.setQuotedPost(mapQuotedPost(post));
         response.setAuthor(mapAuthor(post));
         response.setContent(post.getContent());
         response.setContentParsed(mapContentParsed(post));
@@ -68,7 +93,10 @@ public class PostResponseMapper {
         response.setCollaboration(mapCollaboration(post));
         response.setPrivacySettings(mapPrivacySettings(post));
         response.setEngagement(mapEngagement(post));
-        response.setUserInteraction(mapUserInteraction(post, getAuthenticatedAccount().getId()));
+
+        AccountEntity currentUser = getAuthenticatedAccountOrNull();
+        response.setUserInteraction(mapUserInteraction(post, currentUser != null ? currentUser.getId() : null));
+
         response.setCreatedAt(post.getCreatedAt());
         response.setPublishedAt(post.getPublishedAt());
         response.setScheduledAt(post.getScheduledAt());
@@ -83,7 +111,9 @@ public class PostResponseMapper {
             author.setUserName(account.getUserName());
             author.setFirstName(account.getFirstName());
             author.setLastName(account.getLastName());
-            author.setProfilePictureUrl(account.getProfilePictureUrls().getFirst());
+            author.setProfilePictureUrl(account.getProfilePictureUrls() != null && !account.getProfilePictureUrls().isEmpty()
+                    ? account.getProfilePictureUrls().getFirst()
+                    : null);
             author.setVerified(account.getIsVerified());
         });
 
@@ -108,7 +138,9 @@ public class PostResponseMapper {
                 mentionedUser.setUserName(user.getUserName());
                 mentionedUser.setFirstName(user.getFirstName());
                 mentionedUser.setLastName(user.getLastName());
-                mentionedUser.setProfilePictureUrl(user.getProfilePictureUrls().getFirst());
+                mentionedUser.setProfilePictureUrl(user.getProfilePictureUrls() != null && !user.getProfilePictureUrls().isEmpty()
+                        ? user.getProfilePictureUrls().getFirst()
+                        : null);
                 entity.setUser(mentionedUser);
 
                 entities.add(entity);
@@ -183,8 +215,111 @@ public class PostResponseMapper {
     }
 
     private PostResponse.Poll mapPoll(PostEntity post) {
-        // TODO: Implement poll mapping when poll entities are created
-        return null;
+        if (post.getPostType() != PostType.POLL) {
+            return null;
+        }
+
+        return pollRepository.findByPostId(post.getId()).map(poll -> {
+            PostResponse.Poll pollResponse = new PostResponse.Poll();
+            pollResponse.setId(poll.getId());
+            pollResponse.setTitle(poll.getTitle());
+            pollResponse.setDescription(poll.getDescription());
+            pollResponse.setTotalVotes(poll.getTotalVotes());
+            pollResponse.setAllowMultipleVotes(poll.isAllowMultipleVotes());
+            pollResponse.setAnonymous(poll.isAnonymous());
+            pollResponse.setExpiresAt(poll.getExpiresAt());
+            pollResponse.setHasExpired(poll.getExpiresAt() != null && LocalDateTime.now().isAfter(poll.getExpiresAt()));
+
+            List<PollOptionEntity> options = pollOptionRepository.findByPollIdOrderByOptionOrder(poll.getId());
+
+            AccountEntity currentUser = getAuthenticatedAccountOrNull();
+            UUID currentUserId = currentUser != null ? currentUser.getId() : null;
+
+            boolean userHasVoted = currentUserId != null && pollVoteRepository.existsByPollIdAndVoterId(poll.getId(), currentUserId);
+            pollResponse.setUserHasVoted(userHasVoted);
+
+            List<UUID> userVotedOptions = currentUserId != null
+                    ? pollVoteRepository.findByPollIdAndVoterId(poll.getId(), currentUserId)
+                    .stream()
+                    .map(PollVoteEntity::getOptionId)
+                    .collect(Collectors.toList())
+                    : new ArrayList<>();
+            pollResponse.setUserVotedOptions(userVotedOptions);
+
+            List<PostResponse.PollOption> pollOptions = options.stream()
+                    .map(option -> {
+                        PostResponse.PollOption pollOption = new PostResponse.PollOption();
+                        pollOption.setId(option.getId());
+                        pollOption.setOptionText(option.getOptionText());
+                        pollOption.setOptionImageUrl(option.getOptionImageUrl());
+                        pollOption.setOptionOrder(option.getOptionOrder());
+                        pollOption.setVotesCount(option.getVotesCount());
+
+                        double percentage = poll.getTotalVotes() > 0
+                                ? (option.getVotesCount() * 100.0) / poll.getTotalVotes()
+                                : 0.0;
+                        pollOption.setPercentage(Math.round(percentage * 10.0) / 10.0);
+
+                        pollOption.setHasVoted(userVotedOptions.contains(option.getId()));
+
+                        return pollOption;
+                    })
+                    .collect(Collectors.toList());
+
+            pollResponse.setOptions(pollOptions);
+
+            return pollResponse;
+        }).orElse(null);
+    }
+
+    private PostResponse.Poll mapQuotedPoll(PostEntity post) {
+        if (post.getPostType() != PostType.POLL) {
+            return null;
+        }
+
+        return pollRepository.findByPostId(post.getId()).map(poll -> {
+            PostResponse.Poll pollResponse = new PostResponse.Poll();
+            pollResponse.setId(poll.getId());
+            pollResponse.setTitle(poll.getTitle());
+            pollResponse.setDescription(poll.getDescription());
+            pollResponse.setTotalVotes(poll.getTotalVotes());
+            pollResponse.setAllowMultipleVotes(poll.isAllowMultipleVotes());
+            pollResponse.setAnonymous(poll.isAnonymous());
+            pollResponse.setExpiresAt(poll.getExpiresAt());
+            pollResponse.setHasExpired(poll.getExpiresAt() != null &&
+                    LocalDateTime.now().isAfter(poll.getExpiresAt()));
+
+            // IMPORTANT: In quoted polls → NEVER reveal current user's votes
+            pollResponse.setUserHasVoted(false);
+            pollResponse.setUserVotedOptions(Collections.emptyList());
+
+            List<PollOptionEntity> options = pollOptionRepository
+                    .findByPollIdOrderByOptionOrder(poll.getId());
+
+            List<PostResponse.PollOption> pollOptions = options.stream()
+                    .map(option -> {
+                        PostResponse.PollOption opt = new PostResponse.PollOption();
+                        opt.setId(option.getId());
+                        opt.setOptionText(option.getOptionText());
+                        opt.setOptionImageUrl(option.getOptionImageUrl());
+                        opt.setOptionOrder(option.getOptionOrder());
+                        opt.setVotesCount(option.getVotesCount());
+
+                        double percentage = poll.getTotalVotes() > 0
+                                ? (option.getVotesCount() * 100.0) / poll.getTotalVotes()
+                                : 0.0;
+                        opt.setPercentage(Math.round(percentage * 10.0) / 10.0);
+
+                        // Never highlight user's vote in quoted poll
+                        opt.setHasVoted(false);
+
+                        return opt;
+                    })
+                    .collect(Collectors.toList());
+
+            pollResponse.setOptions(pollOptions);
+            return pollResponse;
+        }).orElse(null);
     }
 
     private PostResponse.Attachments mapAttachments(PostEntity post) {
@@ -209,11 +344,12 @@ public class PostResponseMapper {
                 attachedProduct.setId(product.getProductId());
                 attachedProduct.setName(product.getProductName());
                 attachedProduct.setPrice(product.getPrice());
-                //attachedProduct.setDiscountPrice(product.getDiscountPrice());
-                attachedProduct.setImageUrl(product.getProductImages().getFirst());
+                attachedProduct.setImageUrl(product.getProductImages() != null && !product.getProductImages().isEmpty()
+                        ? product.getProductImages().getFirst()
+                        : null);
                 attachedProduct.setInStock(product.getStockQuantity() > 0);
 
-                if (product.getShop().getShopId() != null) {
+                if (product.getShop() != null && product.getShop().getShopId() != null) {
                     shopRepo.findByShopIdAndIsDeletedFalseAndStatus(product.getShop().getShopId(), ShopStatus.ACTIVE).ifPresent(shop -> {
                         attachedProduct.setShopName(shop.getShopName());
                         attachedProduct.setShopId(shop.getShopId());
@@ -238,8 +374,6 @@ public class PostResponseMapper {
                 attachedShop.setName(shop.getShopName());
                 attachedShop.setLogoUrl(shop.getLogoUrl());
                 attachedShop.setDescription(shop.getShopDescription());
-               // attachedShop.setRating(shop.getRating());
-                //attachedShop.setTotalProducts(shop.getTotalProducts());
                 attachedShop.setVerified(shop.getIsVerified());
                 shops.add(attachedShop);
             });
@@ -257,15 +391,11 @@ public class PostResponseMapper {
                 attachedEvent.setId(event.getId());
                 attachedEvent.setTitle(event.getTitle());
                 attachedEvent.setDescription(event.getDescription());
-                attachedEvent.setImageUrl(event.getMedia().getBanner());
-                attachedEvent.setDate(event.getStartDateTime().toLocalDateTime());
-                attachedEvent.setEndDate(event.getEndDateTime().toLocalDateTime());
-                attachedEvent.setLocation(event.getVenue().getName());
-                attachedEvent.setAddress(event.getVenue().getAddress());
-                //attachedEvent.setTicketPrice(event.getTicketPrice());
-                //attachedEvent.setTicketsAvailable(event.getAvailableTickets() > 0);
-                //attachedEvent.setAttendeesCount(event.getAttendeesCount());
-                //attachedEvent.setMaxAttendees(event.getMaxAttendees());
+                attachedEvent.setImageUrl(event.getMedia() != null ? event.getMedia().getBanner() : null);
+                attachedEvent.setDate(event.getStartDateTime() != null ? event.getStartDateTime().toLocalDateTime() : null);
+                attachedEvent.setEndDate(event.getEndDateTime() != null ? event.getEndDateTime().toLocalDateTime() : null);
+                attachedEvent.setLocation(event.getVenue() != null ? event.getVenue().getName() : null);
+                attachedEvent.setAddress(event.getVenue() != null ? event.getVenue().getAddress() : null);
                 attachedEvent.setSocialContext(null);
                 events.add(attachedEvent);
             });
@@ -285,22 +415,24 @@ public class PostResponseMapper {
                 attachedGroup.setTotalSlots(group.getTotalSeats());
                 attachedGroup.setOriginalPrice(group.getRegularPrice());
                 attachedGroup.setDiscountPrice(group.getGroupPrice());
+                attachedGroup.setRemainingSlots(group.getSeatsRemaining());
 
                 if (group.getRegularPrice() != null && group.getGroupPrice() != null) {
                     BigDecimal savings = group.getRegularPrice().subtract(group.getGroupPrice());
                     attachedGroup.setSavingsAmount(savings);
                     attachedGroup.setSavingsPercentage(
-                            savings.multiply(new BigDecimal("100"))
-                                    .divide(group.getRegularPrice(), 2, BigDecimal.ROUND_HALF_UP)
+                            savings.multiply(new BigDecimal("100")).divide(group.getRegularPrice(), 2, BigDecimal.ROUND_HALF_UP)
                     );
                 }
                 attachedGroup.setExpiresAt(group.getExpiresAt());
                 attachedGroup.setStatus(group.getStatus().name());
 
-                if (group.getProduct().getProductId() != null) {
+                if (group.getProduct() != null && group.getProduct().getProductId() != null) {
                     productRepo.findById(group.getProduct().getProductId()).ifPresent(product -> {
                         attachedGroup.setProductName(product.getProductName());
-                        attachedGroup.setProductImageUrl(product.getProductImages().getFirst());
+                        attachedGroup.setProductImageUrl(product.getProductImages() != null && !product.getProductImages().isEmpty()
+                                ? product.getProductImages().getFirst()
+                                : null);
                     });
                 }
 
@@ -319,18 +451,14 @@ public class PostResponseMapper {
             installmentPlanRepo.findById(postPlan.getPlanId()).ifPresent(plan -> {
                 PostResponse.AttachedInstallmentPlan attachedPlan = new PostResponse.AttachedInstallmentPlan();
                 attachedPlan.setId(plan.getPlanId());
-                attachedPlan.setProductId(plan.getProduct().getProductId());
-              //  attachedPlan.setMonthlyAmount(plan.getMonthlyAmount());
-               // attachedPlan.setDuration(plan.getDuration());
-              //  attachedPlan.setTotalAmount(plan.getTotalAmount());
-              //  attachedPlan.setInterestRate(plan.getInterestRate());
-             //   attachedPlan.setDownPayment(plan.getDownPayment());
-              //  attachedPlan.setInterestFree(plan.getInterestRate() == 0);
+                attachedPlan.setProductId(plan.getProduct() != null ? plan.getProduct().getProductId() : null);
 
-                if (plan.getProduct().getProductId() != null) {
+                if (plan.getProduct() != null && plan.getProduct().getProductId() != null) {
                     productRepo.findById(plan.getProduct().getProductId()).ifPresent(product -> {
                         attachedPlan.setProductName(product.getProductName());
-                        attachedPlan.setProductImageUrl(product.getProductImages().getFirst());
+                        attachedPlan.setProductImageUrl(product.getProductImages() != null && !product.getProductImages().isEmpty()
+                                ? product.getProductImages().getFirst()
+                                : null);
                     });
                 }
 
@@ -389,7 +517,9 @@ public class PostResponseMapper {
                 collabUser.setUserName(user.getUserName());
                 collabUser.setFirstName(user.getFirstName());
                 collabUser.setLastName(user.getLastName());
-                collabUser.setProfilePictureUrl(user.getProfilePictureUrls().getFirst());
+                collabUser.setProfilePictureUrl(user.getProfilePictureUrls() != null && !user.getProfilePictureUrls().isEmpty()
+                        ? user.getProfilePictureUrls().getFirst()
+                        : null);
                 collaborator.setUser(collabUser);
             });
 
@@ -448,6 +578,7 @@ public class PostResponseMapper {
         PostResponse.Engagement engagement = new PostResponse.Engagement();
         engagement.setLikesCount(post.getLikesCount());
         engagement.setCommentsCount(post.getCommentsCount());
+        engagement.setQuotesCount(post.getQuotesCount());
         engagement.setRepostsCount(post.getRepostsCount());
         engagement.setQuotesCount(0);
         engagement.setBookmarksCount(post.getBookmarksCount());
@@ -459,6 +590,75 @@ public class PostResponseMapper {
         engagement.setCanShare(true);
         return engagement;
     }
+
+    private PostResponse.QuotedPost mapQuotedPost(PostEntity post) {
+        // 1. No quote at all → genuinely nothing to show
+        if (post.getQuotedPostId() == null) {
+            return null;
+        }
+
+        UUID quotedPostId = post.getQuotedPostId();
+
+        // 2. Try to fetch the quoted post (respecting soft-delete)
+        PostEntity quotedPost = postRepository.findByIdAndIsDeletedFalse(quotedPostId)
+                .orElse(null);
+
+        //Todo: Here we will fetch curret or null user if needed for privacy checks
+   //AccountEntity currentUser = getAuthenticatedAccountOrNull();
+
+        // 3. PRIVACY + VISIBILITY CHECKS
+        // TODO: extend this block for more privacy rules (suspended account, muted, etc.)
+        if (quotedPost != null) {
+            if (quotedPost.getStatus() != PostStatus.PUBLISHED) {
+                quotedPost = null;
+            }
+
+            // — Current user is blocked by quoted post author → hide entirely
+//            else if (currentUser != null && blockRepository.existsByBlockerIdAndBlockedId(
+//                    quotedPost.getAuthorId(), currentUser.getId())) {
+//                quotedPost = null;
+//
+//            — Quoted post is from private account + current user doesn't follow → hide
+//            else if (quotedPost.getAuthor().isPrivate() && currentUser != null &&
+//                    !followRepository.existsByFollowerIdAndFollowingId(currentUser.getId(), quotedPost.getAuthorId())) {
+//                quotedPost = null;
+//            }
+            // — Current user blocked the author? Still show (personal choice), or hide if you prefer
+            // else if (currentUser != null && blockRepository.existsByBlockerIdAndBlockedId(currentUser.getId(), quotedPost.getAuthorId())) { quotedPost = null; }
+        }
+
+        // 4. If quoted post is unavailable for ANY reason → tombstone
+        if (quotedPost == null) {
+            return PostResponse.QuotedPost.builder()
+                    .id(quotedPostId)
+                    .content("This post is no longer available.")
+                    .author(null)
+                    .postType(null)
+                    .status(PostStatus.DELETED)
+                    .unavailable(true)
+                    .build();
+        }
+
+        // 5. Fully visible & published → return rich quoted post
+        PostResponse.QuotedPost response = new PostResponse.QuotedPost();
+        response.setId(quotedPost.getId());
+        response.setAuthor(mapAuthor(quotedPost));
+        response.setContent(quotedPost.getContent());
+        response.setContentParsed(mapContentParsed(quotedPost));
+        response.setPostType(quotedPost.getPostType());
+        response.setStatus(quotedPost.getStatus());
+        response.setMedia(mapMedia(quotedPost));
+        response.setCreatedAt(Instant.from(quotedPost.getCreatedAt()));
+        response.setPublishedAt(Instant.from(quotedPost.getPublishedAt()));
+        response.setEngagement(mapEngagement(quotedPost));
+
+        if (quotedPost.getPostType() == PostType.POLL) {
+            response.setPoll(mapQuotedPoll(quotedPost));
+        }
+
+        return response;
+    }
+
 
     private PostResponse.UserInteraction mapUserInteraction(PostEntity post, UUID currentUserId) {
         PostResponse.UserInteraction interaction = new PostResponse.UserInteraction();
@@ -472,12 +672,11 @@ public class PostResponseMapper {
             return interaction;
         }
 
-        // TODO: Query interaction tables when implemented
-        interaction.setHasLiked(false);
-        interaction.setHasBookmarked(false);
-        interaction.setHasReposted(false);
-        interaction.setHasCommented(false);
-        interaction.setHasViewed(false);
+        // ✅ Query actual interaction tables
+        interaction.setHasLiked(postLikeRepository.existsByPostIdAndUserId(post.getId(), currentUserId));
+        interaction.setHasBookmarked(postBookmarkRepository.existsByPostIdAndUserId(post.getId(), currentUserId));
+        interaction.setHasReposted(postRepostRepository.existsByPostIdAndUserId(post.getId(), currentUserId));
+        interaction.setHasCommented(commentRepository.existsByPostIdAndUserIdAndIsDeletedFalse(post.getId(), currentUserId));        interaction.setHasViewed(postViewRepository.existsByPostIdAndUserId(post.getId(), currentUserId));
 
         return interaction;
     }
@@ -499,5 +698,13 @@ public class PostResponseMapper {
                     .orElseThrow(() -> new IllegalArgumentException("User not found"));
         }
         throw new IllegalArgumentException("User not authenticated");
+    }
+
+    private AccountEntity getAuthenticatedAccountOrNull() {
+        try {
+            return getAuthenticatedAccount();
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

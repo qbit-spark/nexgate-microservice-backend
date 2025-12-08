@@ -2,10 +2,7 @@ package org.nextgate.nextgatebackend.e_social.posts_mng.service;
 
 
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PostEntity;
-import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.CreatePostRequest;
-import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.MediaRequest;
-import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.PrivacySettingsRequest;
-import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.UpdateDraftRequest;
+import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -17,7 +14,8 @@ public interface PostService {
     // Create and manage posts
     PostEntity createPost(CreatePostRequest request);
 
-    PostEntity publishPost(UUID postId);
+    PostEntity createQuotePost(UUID quotedPostId, CreateQuotePostRequest request);
+    PostEntity publishPost();
 
     // Attach to draft (discovery flow)
     PostEntity attachProductToDraft(UUID productId);
@@ -56,16 +54,18 @@ public interface PostService {
     List<PostEntity> getMyScheduledPosts();
 
     // Update draft
-    PostEntity updateDraft(UUID postId, UpdateDraftRequest request);
+    PostEntity updateDraft(UpdateDraftRequest request);
 
-    PostEntity updateDraftContent(UUID postId, String content);
+    PostEntity updateDraftContent(String content);
 
-    PostEntity addMediaToDraft(UUID postId, List<MediaRequest> media);
+    PostEntity addMediaToDraft(List<MediaRequest> media);
 
-    PostEntity updateDraftPrivacySettings(UUID postId, PrivacySettingsRequest settings);
+    PostEntity updateDraftPrivacySettings(PrivacySettingsRequest settings);
 
     // Delete post
     void deletePost(UUID postId);
+
+    PostEntity updateDraftCollaboration(CollaborationRequest collaboration);
 
     // Collaboration
     PostEntity acceptCollaboration(UUID postId);

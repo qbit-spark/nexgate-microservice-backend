@@ -3,10 +3,10 @@ package org.nextgate.nextgatebackend.e_social.posts_mng.repo;
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PostEntity;
 import org.nextgate.nextgatebackend.e_social.posts_mng.enums.PostStatus;
 import org.nextgate.nextgatebackend.e_social.posts_mng.enums.PostType;
+import org.nextgate.nextgatebackend.e_social.posts_mng.enums.PostVisibility;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -34,4 +34,10 @@ public interface PostRepository extends JpaRepository<PostEntity, UUID> {
     long countByAuthorIdAndIsDeletedFalse(UUID authorId);
 
     boolean existsByIdAndAuthorId(UUID id, UUID authorId);
+
+    List<PostEntity>findByAuthorIdAndIsDeletedFalseAndStatus(UUID authorId, PostStatus status);
+
+    List<PostEntity> findByAuthorIdInAndIsDeletedFalseAndStatusOrderByCreatedAtDesc(List<UUID> authorIds, PostStatus status);
+
+   List<PostEntity>findByIsDeletedFalseAndStatusAndVisibilityOrderByCreatedAtDesc(PostStatus status, PostVisibility visibility);
 }

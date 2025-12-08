@@ -33,10 +33,12 @@ public class CheckoutItemsJsonConverter implements AttributeConverter<List<Produ
             return "[]";
         }
         try {
-            return objectMapper.writeValueAsString(items);
+            String json = objectMapper.writeValueAsString(items);
+            log.debug("Successfully converted {} items to JSON", items.size());
+            return json;
         } catch (JsonProcessingException e) {
-            log.error("Error converting checkout items to JSON", e);
-            throw new RuntimeException("Error converting checkout items to JSON", e);
+            log.error("❌ ERROR converting checkout items to JSON. Items: {}", items, e);
+            throw new RuntimeException("Error converting checkout items to JSON: " + e.getMessage(), e);
         }
     }
 

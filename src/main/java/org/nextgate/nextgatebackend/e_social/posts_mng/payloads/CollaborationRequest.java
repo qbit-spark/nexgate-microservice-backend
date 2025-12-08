@@ -14,7 +14,5 @@ import java.util.UUID;
 @NoArgsConstructor
 public class CollaborationRequest {
 
-    private Boolean isCollaborative = false;
-
     private List<UUID> collaboratorIds;
 }

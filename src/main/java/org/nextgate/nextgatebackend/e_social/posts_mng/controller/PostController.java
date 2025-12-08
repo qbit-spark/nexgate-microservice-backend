@@ -2,9 +2,15 @@ package org.nextgate.nextgatebackend.e_social.posts_mng.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.nextgate.nextgatebackend.e_social.interactions.service.PostInteractionService;
+import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PostCommentEntity;
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PostEntity;
 import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.*;
+import org.nextgate.nextgatebackend.e_social.posts_mng.service.CommentService;
+import org.nextgate.nextgatebackend.e_social.posts_mng.service.FeedService;
+import org.nextgate.nextgatebackend.e_social.posts_mng.service.PollService;
 import org.nextgate.nextgatebackend.e_social.posts_mng.service.PostService;
+import org.nextgate.nextgatebackend.e_social.posts_mng.utils.mapper.CommentResponseMapper;
 import org.nextgate.nextgatebackend.e_social.posts_mng.utils.mapper.PostResponseMapper;
 import org.nextgate.nextgatebackend.globeresponsebody.GlobeSuccessResponseBuilder;
 import org.springframework.data.domain.Page;
@@ -15,7 +21,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -25,6 +33,11 @@ public class PostController {
 
     private final PostService postService;
     private final PostResponseMapper postResponseMapper;
+    private final PollService pollService;
+    private final PostInteractionService interactionService;
+    private final CommentService commentService;
+    private final CommentResponseMapper commentResponseMapper;
+    private final FeedService feedService;
 
     @PostMapping
     public ResponseEntity<GlobeSuccessResponseBuilder> createPost(
@@ -41,11 +54,10 @@ public class PostController {
         return ResponseEntity.ok(successResponse);
     }
 
-    @PostMapping("/{postId}/publish")
-    public ResponseEntity<GlobeSuccessResponseBuilder> publishPost(
-            @PathVariable UUID postId) {
+    @PostMapping("/publish")
+    public ResponseEntity<GlobeSuccessResponseBuilder> publishDraftPost() {
 
-        PostEntity post = postService.publishPost(postId);
+        PostEntity post = postService.publishPost();
 
         PostResponse response = postResponseMapper.toPostResponse(post);
 
@@ -85,6 +97,7 @@ public class PostController {
         return ResponseEntity.ok(successResponse);
     }
 
+    //Todo: This needs a lot of optimisation for now its fine for development
     @GetMapping
     public ResponseEntity<GlobeSuccessResponseBuilder> getPublishedPosts(
             @RequestParam(defaultValue = "1") int page,
@@ -94,15 +107,15 @@ public class PostController {
         Page<PostEntity> postsPage = postService.getPublishedPosts(pageable);
         List<PostResponse> responses = postResponseMapper.toPostResponseList(postsPage.getContent());
 
-
         GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
                 "Posts retrieved successfully",
                 responses
         );
-
+    
         return ResponseEntity.ok(successResponse);
     }
 
+    //Todo: This needs a lot of optimisation for now its fine for development
     @GetMapping("/author/{authorId}")
     public ResponseEntity<GlobeSuccessResponseBuilder> getPostsByAuthor(
             @PathVariable UUID authorId,
@@ -202,11 +215,11 @@ public class PostController {
 
         PostEntity draft = postService.attachEventToDraft(eventId);
 
-        PostResponse response = postResponseMapper.toPostResponse(draft);
+       // PostResponse response = postResponseMapper.toPostResponse(draft);
 
         GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
                 "Event attached to draft successfully",
-                response
+                "Event attached to draft successfully"
         );
 
         return ResponseEntity.ok(successResponse);
@@ -228,6 +241,7 @@ public class PostController {
         return ResponseEntity.ok(successResponse);
     }
 
+    //Todo: The installment plan response is not cool
     @PostMapping("/draft/attach-plan/{planId}")
     public ResponseEntity<GlobeSuccessResponseBuilder> attachInstallmentPlanToDraft(
             @PathVariable UUID planId) {
@@ -291,7 +305,7 @@ public class PostController {
     }
 
     @DeleteMapping("/draft/remove-group/{groupId}")
-    public ResponseEntity<GlobeSuccessResponseBuilder> removeBuyTogetherGroupFromDraft(
+        public ResponseEntity<GlobeSuccessResponseBuilder> removeBuyTogetherGroupFromDraft(
             @PathVariable UUID groupId) {
 
         PostEntity draft = postService.removeBuyTogetherGroupFromDraft(groupId);
@@ -322,12 +336,11 @@ public class PostController {
         return ResponseEntity.ok(successResponse);
     }
 
-    @PutMapping("/{postId}")
+    @PutMapping()
     public ResponseEntity<GlobeSuccessResponseBuilder> updateDraft(
-            @PathVariable UUID postId,
             @Valid @RequestBody UpdateDraftRequest request) {
 
-        PostEntity draft = postService.updateDraft(postId, request);
+        PostEntity draft = postService.updateDraft(request);
 
         PostResponse response = postResponseMapper.toPostResponse(draft);
 
@@ -339,12 +352,11 @@ public class PostController {
         return ResponseEntity.ok(successResponse);
     }
 
-    @PutMapping("/{postId}/content")
+    @PutMapping("/content")
     public ResponseEntity<GlobeSuccessResponseBuilder> updateDraftContent(
-            @PathVariable UUID postId,
             @RequestBody String content) {
 
-        PostEntity draft = postService.updateDraftContent(postId, content);
+        PostEntity draft = postService.updateDraftContent(content);
 
         PostResponse response = postResponseMapper.toPostResponse(draft);
 
@@ -356,12 +368,11 @@ public class PostController {
         return ResponseEntity.ok(successResponse);
     }
 
-    @PutMapping("/{postId}/media")
+    @PutMapping("/media")
     public ResponseEntity<GlobeSuccessResponseBuilder> addMediaToDraft(
-            @PathVariable UUID postId,
             @Valid @RequestBody List<MediaRequest> media) {
 
-        PostEntity draft = postService.addMediaToDraft(postId, media);
+        PostEntity draft = postService.addMediaToDraft( media);
 
         PostResponse response = postResponseMapper.toPostResponse(draft);
 
@@ -373,17 +384,32 @@ public class PostController {
         return ResponseEntity.ok(successResponse);
     }
 
-    @PutMapping("/{postId}/privacy")
+    @PutMapping("/privacy")
     public ResponseEntity<GlobeSuccessResponseBuilder> updateDraftPrivacySettings(
-            @PathVariable UUID postId,
             @Valid @RequestBody PrivacySettingsRequest settings) {
 
-        PostEntity draft = postService.updateDraftPrivacySettings(postId, settings);
+        PostEntity draft = postService.updateDraftPrivacySettings(settings);
 
         PostResponse response = postResponseMapper.toPostResponse(draft);
 
         GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
                 "Privacy settings updated successfully",
+                response
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @PutMapping("/collaboration")
+    public ResponseEntity<GlobeSuccessResponseBuilder> updateDraftCollaboration(
+            @Valid @RequestBody CollaborationRequest collaboration) {
+
+        PostEntity draft = postService.updateDraftCollaboration(collaboration);
+
+        PostResponse response = postResponseMapper.toPostResponse(draft);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Collaboration settings updated successfully",
                 response
         );
 
@@ -431,6 +457,391 @@ public class PostController {
 
         GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
                 "Collaborator removed successfully"
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+      // ============================================
+      // POLL ENDPOINTS
+     // ============================================
+
+    @PostMapping("/{postId}/vote")
+    public ResponseEntity<GlobeSuccessResponseBuilder> voteOnPoll(
+            @PathVariable UUID postId,
+            @Valid @RequestBody VotePollRequest request) {
+
+            pollService.voteOnPoll(postId, request.getOptionIds());
+
+            GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                    "Vote recorded successfully",
+                    "Vote recorded successfully"
+            );
+
+            return ResponseEntity.ok(successResponse);
+
+    }
+
+    @DeleteMapping("/{postId}/vote")
+    public ResponseEntity<GlobeSuccessResponseBuilder> removeVote(@PathVariable UUID postId) {
+
+        pollService.removeVote(postId);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Vote removed successfully",
+                "Vote removed successfully"
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @GetMapping("/{postId}/poll-results")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getPollResults(@PathVariable UUID postId) {
+
+        PollResultsResponse results = pollService.getPollResults(postId);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Poll results retrieved successfully",
+                results
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @GetMapping("/{postId}/poll-voters/{optionId}")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getOptionVoters(
+            @PathVariable UUID postId,
+            @PathVariable UUID optionId) {
+
+        List<VoterInfo> voters = pollService.getOptionVoters(postId, optionId);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Voters retrieved successfully",
+                voters
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    // ============================================
+   // INTERACTION ENDPOINTS
+  // ============================================
+
+    @PostMapping("/{postId}/like")
+    public ResponseEntity<GlobeSuccessResponseBuilder> likePost(@PathVariable UUID postId) {
+
+        interactionService.likePost(postId);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Post liked successfully",
+                null
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @DeleteMapping("/{postId}/like")
+    public ResponseEntity<GlobeSuccessResponseBuilder> unlikePost(@PathVariable UUID postId) {
+
+        interactionService.unlikePost(postId);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Post unliked successfully",
+                null
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @PostMapping("/{postId}/bookmark")
+    public ResponseEntity<GlobeSuccessResponseBuilder> bookmarkPost(@PathVariable UUID postId) {
+
+        interactionService.bookmarkPost(postId);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Post bookmarked successfully",
+                null
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @DeleteMapping("/{postId}/bookmark")
+    public ResponseEntity<GlobeSuccessResponseBuilder> unbookmarkPost(@PathVariable UUID postId) {
+
+        interactionService.unbookmarkPost(postId);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Bookmark removed successfully",
+                null
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @PostMapping("/{postId}/repost")
+    public ResponseEntity<GlobeSuccessResponseBuilder> repostPost(
+            @PathVariable UUID postId,
+            @RequestBody(required = false) RepostRequest request) {
+
+        String comment = request != null ? request.getComment() : null;
+        interactionService.repostPost(postId, comment);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Post reposted successfully",
+                null
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @DeleteMapping("/{postId}/repost")
+    public ResponseEntity<GlobeSuccessResponseBuilder> unrepostPost(@PathVariable UUID postId) {
+
+        interactionService.unrepostPost(postId);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Repost removed successfully",
+                null
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @PostMapping("/{postId}/view")
+    public ResponseEntity<GlobeSuccessResponseBuilder> recordView(@PathVariable UUID postId) {
+
+        interactionService.recordView(postId);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "View recorded successfully",
+                null
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    // ============================================
+   // COMMENT ENDPOINTS
+   // ============================================
+
+    @PostMapping("/{postId}/comments")
+    public ResponseEntity<GlobeSuccessResponseBuilder> createComment(
+            @PathVariable UUID postId,
+            @Valid @RequestBody CreateCommentRequest request) {
+
+        PostCommentEntity comment = commentService.createComment(postId, request);
+        CommentResponse response = commentResponseMapper.toCommentResponse(comment);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Comment created successfully",
+                response
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @GetMapping("/{postId}/comments")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getComments(
+            @PathVariable UUID postId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        Pageable pageable = PageRequest.of(page - 1, size, Sort.by("createdAt").descending());
+        Page<PostCommentEntity> commentsPage = commentService.getComments(postId, pageable);
+
+        List<CommentResponse> responses = commentResponseMapper.toCommentResponseList(commentsPage.getContent());
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Comments retrieved successfully",
+                responses
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @GetMapping("/comments/{commentId}")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getComment(@PathVariable UUID commentId) {
+
+        PostCommentEntity comment = commentService.getCommentById(commentId);
+        CommentResponse response = commentResponseMapper.toCommentResponse(comment);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Comment retrieved successfully",
+                response
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @GetMapping("/comments/{commentId}/replies")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getReplies(
+            @PathVariable UUID commentId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        Pageable pageable = PageRequest.of(page - 1, size, Sort.by("createdAt").ascending());
+        Page<PostCommentEntity> repliesPage = commentService.getReplies(commentId, pageable);
+
+        List<CommentResponse> responses = commentResponseMapper.toCommentResponseList(repliesPage.getContent());
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Replies retrieved successfully",
+                responses
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @PutMapping("/comments/{commentId}")
+    public ResponseEntity<GlobeSuccessResponseBuilder> updateComment(
+            @PathVariable UUID commentId,
+            @Valid @RequestBody UpdateCommentRequest request) {
+
+        PostCommentEntity comment = commentService.updateComment(commentId, request);
+        CommentResponse response = commentResponseMapper.toCommentResponse(comment);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Comment updated successfully",
+                response
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @DeleteMapping("/comments/{commentId}")
+    public ResponseEntity<GlobeSuccessResponseBuilder> deleteComment(@PathVariable UUID commentId) {
+
+        commentService.deleteComment(commentId);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Comment deleted successfully",
+                null
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @PostMapping("/{postId}/comments/{commentId}/pin")
+    public ResponseEntity<GlobeSuccessResponseBuilder> pinComment(
+            @PathVariable UUID postId,
+            @PathVariable UUID commentId) {
+
+        PostCommentEntity comment = commentService.pinComment(postId, commentId);
+        CommentResponse response = commentResponseMapper.toCommentResponse(comment);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Comment pinned successfully",
+                response
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @DeleteMapping("/comments/{commentId}/pin")
+    public ResponseEntity<GlobeSuccessResponseBuilder> unpinComment(@PathVariable UUID commentId) {
+
+        PostCommentEntity comment = commentService.unpinComment(commentId);
+        CommentResponse response = commentResponseMapper.toCommentResponse(comment);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Comment unpinned successfully",
+                response
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @PostMapping("/comments/{commentId}/like")
+    public ResponseEntity<GlobeSuccessResponseBuilder> likeComment(@PathVariable UUID commentId) {
+
+        commentService.likeComment(commentId);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Comment liked successfully",
+                null
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @DeleteMapping("/comments/{commentId}/like")
+    public ResponseEntity<GlobeSuccessResponseBuilder> unlikeComment(@PathVariable UUID commentId) {
+
+        commentService.unlikeComment(commentId);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Comment unliked successfully",
+                null
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    // ============================================
+    // FEED/TIMELINE ENDPOINTS
+    // ============================================
+
+    @GetMapping("/users/{userId}/timeline")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getUserTimeline(
+            @PathVariable UUID userId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        Pageable pageable = PageRequest.of(page - 1, size);
+        Page<TimelineItemResponse> timelinePage = feedService.getUserTimeline(userId, pageable);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Timeline retrieved successfully",
+                timelinePage
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @GetMapping("/feed/following")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getFollowingFeed(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        Pageable pageable = PageRequest.of(page - 1, size);
+        Page<TimelineItemResponse> feedPage = feedService.getFollowingFeed(pageable);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Following feed retrieved successfully",
+                feedPage
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @GetMapping("/feed/explore")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getExploreFeed(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        Pageable pageable = PageRequest.of(page - 1, size);
+        Page<TimelineItemResponse> feedPage = feedService.getExploreFeed(pageable);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Explore feed retrieved successfully",
+                feedPage
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @PostMapping("/quote/{quotedPostId}")
+    public ResponseEntity<GlobeSuccessResponseBuilder> createQuotePost(
+            @PathVariable UUID quotedPostId,
+            @Valid @RequestBody CreateQuotePostRequest request) {
+
+        PostEntity post = postService.createQuotePost(quotedPostId, request);
+        PostResponse response = postResponseMapper.toPostResponse(post);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Quote post created successfully",
+                response
         );
 
         return ResponseEntity.ok(successResponse);

@@ -11,12 +11,10 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "poll_votes", indexes = {
-        @Index(name = "idx_poll_votes_poll_id", columnList = "pollId"),
+        @Index(name = "idx_poll_votes_poll_id",   columnList = "pollId"),
         @Index(name = "idx_poll_votes_option_id", columnList = "optionId"),
-        @Index(name = "idx_poll_votes_user_id", columnList = "userId"),
-        @Index(name = "idx_poll_votes_poll_user", columnList = "pollId, userId")
-}, uniqueConstraints = {
-        @UniqueConstraint(name = "uk_poll_votes_poll_user_option", columnNames = {"pollId", "userId", "optionId"})
+        @Index(name = "idx_poll_votes_voter_id",  columnList = "voterId"),
+        @Index(name = "idx_poll_votes_poll_voter", columnList = "pollId, voterId")
 })
 @AllArgsConstructor
 @NoArgsConstructor
@@ -35,7 +33,7 @@ public class PollVoteEntity {
     private UUID optionId;
 
     @Column(nullable = false)
-    private UUID userId;
+    private UUID voterId;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;

@@ -1,12 +1,10 @@
 package org.nextgate.nextgatebackend.e_social.posts_mng.payloads;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 import org.nextgate.nextgatebackend.e_social.posts_mng.enums.*;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,6 +24,7 @@ public class PostResponse {
     private PostStatus status;
     private List<Media> media = new ArrayList<>();
     private Poll poll;
+    private QuotedPost quotedPost;
     private Attachments attachments;
     private Collaboration collaboration;
     private PrivacySettings privacySettings;
@@ -221,6 +220,7 @@ public class PostResponse {
         private String productImageUrl;
         private int currentCount;
         private int totalSlots;
+        private int remainingSlots;
         private BigDecimal originalPrice;
         private BigDecimal discountPrice;
         private BigDecimal savingsAmount;
@@ -377,5 +377,27 @@ public class PostResponse {
         private boolean hasReposted;
         private boolean hasCommented;
         private boolean hasViewed;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class QuotedPost {
+        private UUID id;
+        private Author author;
+        private String content;
+        private Object contentParsed;
+        private PostType postType;
+        private PostStatus status;
+        private List<Media> media;
+        private Instant createdAt;
+        private Instant publishedAt;
+        private Engagement engagement;
+        private boolean unavailable = false;
+
+        // Poll inside quoted post - NEVER shows current user's votes
+        private Poll poll;
     }
 }

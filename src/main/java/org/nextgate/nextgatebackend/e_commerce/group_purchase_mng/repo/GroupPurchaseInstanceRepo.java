@@ -6,6 +6,8 @@ import org.nextgate.nextgatebackend.e_commerce.group_purchase_mng.enums.GroupSta
 import org.nextgate.nextgatebackend.e_commerce.products_mng_service.products.entity.ProductEntity;
 import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng.entity.ShopEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
@@ -39,5 +41,18 @@ public interface GroupPurchaseInstanceRepo extends JpaRepository<GroupPurchaseIn
     List<GroupPurchaseInstanceEntity> findByStatusAndIsDeletedFalseOrderByCreatedAtDesc(
             GroupStatus status);
 
+    /**
+     * Fetch group with all required relationships for notifications.
+     * Eagerly loads: shop, shop.owner, product, initiator
+     */
+    @Query("""
+        SELECT g FROM GroupPurchaseInstanceEntity g
+        LEFT JOIN FETCH g.shop s
+        LEFT JOIN FETCH s.owner
+        LEFT JOIN FETCH g.product
+        LEFT JOIN FETCH g.initiator
+        WHERE g.groupInstanceId = :groupId
+    """)
+    Optional<GroupPurchaseInstanceEntity> findByIdWithRelations(@Param("groupId") UUID groupId);
 
 }

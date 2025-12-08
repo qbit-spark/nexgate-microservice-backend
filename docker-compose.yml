@@ -3,7 +3,7 @@ services:
   # Database Services
   # ========================
   postgres:
-    image: postgres:latest
+    image: postgres:17  # Pinned to 17 to avoid PG 18+ data dir issues
     container_name: nexgate_postgres
     restart: unless-stopped
     ports:
@@ -18,7 +18,7 @@ services:
       - nexgate-local
 
   notification-postgres:
-    image: postgres:latest
+    image: postgres:17  # Pinned to 17 to avoid PG 18+ data dir issues
     container_name: nexgate_notification_postgres
     restart: unless-stopped
     ports:
@@ -83,32 +83,32 @@ services:
   # ========================
   # Application Services
   # ========================
-#  backend:
-#    image: josh656/nexgate-backend:latest
-#    container_name: nexgate_backend
-#    restart: unless-stopped
-#    ports:
-#      - "8765:8765"
-#    environment:
-#      POSTGRES_HOST: postgres
-#      POSTGRES_PORT: 5432
-#      POSTGRES_DB: nexgate
-#      POSTGRES_USER: postgres
-#      POSTGRES_PASSWORD: nexgate123
-#      MINIO_HOST: minio
-#      MINIO_PORT: 9000
-#      MINIO_ACCESS_KEY: nexgate_admin
-#      MINIO_SECRET_KEY: nexgate_minio123
-#      RABBITMQ_HOST: rabbitmq
-#      RABBITMQ_PORT: 5672
-#      RABBITMQ_USER: guest
-#      RABBITMQ_PASSWORD: guest
-#    depends_on:
-#      - postgres
-#      - minio
-#      - rabbitmq
-#    networks:
-#      - nexgate-local
+  #  backend:
+  #    image: josh656/nexgate-backend:latest
+  #    container_name: nexgate_backend
+  #    restart: unless-stopped
+  #    ports:
+  #      - "8765:8765"
+  #    environment:
+  #      POSTGRES_HOST: postgres
+  #      POSTGRES_PORT: 5432
+  #      POSTGRES_DB: nexgate
+  #      POSTGRES_USER: postgres
+  #      POSTGRES_PASSWORD: nexgate123
+  #      MINIO_HOST: minio
+  #      MINIO_PORT: 9000
+  #      MINIO_ACCESS_KEY: nexgate_admin
+  #      MINIO_SECRET_KEY: nexgate_minio123
+  #      RABBITMQ_HOST: rabbitmq
+  #      RABBITMQ_PORT: 5672
+  #      RABBITMQ_USER: guest
+  #      RABBITMQ_PASSWORD: guest
+  #    depends_on:
+  #      - postgres
+  #      - minio
+  #      - rabbitmq
+  #    networks:
+  #      - nexgate-local
 
   notification-server:
     image: josh656/nexgate-notification-server:latest

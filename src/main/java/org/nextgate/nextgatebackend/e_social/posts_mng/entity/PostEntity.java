@@ -41,6 +41,8 @@ public class PostEntity {
     @Column(nullable = false)
     private PostType postType;
 
+    private UUID quotedPostId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private PostStatus status = PostStatus.DRAFT;
@@ -91,6 +93,10 @@ public class PostEntity {
 
     @Column(nullable = false)
     private long viewsCount = 0;
+
+    @Column(nullable = false)
+    private long quotesCount = 0;
+
 
     private LocalDateTime scheduledAt;
 

@@ -24,10 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -198,17 +195,25 @@ public class EventCategoryServiceImpl implements EventsCategoryService {
     @Override
     @Transactional
     public List<EventsCategoryEntity> seedCategories() throws ItemNotFoundException, AccessDeniedException {
-
         AccountEntity currentUser = getAuthenticatedAccount();
-
         validateRole(currentUser, "ROLE_STAFF_ADMIN", "ROLE_SUPER_ADMIN");
 
         List<EventsCategoryEntity> defaultCategories = CategorySeeder.getDefaultCategories();
+        List<EventsCategoryEntity> categoriesToSave = new ArrayList<>();
 
-        defaultCategories.forEach(category -> category.setCreatedBy(currentUser));
+        for (EventsCategoryEntity category : defaultCategories) {
+            if (!categoryRepository.existsByNameIgnoreCase(category.getName())) {
+                category.setCreatedBy(currentUser);
+                categoriesToSave.add(category);
+            }
+        }
 
+        if (categoriesToSave.isEmpty()) {
+            return categoryRepository.findAll();
+        }
 
-        return categoryRepository.saveAll(defaultCategories);
+        // Save only the new categories
+        return categoryRepository.saveAll(categoriesToSave);
     }
 
 

@@ -2,7 +2,7 @@ package org.nextgate.nextgatebackend.globe_crypto;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.nextgate.nextgatebackend.globe_crypto.RSAKeys;
+import org.nextgate.nextgatebackend.globe_crypto.enums.KeyStatus;
 import org.springframework.stereotype.Service;
 
 import java.security.*;
@@ -61,7 +61,7 @@ public class RSAKeyService {
             rsaKeys.setPublicKey(publicKeyBase64);
             rsaKeys.setAlgorithm("RS256");
             rsaKeys.setKeySize(KEY_SIZE);
-            rsaKeys.setStatus("ACTIVE");
+            rsaKeys.setStatus(KeyStatus.ACTIVE);
             rsaKeys.setGeneratedAt(Instant.now());
 
             log.info("RSA key pair generated successfully");

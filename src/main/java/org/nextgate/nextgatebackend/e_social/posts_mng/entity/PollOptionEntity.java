@@ -30,6 +30,7 @@ public class PollOptionEntity {
     @Column(nullable = false)
     private String optionText;
 
+    @Column(columnDefinition = "TEXT")
     private String optionImageUrl;
 
     @Column(nullable = false)

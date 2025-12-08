@@ -30,5 +30,7 @@ public class PollRequest {
 
     private Boolean isAnonymous = true;
 
+    private Boolean allowVoteChange = true;
+
     private LocalDateTime expiresAt;
 }
