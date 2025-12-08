@@ -32,6 +32,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -648,8 +649,9 @@ public class PostResponseMapper {
         response.setPostType(quotedPost.getPostType());
         response.setStatus(quotedPost.getStatus());
         response.setMedia(mapMedia(quotedPost));
-        response.setCreatedAt(Instant.from(quotedPost.getCreatedAt()));
-        response.setPublishedAt(Instant.from(quotedPost.getPublishedAt()));
+        response.setCreatedAt(quotedPost.getCreatedAt().atZone(ZoneId.of("UTC")).toInstant());
+        response.setPublishedAt(quotedPost.getPublishedAt().atZone(ZoneId.of("UTC")).toInstant());
+
         response.setEngagement(mapEngagement(quotedPost));
 
         if (quotedPost.getPostType() == PostType.POLL) {

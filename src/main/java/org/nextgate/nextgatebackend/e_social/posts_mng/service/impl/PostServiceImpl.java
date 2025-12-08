@@ -131,7 +131,7 @@ public class PostServiceImpl implements PostService {
         post.setAuthorId(author.getId());
         post.setContent(request.getContent());
         post.setPostType(PostType.REGULAR); // Quote posts are always REGULAR
-        post.setQuotedPostId(quotedPostId); // Set the quoted post ID
+        post.setQuotedPostId(quotedPostId); // Set the quoted post-ID
 
         // Set privacy settings
         if (request.getPrivacySettings() != null) {
@@ -143,6 +143,9 @@ public class PostServiceImpl implements PostService {
         }
 
         post.setStatus(PostStatus.PUBLISHED);
+        post.setCreatedAt(LocalDateTime.now());
+        post.setPublishedAt(LocalDateTime.now());
+        post.setUpdatedAt(LocalDateTime.now());
 
         // Set media if provided
         if (request.getMedia() != null && !request.getMedia().isEmpty()) {
