@@ -581,7 +581,7 @@ public class PostResponseMapper {
         engagement.setCommentsCount(post.getCommentsCount());
         engagement.setQuotesCount(post.getQuotesCount());
         engagement.setRepostsCount(post.getRepostsCount());
-        engagement.setQuotesCount(0);
+        engagement.setQuotesCount(post.getQuotesCount());
         engagement.setBookmarksCount(post.getBookmarksCount());
         engagement.setSharesCount(0);
         engagement.setViewsCount(post.getViewsCount());
