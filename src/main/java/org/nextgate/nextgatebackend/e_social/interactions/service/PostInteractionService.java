@@ -1,5 +1,8 @@
 package org.nextgate.nextgatebackend.e_social.interactions.service;
 
+import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.PostResponse;
+import org.springframework.data.domain.Page;
+
 import java.util.UUID;
 
 public interface PostInteractionService {
@@ -18,4 +21,10 @@ public interface PostInteractionService {
 
     // Views
     void recordView(UUID postId);
+
+    Page<PostResponse> getMyBookmarks(int page, int size);
+
+    Page<PostResponse> getMyReposts(int page, int size);
+
+    Page<PostResponse> getUserReposts(UUID userId, int page, int size);
 }

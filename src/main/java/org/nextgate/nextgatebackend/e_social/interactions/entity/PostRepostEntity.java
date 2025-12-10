@@ -1,4 +1,4 @@
-package org.nextgate.nextgatebackend.e_social.posts_mng.entity;
+package org.nextgate.nextgatebackend.e_social.interactions.entity;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;

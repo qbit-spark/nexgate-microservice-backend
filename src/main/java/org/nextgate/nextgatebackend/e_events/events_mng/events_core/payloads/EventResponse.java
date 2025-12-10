@@ -196,7 +196,6 @@ public class EventResponse {
         private Integer totalTickets;
         private Integer ticketsSold;
         private Integer ticketsAvailable;
-        private Boolean isUnlimited;
         private Boolean isSoldOut;
         private AttendanceMode attendanceMode;
         private TicketStatus status;

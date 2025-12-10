@@ -18,4 +18,6 @@ public interface FileService {
     List<FileResponse> getUserFiles(UUID accountId, FileDirectory directory);
 
     void deleteFile(UUID accountId, String objectKey);
+
+
 }

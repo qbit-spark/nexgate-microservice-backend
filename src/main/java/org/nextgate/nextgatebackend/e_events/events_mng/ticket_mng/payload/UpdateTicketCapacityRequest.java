@@ -14,6 +14,6 @@ import lombok.NoArgsConstructor;
 public class UpdateTicketCapacityRequest {
 
     @NotNull(message = "New total quantity is required")
-    @Min(value = 0, message = "Total quantity must be zero or positive")
+    @Min(value = 1, message = "Total quantity must be at least 1")
     private Integer newTotalQuantity;
 }

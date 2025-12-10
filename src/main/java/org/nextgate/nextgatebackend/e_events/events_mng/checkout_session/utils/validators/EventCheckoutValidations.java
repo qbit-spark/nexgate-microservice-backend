@@ -116,12 +116,10 @@ public class EventCheckoutValidations {
         }
 
         // ✅ Check available quantity (if not unlimited)
-        if (!ticket.getIsUnlimited()) {
-            Integer available = ticket.getQuantityAvailable();
-            if (available == null || available < totalQuantity) {
-                throw new BadRequestException(
-                        String.format("Only %d tickets available", available != null ? available : 0));
-            }
+        Integer available = ticket.getQuantityAvailable();
+        if (available < totalQuantity) {
+            throw new BadRequestException(
+                    String.format("Only %d tickets available", available));
         }
 
         // ✅ maxQuantityPerOrder: null or 0 = unlimited per order

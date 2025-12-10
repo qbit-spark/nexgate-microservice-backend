@@ -10,12 +10,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CapacityMetrics {
-    private Boolean hasUnlimitedTickets;
-    private Integer limitedCapacity;
-    private Integer limitedSold;
-    private Integer limitedRemaining;
-    private Integer unlimitedSold;
+    private Integer totalCapacity;
     private Integer totalSold;
-    private Integer displayCapacity;
+    private Integer totalRemaining;
     private Double sellOutPercentage;
 }

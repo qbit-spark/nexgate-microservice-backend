@@ -170,13 +170,9 @@ public class OrganizerAnalyticsServiceImpl implements OrganizerAnalyticsService 
         CapacityMetrics capacityMetrics = EventCapacityHelper.calculateCapacityMetrics(event.getTickets());
 
         EventPerformanceResponse.TicketMetrics ticketMetrics = EventPerformanceResponse.TicketMetrics.builder()
-                .hasUnlimitedTickets(capacityMetrics.getHasUnlimitedTickets())
-                .limitedCapacity(capacityMetrics.getLimitedCapacity())
-                .limitedSold(capacityMetrics.getLimitedSold())
-                .limitedRemaining(capacityMetrics.getLimitedRemaining())
-                .unlimitedSold(capacityMetrics.getUnlimitedSold())
+                .totalCapacity(capacityMetrics.getTotalCapacity())
                 .totalSold(capacityMetrics.getTotalSold())
-                .displayCapacity(capacityMetrics.getDisplayCapacity())
+                .totalRemaining(capacityMetrics.getTotalRemaining())
                 .sellOutPercentage(capacityMetrics.getSellOutPercentage())
                 .build();
 
@@ -425,7 +421,7 @@ public class OrganizerAnalyticsServiceImpl implements OrganizerAnalyticsService 
         double attendance = calculateEventAttendanceRate(event);
 
         CapacityMetrics capacityMetrics = EventCapacityHelper.calculateCapacityMetrics(event.getTickets());
-        Integer displayCapacity = capacityMetrics.getDisplayCapacity();
+        Integer totalCapacity = capacityMetrics.getTotalCapacity();
         Double sellOutPercentage = capacityMetrics.getSellOutPercentage();
 
         return EventRevenueResponse.EventRevenue.builder()
@@ -439,7 +435,7 @@ public class OrganizerAnalyticsServiceImpl implements OrganizerAnalyticsService 
                 .released(released)
                 .refunded(BigDecimal.ZERO)
                 .attendanceRate(attendance)
-                .totalCapacity(displayCapacity)
+                .totalCapacity(totalCapacity)
                 .sellOutPercentage(sellOutPercentage)
                 .build();
     }

@@ -24,6 +24,8 @@ public class FileResponse {
     // URLs
     private String permanentUrl;
     private String thumbnailUrl; // For images/videos
+    private String blurHash;
+
 
     // File type info
     private String fileExtension;

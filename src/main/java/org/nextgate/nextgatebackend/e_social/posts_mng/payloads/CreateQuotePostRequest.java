@@ -17,6 +17,7 @@ import java.util.UUID;
 @NoArgsConstructor
 public class CreateQuotePostRequest {
 
+    @NotNull(message = "Content cannot be null")
     private String content;
 
     private List<MediaRequest> media;

@@ -126,14 +126,18 @@ public class PostServiceImpl implements PostService {
             throw new IllegalArgumentException("Can only quote published posts");
         }
 
-        // Create the quote post (always REGULAR type)
+        // Create the quote post
         PostEntity post = new PostEntity();
         post.setAuthorId(author.getId());
         post.setContent(request.getContent());
-        post.setPostType(PostType.REGULAR); // Quote posts are always REGULAR
-        post.setQuotedPostId(quotedPostId); // Set the quoted post ID
+        post.setPostType(PostType.REGULAR);
+        post.setQuotedPostId(quotedPostId);
+        post.setStatus(PostStatus.PUBLISHED);
+        post.setCreatedAt(LocalDateTime.now());
+        post.setPublishedAt(LocalDateTime.now());
+        post.setUpdatedAt(LocalDateTime.now());
 
-        // Set privacy settings
+        // Privacy settings
         if (request.getPrivacySettings() != null) {
             post.setVisibility(request.getPrivacySettings().getVisibility());
             post.setWhoCanComment(request.getPrivacySettings().getWhoCanComment());
@@ -142,15 +146,14 @@ public class PostServiceImpl implements PostService {
             post.setHideCommentsCount(request.getPrivacySettings().getHideCommentsCount());
         }
 
-        post.setStatus(PostStatus.PUBLISHED);
-
-        // Set media if provided
+        // Media
         if (request.getMedia() != null && !request.getMedia().isEmpty()) {
             setMediaDataForQuotePost(post, request);
         }
 
         PostEntity savedPost = postRepository.save(post);
 
+        // Parse content
         if (request.getContent() != null && !request.getContent().trim().isEmpty()) {
             parseAndSaveContent(savedPost, request.getContent());
         }
@@ -159,9 +162,11 @@ public class PostServiceImpl implements PostService {
             saveAttachmentsForQuotePost(savedPost, request);
         }
 
+        // This is atomic and safe inside the same transaction
+        postRepository.incrementQuotesCount(quotedPostId);
+
         return savedPost;
     }
-
 
     @Override
     @Transactional
@@ -179,6 +184,9 @@ public class PostServiceImpl implements PostService {
         post.setPublishedAt(LocalDateTime.now());
 
         return postRepository.save(post);
+
+        //Todo: we need non blocking event publisher for notification to all collaborators, mentions of (products, shop, users).. etc
+
     }
 
     @Override

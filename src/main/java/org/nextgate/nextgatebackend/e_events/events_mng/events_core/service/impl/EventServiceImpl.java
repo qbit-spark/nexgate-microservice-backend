@@ -16,10 +16,7 @@ import org.nextgate.nextgatebackend.e_events.category.repo.EventsCategoryReposit
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.EventDayEntity;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.EventEntity;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.embedded.*;
-import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventCreationStage;
-import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventFormat;
-import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventStatus;
-import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventSubmissionAction;
+import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.*;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.payloads.*;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.repo.EventsRepo;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.service.EventsService;
@@ -31,6 +28,9 @@ import org.nextgate.nextgatebackend.globe_crypto.RSAKeys;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.AccessDeniedException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.EventValidationException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -58,39 +58,270 @@ public class EventServiceImpl implements EventsService {
 
     @Override
     @Transactional
-    public EventEntity createEvent(CreateEventRequest createEventRequest)
-            throws ItemNotFoundException, AccessDeniedException, EventValidationException {
-
-        log.info("Creating event as draft");
+    public EventEntity createEventDraft(CreateEventDraftRequest request)
+            throws ItemNotFoundException, EventValidationException {
 
         AccountEntity currentUser = getAuthenticatedAccount();
 
-        log.debug("Saving event as DRAFT for user: {}", currentUser.getUserName());
+        // One draft at a time
+        if (eventsRepo.existsByOrganizerAndStatusAndIsDeletedFalse(currentUser, EventStatus.DRAFT)) {
+            throw new EventValidationException(
+                    "You already have an event draft. Complete or discard it first.",
+                    EventCreationStage.BASIC_INFO
+            );
+        }
 
-        eventValidations.hardValidateBasicInfo(createEventRequest);
-        eventValidations.softValidateSchedule(createEventRequest);
-        eventValidations.softValidateLocation(createEventRequest);
-        eventValidations.softValidateMedia(createEventRequest);
-
-        EventsCategoryEntity category = categoryRepository.findById(createEventRequest.getCategoryId())
+        EventsCategoryEntity category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new EventValidationException(
-                        "Category not found",
-                        EventCreationStage.BASIC_INFO
-                ));
+                        "Category not found", EventCreationStage.BASIC_INFO));
 
-        EventEntity event = buildEventEntity(createEventRequest, currentUser, category);
+        EventEntity event = EventEntity.builder()
+                .title(request.getTitle())
+                .slug(generateUniqueSlug(request.getTitle()))
+                .category(category)
+                .eventFormat(request.getEventFormat())
+                .eventVisibility(EventVisibility.PUBLIC)
+                .organizer(currentUser)
+                .createdBy(currentUser)
+                .status(EventStatus.DRAFT)
+                .currentStage(EventCreationStage.BASIC_INFO)
+                .isDeleted(false)
+                .completedStages(new ArrayList<>())
+                .build();
 
-        event.setStatus(EventStatus.DRAFT);
-        event.setSlug(generateUniqueSlug(createEventRequest.getTitle()));
+        event.markStageCompleted(EventCreationStage.BASIC_INFO);
 
-        markCompletedStagesForDraft(event, createEventRequest);
-
-        EventEntity savedEvent = eventsRepo.save(event);
-
-        log.info("Event saved as DRAFT with ID: {}", savedEvent.getId());
-        return savedEvent;
+        log.info("Event draft created for user: {}", currentUser.getUserName());
+        return eventsRepo.save(event);
     }
 
+    @Override
+    public EventEntity getMyCurrentEventDraft() throws ItemNotFoundException {
+        AccountEntity currentUser = getAuthenticatedAccount();
+        return eventsRepo.findByOrganizerAndStatusAndIsDeletedFalse(currentUser, EventStatus.DRAFT)
+                .orElse(null);
+    }
+
+    private EventEntity getMyDraftOrThrow() throws ItemNotFoundException {
+        EventEntity draft = getMyCurrentEventDraft();
+        if (draft == null) {
+            throw new ItemNotFoundException("No event draft found. Create a draft first.");
+        }
+        return draft;
+    }
+
+    @Override
+    @Transactional
+    public void discardEventDraft() throws ItemNotFoundException {
+        EventEntity draft = getMyDraftOrThrow();
+
+        draft.getLinkedProducts().clear();
+        draft.getLinkedShops().clear();
+        draft.getDays().clear();
+
+        eventsRepo.delete(draft);
+        log.info("Event draft discarded: {}", draft.getId());
+    }
+
+    @Override
+    @Transactional
+    public EventEntity updateDraftBasicInfo(UpdateEventBasicInfoRequest request)
+            throws ItemNotFoundException, EventValidationException {
+
+        EventEntity draft = getMyDraftOrThrow();
+        AccountEntity currentUser = getAuthenticatedAccount();
+
+        if (request.getTitle() != null) {
+            draft.setTitle(request.getTitle());
+            draft.setSlug(generateUniqueSlug(request.getTitle()));
+        }
+        if (request.getDescription() != null) {
+            draft.setDescription(request.getDescription());
+        }
+        if (request.getCategoryId() != null) {
+            EventsCategoryEntity category = categoryRepository.findById(request.getCategoryId())
+                    .orElseThrow(() -> new EventValidationException(
+                            "Category not found", EventCreationStage.BASIC_INFO));
+            draft.setCategory(category);
+        }
+        if (request.getEventVisibility() != null) {
+            draft.setEventVisibility(request.getEventVisibility());
+        }
+        if (request.getEventFormat() != null) {
+            draft.setEventFormat(request.getEventFormat());
+        }
+
+        draft.setUpdatedBy(currentUser);
+        draft.markStageCompleted(EventCreationStage.BASIC_INFO);
+        draft.setCurrentStage(EventCreationStage.SCHEDULE);
+
+        return eventsRepo.save(draft);
+    }
+
+    @Override
+    @Transactional
+    public EventEntity updateDraftSchedule(ScheduleRequest schedule)
+            throws ItemNotFoundException, EventValidationException {
+
+        EventEntity draft = getMyDraftOrThrow();
+        AccountEntity currentUser = getAuthenticatedAccount();
+
+        // Clear existing days
+        draft.getDays().clear();
+        eventsRepo.saveAndFlush(draft);
+
+        if (schedule.getDays() != null && !schedule.getDays().isEmpty()) {
+            List<EventDayEntity> eventDays = mapEventDays(schedule.getDays(), draft);
+            draft.setDays(eventDays);
+
+            EventDayEntity firstDay = eventDays.getFirst();
+            EventDayEntity lastDay = eventDays.getLast();
+
+            String timezone = schedule.getTimezone() != null ? schedule.getTimezone() : "UTC";
+
+            draft.setStartDateTime(ZonedDateTime.of(
+                    firstDay.getDate(), firstDay.getStartTime(), ZoneId.of(timezone)));
+            draft.setEndDateTime(ZonedDateTime.of(
+                    lastDay.getDate(), lastDay.getEndTime(), ZoneId.of(timezone)));
+            draft.setTimezone(timezone);
+
+            draft.markStageCompleted(EventCreationStage.SCHEDULE);
+            draft.setCurrentStage(EventCreationStage.LOCATION_DETAILS);
+        }
+
+        draft.setUpdatedBy(currentUser);
+        return eventsRepo.save(draft);
+    }
+
+    @Override
+    @Transactional
+    public EventEntity updateDraftLocation(UpdateEventLocationRequest request)
+            throws ItemNotFoundException, EventValidationException {
+
+        EventEntity draft = getMyDraftOrThrow();
+        AccountEntity currentUser = getAuthenticatedAccount();
+
+        if (request.getVenue() != null) {
+            draft.setVenue(mapVenue(request.getVenue()));
+        }
+        if (request.getVirtualDetails() != null) {
+            draft.setVirtualDetails(mapVirtualDetails(request.getVirtualDetails()));
+        }
+
+        // Check if location complete based on format
+        EventFormat format = draft.getEventFormat();
+        boolean complete = switch (format) {
+            case IN_PERSON -> draft.getVenue() != null && draft.getVenue().getName() != null;
+            case ONLINE -> draft.getVirtualDetails() != null && draft.getVirtualDetails().getMeetingLink() != null;
+            case HYBRID -> draft.getVenue() != null && draft.getVenue().getName() != null &&
+                    draft.getVirtualDetails() != null && draft.getVirtualDetails().getMeetingLink() != null;
+        };
+
+        if (complete) {
+            draft.markStageCompleted(EventCreationStage.LOCATION_DETAILS);
+            draft.setCurrentStage(EventCreationStage.TICKETS);
+        }
+
+        draft.setUpdatedBy(currentUser);
+        return eventsRepo.save(draft);
+    }
+
+    @Override
+    @Transactional
+    public EventEntity updateDraftMedia(MediaRequest media) throws ItemNotFoundException {
+        EventEntity draft = getMyDraftOrThrow();
+        AccountEntity currentUser = getAuthenticatedAccount();
+
+        if (media != null) {
+            draft.setMedia(mapMedia(media));
+            draft.markStageCompleted(EventCreationStage.MEDIA);
+        }
+
+        draft.setUpdatedBy(currentUser);
+        return eventsRepo.save(draft);
+    }
+
+    @Override
+    @Transactional
+    public EventEntity attachProductToDraft(UUID productId)
+            throws ItemNotFoundException, EventValidationException {
+
+        EventEntity draft = getMyDraftOrThrow();
+
+        ProductEntity product = productRepo
+                .findByProductIdAndIsDeletedFalseAndStatus(productId, ProductStatus.ACTIVE)
+                .orElseThrow(() -> new EventValidationException(
+                        "Product not found or not active", EventCreationStage.LINKS));
+
+        boolean exists = draft.getLinkedProducts().stream()
+                .anyMatch(p -> p.getProductId().equals(productId));
+
+        if (exists) {
+            throw new EventValidationException(
+                    "Product already attached to draft", EventCreationStage.LINKS);
+        }
+
+        draft.getLinkedProducts().add(product);
+        draft.markStageCompleted(EventCreationStage.LINKS);
+
+        return eventsRepo.save(draft);
+    }
+
+    @Override
+    @Transactional
+    public EventEntity attachShopToDraft(UUID shopId)
+            throws ItemNotFoundException, EventValidationException {
+
+        EventEntity draft = getMyDraftOrThrow();
+
+        ShopEntity shop = shopRepo
+                .findByShopIdAndIsDeletedFalseAndStatus(shopId, ShopStatus.ACTIVE)
+                .orElseThrow(() -> new EventValidationException(
+                        "Shop not found or not active", EventCreationStage.LINKS));
+
+        boolean exists = draft.getLinkedShops().stream()
+                .anyMatch(s -> s.getShopId().equals(shopId));
+
+        if (exists) {
+            throw new EventValidationException(
+                    "Shop already attached to draft", EventCreationStage.LINKS);
+        }
+
+        draft.getLinkedShops().add(shop);
+        draft.markStageCompleted(EventCreationStage.LINKS);
+
+        return eventsRepo.save(draft);
+    }
+
+    @Override
+    @Transactional
+    public EventEntity removeProductFromDraft(UUID productId) throws ItemNotFoundException {
+        EventEntity draft = getMyDraftOrThrow();
+
+        boolean removed = draft.getLinkedProducts()
+                .removeIf(p -> p.getProductId().equals(productId));
+
+        if (!removed) {
+            throw new ItemNotFoundException("Product not attached to draft");
+        }
+
+        return eventsRepo.save(draft);
+    }
+
+    @Override
+    @Transactional
+    public EventEntity removeShopFromDraft(UUID shopId) throws ItemNotFoundException {
+        EventEntity draft = getMyDraftOrThrow();
+
+        boolean removed = draft.getLinkedShops()
+                .removeIf(s -> s.getShopId().equals(shopId));
+
+        if (!removed) {
+            throw new ItemNotFoundException("Shop not attached to draft");
+        }
+
+        return eventsRepo.save(draft);
+    }
 
     @Override
     @Transactional
@@ -119,9 +350,9 @@ public class EventServiceImpl implements EventsService {
             }
 
             // Validate event before publishing
-            eventValidations.validateEventEntityForPublish(event);
+            eventValidations.validateForPublish(event);
 
-            DuplicateValidationResult duplicateCheck = duplicateValidator.validateNoDuplicateForEntity(event);
+            DuplicateValidationResult duplicateCheck = duplicateValidator.validate(event);
 
             if (duplicateCheck.isBlocked()) {
                 log.warn("Duplicate event detected for user: {}", currentUser.getUserName());
@@ -192,201 +423,30 @@ public class EventServiceImpl implements EventsService {
     }
 
 
-    /**
-     * Build EventEntity from CreateEventRequest
-     */
-    private EventEntity buildEventEntity(
-            CreateEventRequest request,
-            AccountEntity organizer,
-            EventsCategoryEntity category) throws EventValidationException {
+    @Override
+    @Transactional(readOnly = true)
+    public Page<EventEntity> getMyEvents(int page, int size) throws ItemNotFoundException {
+        log.debug("Fetching events for organizer, page: {}, size: {}", page, size);
 
-        EventEntity.EventEntityBuilder builder = EventEntity.builder()
-                .title(request.getTitle())
-                .slug(generateUniqueSlug(request.getTitle()))
-                .description(request.getDescription())
-                .category(category)
-                .eventFormat(request.getEventFormat())
-                .organizer(organizer)
-                .createdBy(organizer)
-                .eventVisibility(request.getEventVisibility())
-                .isDeleted(false)
-                .completedStages(new ArrayList<>());
+        AccountEntity currentUser = getAuthenticatedAccount();
+        Pageable pageable = PageRequest.of(page - 1, size);
 
-        // Map venue (for IN_PERSON and HYBRID)
-        if (request.getVenue() != null) {
-            builder.venue(mapVenue(request.getVenue()));
-        }
+        return eventsRepo.findByOrganizerAndIsDeletedFalseOrderByCreatedAtDesc(currentUser, pageable);
+    }
 
-        // Map virtual details (for ONLINE and HYBRID)
-        if (request.getVirtualDetails() != null) {
-            builder.virtualDetails(mapVirtualDetails(request.getVirtualDetails()));
-        }
+    @Override
+    @Transactional(readOnly = true)
+    public Page<EventEntity> getMyEventsByStatus(EventStatus status, int page, int size)
+            throws ItemNotFoundException {
+        log.debug("Fetching events with status: {}, page: {}, size: {}", status, page, size);
 
-        // Map media
-        if (request.getMedia() != null) {
-            builder.media(mapMedia(request.getMedia()));
-        }
+        AccountEntity currentUser = getAuthenticatedAccount();
+        Pageable pageable = PageRequest.of(page - 1, size);
 
-        // Build the event first
-        EventEntity event = builder.build();
-
-        // ========== NEW: Map EventDays for MULTI_DAY events ==========
-        if (request.getSchedule() != null &&
-                request.getSchedule().getDays() != null &&
-                !request.getSchedule().getDays().isEmpty()) {
-
-            List<EventDayEntity> eventDays = mapEventDays(
-                    request.getSchedule().getDays(),
-                    event
-            );
-            event.setDays(eventDays);
-
-            // Auto-calculate startDateTime and endDateTime from days
-            EventDayEntity firstDay = eventDays.getFirst();
-            EventDayEntity lastDay = eventDays.getLast();
-
-            String timezone = request.getSchedule().getTimezone() != null
-                    ? request.getSchedule().getTimezone()
-                    : "UTC";
-
-            event.setStartDateTime(ZonedDateTime.of(
-                    firstDay.getDate(),
-                    firstDay.getStartTime(),
-                    ZoneId.of(timezone)
-            ));
-
-            event.setEndDateTime(ZonedDateTime.of(
-                    lastDay.getDate(),
-                    lastDay.getEndTime(),
-                    ZoneId.of(timezone)
-            ));
-
-            event.setTimezone(timezone);
-
-            log.debug("Added {} days to event, start: {}, end: {}",
-                    eventDays.size(), event.getStartDateTime(), event.getEndDateTime());
-        }
-        // ============================================================
-
-        // Map linked products
-        if (request.getLinkedProductIds() != null && !request.getLinkedProductIds().isEmpty()) {
-            event.setLinkedProducts(mapLinkedProducts(request.getLinkedProductIds()));
-        }
-
-        // Map linked shops
-        if (request.getLinkedShopIds() != null && !request.getLinkedShopIds().isEmpty()) {
-            event.setLinkedShops(mapLinkedShops(request.getLinkedShopIds()));
-        }
-
-        return event;
+        return eventsRepo.findByOrganizerAndStatusAndIsDeletedFalseOrderByCreatedAtDesc(currentUser, status, pageable);
     }
 
 
-    private void markCompletedStagesForDraft(EventEntity event, CreateEventRequest request) {
-        List<String> completedStages = new ArrayList<>();
-
-        completedStages.add(EventCreationStage.BASIC_INFO.name());
-
-        if (request.getSchedule() != null &&
-                request.getSchedule().getDays() != null &&
-                !request.getSchedule().getDays().isEmpty()) {
-            completedStages.add(EventCreationStage.SCHEDULE.name());
-        }
-
-        if (isLocationComplete(request)) {
-            completedStages.add(EventCreationStage.LOCATION_DETAILS.name());
-        }
-
-        if (request.getMedia() != null &&
-                (request.getMedia().getBanner() != null || request.getMedia().getThumbnail() != null)) {
-            completedStages.add(EventCreationStage.MEDIA.name());
-        }
-
-        if ((request.getLinkedProductIds() != null && !request.getLinkedProductIds().isEmpty()) ||
-                (request.getLinkedShopIds() != null && !request.getLinkedShopIds().isEmpty())) {
-            completedStages.add(EventCreationStage.LINKS.name());
-        }
-
-        event.setCompletedStages(completedStages);
-        event.setCurrentStage(determineCurrentStage(completedStages));
-    }
-
-    private boolean isLocationComplete(CreateEventRequest request) {
-        EventFormat format = request.getEventFormat();
-
-        if (format == EventFormat.IN_PERSON) {
-            return request.getVenue() != null && request.getVenue().getName() != null;
-        } else if (format == EventFormat.ONLINE) {
-            return request.getVirtualDetails() != null && request.getVirtualDetails().getMeetingLink() != null;
-        } else if (format == EventFormat.HYBRID) {
-            return request.getVenue() != null && request.getVenue().getName() != null &&
-                    request.getVirtualDetails() != null && request.getVirtualDetails().getMeetingLink() != null;
-        }
-
-        return false;
-    }
-
-    private EventCreationStage determineCurrentStage(List<String> completedStages) {
-        if (!completedStages.contains(EventCreationStage.BASIC_INFO.name())) {
-            return EventCreationStage.BASIC_INFO;
-        }
-        if (!completedStages.contains(EventCreationStage.SCHEDULE.name())) {
-            return EventCreationStage.SCHEDULE;
-        }
-        if (!completedStages.contains(EventCreationStage.LOCATION_DETAILS.name())) {
-            return EventCreationStage.LOCATION_DETAILS;
-        }
-        if (!completedStages.contains(EventCreationStage.TICKETS.name())) {
-            return EventCreationStage.TICKETS;
-        }
-
-        return EventCreationStage.REVIEW;
-    }
-
-    /**
-     * Map linked product IDs to the ProductEntity list
-     */private List<ProductEntity> mapLinkedProducts(List<UUID> productIds) throws EventValidationException {
-        log.debug("Mapping {} linked products", productIds.size());
-
-        List<ProductEntity> products = new ArrayList<>();
-
-        for (UUID productId : productIds) {
-            ProductEntity product = productRepo
-                    .findByProductIdAndIsDeletedFalseAndStatus(productId, ProductStatus.ACTIVE)
-                    .orElseThrow(() -> new EventValidationException(
-                            "Product not found or not active: " + productId,
-                            EventCreationStage.LINKS
-                    ));
-
-            products.add(product);
-        }
-
-        log.debug("Successfully mapped {} products", products.size());
-        return products;
-    }
-
-    /**
-     * Map linked shop IDs to ShopEntity list
-     */
-    private List<ShopEntity> mapLinkedShops(List<UUID> shopIds) throws EventValidationException {
-        log.debug("Mapping {} linked shops", shopIds.size());
-
-        List<ShopEntity> shops = new ArrayList<>();
-
-        for (UUID shopId : shopIds) {
-            ShopEntity shop = shopRepo
-                    .findByShopIdAndIsDeletedFalseAndStatus(shopId, ShopStatus.ACTIVE)
-                    .orElseThrow(() -> new EventValidationException(
-                            "Shop not found or not active: " + shopId,
-                            EventCreationStage.LINKS
-                    ));
-
-            shops.add(shop);
-        }
-
-        log.debug("Successfully mapped {} shops", shops.size());
-        return shops;
-    }
 
     /**
      * Map VenueRequest to Venue (embedded)

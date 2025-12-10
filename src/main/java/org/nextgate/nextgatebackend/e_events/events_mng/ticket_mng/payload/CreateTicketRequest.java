@@ -35,11 +35,9 @@ public class CreateTicketRequest {
 
 
     // ========== QUANTITY MANAGEMENT ==========
-    @Min(value = 0, message = "Total quantity cannot be negative")
-    private Integer totalQuantity; // null if unlimited
+    @Min(value = 1, message = "Total quantity cannot be less than one")
+    private Integer totalQuantity;
 
-    @Builder.Default
-    private Boolean isUnlimited = false;
 
     // ========== SALES PERIOD (Optional) ==========
     private ZonedDateTime salesStartDateTime;

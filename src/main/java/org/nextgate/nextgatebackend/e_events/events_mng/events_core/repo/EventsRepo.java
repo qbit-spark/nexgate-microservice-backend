@@ -3,6 +3,8 @@ package org.nextgate.nextgatebackend.e_events.events_mng.events_core.repo;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.EventEntity;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -63,9 +65,7 @@ public interface EventsRepo extends JpaRepository<EventEntity, UUID> {
     );
 
     // Find events by organizer
-    List<EventEntity> findByOrganizerAndIsDeletedFalseOrderByCreatedAtDesc(
-            AccountEntity organizer
-    );
+
 
     // Find events by category
     List<EventEntity> findByCategoryCategoryIdAndIsDeletedFalseAndStatus(
@@ -81,4 +81,22 @@ public interface EventsRepo extends JpaRepository<EventEntity, UUID> {
     List<EventEntity> findByOrganizerAndIsDeletedFalse(AccountEntity organizer);
 
     Optional<EventEntity> findByIdAndStatusAndIsDeletedFalse(UUID id, EventStatus eventStatus);
+
+    Page<EventEntity> findByOrganizerAndStatusAndIsDeletedFalseOrderByCreatedAtDesc(
+            AccountEntity organizer,
+            EventStatus status,
+            org.springframework.data.domain.Pageable pageable
+    );
+
+    Page<EventEntity> findByOrganizerAndIsDeletedFalseOrderByCreatedAtDesc(
+            AccountEntity organizer,
+            Pageable pageable
+    );
+
+    Optional<EventEntity> findByOrganizerAndStatusAndIsDeletedFalse(
+            AccountEntity organizer,
+            EventStatus status
+    );
+
+    boolean existsByOrganizerAndStatusAndIsDeletedFalse(AccountEntity organizer, EventStatus status);
 }

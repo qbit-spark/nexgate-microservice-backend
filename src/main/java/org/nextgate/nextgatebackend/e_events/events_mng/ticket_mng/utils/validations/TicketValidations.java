@@ -77,17 +77,14 @@ public class TicketValidations {
     public void validateQuantityFields(CreateTicketRequest request) throws EventValidationException {
         Integer quantity = request.getTotalQuantity();
 
-        // null or 0 means unlimited - that's fine
-        if (quantity == null || quantity == 0) {
-            return;
+        if (quantity == null) {
+            throw new EventValidationException("Total quantity is required");
         }
 
-        // If quantity provided, must be positive
-        if (quantity < 0) {
-            throw new EventValidationException("Total quantity cannot be negative");
+        if (quantity < 1) {
+            throw new EventValidationException("Total quantity must be at least 1");
         }
 
-        // Reasonable upper limit check
         if (quantity > 1_000_000) {
             throw new EventValidationException("Total quantity exceeds maximum allowed (1,000,000)");
         }
@@ -340,13 +337,6 @@ public class TicketValidations {
 
         log.debug("Validating capacity update for ticket: {}", ticket.getId());
 
-        // Cannot set capacity on unlimited tickets
-        if (ticket.getIsUnlimited()) {
-            throw new EventValidationException(
-                    "Cannot set capacity on unlimited tickets. " +
-                            "Change isUnlimited to false first."
-            );
-        }
 
         // New capacity must be positive
         if (newCapacity < 1) {
