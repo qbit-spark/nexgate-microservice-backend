@@ -2,10 +2,6 @@ package org.nextgate.nextgatebackend.e_events.events_mng.events_core.utils.valid
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.nextgate.nextgatebackend.e_commerce.products_mng_service.products.enums.ProductStatus;
-import org.nextgate.nextgatebackend.e_commerce.products_mng_service.products.repo.ProductRepo;
-import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng.enums.ShopStatus;
-import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng.repo.ShopRepo;
 import org.nextgate.nextgatebackend.e_events.category.entity.EventsCategoryEntity;
 import org.nextgate.nextgatebackend.e_events.category.repo.EventsCategoryRepository;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.EventEntity;
@@ -18,7 +14,11 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.*;
+import java.time.ZonedDateTime;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -26,35 +26,16 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class EventValidations {
 
-    private final EventsCategoryRepository eventsCategoryRepository;
-    private final ShopRepo shopRepo;
-    private final ProductRepo productRepo;
+    private final EventsCategoryRepository categoryRepository;
     private final TicketValidations ticketValidations;
 
     // ========================================================================
-    // DRAFT CREATION VALIDATION
+    // DRAFT CREATION
     // ========================================================================
 
     public void validateCreateDraft(CreateEventDraftRequest request) throws EventValidationException {
-        log.debug("Validating create draft request");
-
-        if (request.getTitle() == null || request.getTitle().isBlank()) {
-            throw new EventValidationException("Event title is required", EventCreationStage.BASIC_INFO);
-        }
-        if (request.getTitle().length() < 3) {
-            throw new EventValidationException("Title must be at least 3 characters", EventCreationStage.BASIC_INFO);
-        }
-        if (request.getTitle().length() > 200) {
-            throw new EventValidationException("Title must not exceed 200 characters", EventCreationStage.BASIC_INFO);
-        }
-
-        if (request.getCategoryId() == null) {
-            throw new EventValidationException("Category is required", EventCreationStage.BASIC_INFO);
-        }
-        EventsCategoryEntity category = validateCategoryExists(request.getCategoryId());
-        if (!category.getIsActive()) {
-            throw new EventValidationException("Cannot create event in inactive category", EventCreationStage.BASIC_INFO);
-        }
+        validateTitle(request.getTitle(), true);
+        validateCategory(request.getCategoryId());
 
         if (request.getEventFormat() == null) {
             throw new EventValidationException("Event format is required", EventCreationStage.BASIC_INFO);
@@ -62,19 +43,12 @@ public class EventValidations {
     }
 
     // ========================================================================
-    // BASIC INFO VALIDATION
+    // BASIC INFO
     // ========================================================================
 
     public void validateBasicInfo(UpdateEventBasicInfoRequest request) throws EventValidationException {
-        log.debug("Validating basic info update");
-
         if (request.getTitle() != null) {
-            if (request.getTitle().length() < 3) {
-                throw new EventValidationException("Title must be at least 3 characters", EventCreationStage.BASIC_INFO);
-            }
-            if (request.getTitle().length() > 200) {
-                throw new EventValidationException("Title must not exceed 200 characters", EventCreationStage.BASIC_INFO);
-            }
+            validateTitle(request.getTitle(), false);
         }
 
         if (request.getDescription() != null) {
@@ -87,20 +61,15 @@ public class EventValidations {
         }
 
         if (request.getCategoryId() != null) {
-            EventsCategoryEntity category = validateCategoryExists(request.getCategoryId());
-            if (!category.getIsActive()) {
-                throw new EventValidationException("Cannot use inactive category", EventCreationStage.BASIC_INFO);
-            }
+            validateCategory(request.getCategoryId());
         }
     }
 
     // ========================================================================
-    // SCHEDULE VALIDATION
+    // SCHEDULE
     // ========================================================================
 
     public void validateSchedule(ScheduleRequest request) throws EventValidationException {
-        log.debug("Validating schedule update");
-
         if (request.getDays() == null || request.getDays().isEmpty()) {
             throw new EventValidationException("At least one day is required", EventCreationStage.SCHEDULE);
         }
@@ -110,6 +79,108 @@ public class EventValidations {
         }
 
         validateDays(request.getDays());
+    }
+
+    // ========================================================================
+    // LOCATION
+    // ========================================================================
+
+    public void validateLocation(UpdateEventLocationRequest request, EventFormat format)
+            throws EventValidationException {
+
+        boolean venueRequired = format == EventFormat.IN_PERSON || format == EventFormat.HYBRID;
+        boolean virtualRequired = format == EventFormat.ONLINE || format == EventFormat.HYBRID;
+
+        if (venueRequired) {
+            validateVenue(request.getVenue(), true);
+        } else if (request.getVenue() != null) {
+            validateVenue(request.getVenue(), false);
+        }
+
+        if (virtualRequired) {
+            validateVirtualDetails(request.getVirtualDetails(), true);
+        } else if (request.getVirtualDetails() != null) {
+            validateVirtualDetails(request.getVirtualDetails(), false);
+        }
+    }
+
+    // ========================================================================
+    // MEDIA
+    // ========================================================================
+
+    public void validateMedia(MediaRequest request) throws EventValidationException {
+        if (request == null) return;
+
+        if (request.getBanner() != null && request.getBanner().length() > 500) {
+            throw new EventValidationException("Banner URL must not exceed 500 characters", EventCreationStage.MEDIA);
+        }
+
+        if (request.getThumbnail() != null && request.getThumbnail().length() > 500) {
+            throw new EventValidationException("Thumbnail URL must not exceed 500 characters", EventCreationStage.MEDIA);
+        }
+
+        if (request.getGallery() != null && request.getGallery().size() > 20) {
+            throw new EventValidationException("Gallery cannot have more than 20 images", EventCreationStage.MEDIA);
+        }
+    }
+
+    // ========================================================================
+    // PUBLISH
+    // ========================================================================
+
+    public void validateForPublish(EventEntity event) throws EventValidationException {
+        // Check required stages
+        checkStageCompleted(event, EventCreationStage.BASIC_INFO);
+        checkStageCompleted(event, EventCreationStage.SCHEDULE);
+        checkStageCompleted(event, EventCreationStage.LOCATION_DETAILS);
+
+        // Validate entity data
+        validateEventData(event);
+
+        // Validate tickets
+        ticketValidations.validateEventHasRequiredTickets(event);
+    }
+
+    // ========================================================================
+    // PRIVATE HELPERS
+    // ========================================================================
+
+    private void validateTitle(String title, boolean required) throws EventValidationException {
+        if (title == null || title.isBlank()) {
+            if (required) {
+                throw new EventValidationException("Event title is required", EventCreationStage.BASIC_INFO);
+            }
+            return;
+        }
+
+        if (title.length() < 3) {
+            throw new EventValidationException("Title must be at least 3 characters", EventCreationStage.BASIC_INFO);
+        }
+        if (title.length() > 200) {
+            throw new EventValidationException("Title must not exceed 200 characters", EventCreationStage.BASIC_INFO);
+        }
+    }
+
+    private void validateCategory(UUID categoryId) throws EventValidationException {
+        if (categoryId == null) {
+            throw new EventValidationException("Category is required", EventCreationStage.BASIC_INFO);
+        }
+
+        EventsCategoryEntity category = categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new EventValidationException(
+                        "Category not found: " + categoryId, EventCreationStage.BASIC_INFO));
+
+        if (!category.getIsActive()) {
+            throw new EventValidationException("Cannot use inactive category", EventCreationStage.BASIC_INFO);
+        }
+    }
+
+    private void validateTimezone(String timezone) throws EventValidationException {
+        try {
+            ZoneId.of(timezone);
+        } catch (Exception e) {
+            throw new EventValidationException("Invalid timezone: " + timezone, EventCreationStage.SCHEDULE);
+        }
     }
 
     private void validateDays(List<EventDayRequest> days) throws EventValidationException {
@@ -130,69 +201,28 @@ public class EventValidations {
             }
 
             if (day.getDate().isBefore(today)) {
-                throw new EventValidationException(
-                        "Event date cannot be in the past: " + day.getDate(),
-                        EventCreationStage.SCHEDULE
-                );
+                throw new EventValidationException("Event date cannot be in the past: " + day.getDate(), EventCreationStage.SCHEDULE);
             }
 
-            if (day.getEndTime().isBefore(day.getStartTime())) {
-                throw new EventValidationException(
-                        "End time must be after start time for day: " + day.getDate(),
-                        EventCreationStage.SCHEDULE
-                );
+            if (!day.getEndTime().isAfter(day.getStartTime())) {
+                throw new EventValidationException("End time must be after start time for: " + day.getDate(), EventCreationStage.SCHEDULE);
             }
 
-            if (day.getEndTime().equals(day.getStartTime())) {
-                throw new EventValidationException(
-                        "Start and end time cannot be the same for day: " + day.getDate(),
-                        EventCreationStage.SCHEDULE
-                );
+            if (!seenDates.add(day.getDate())) {
+                throw new EventValidationException("Duplicate date: " + day.getDate(), EventCreationStage.SCHEDULE);
             }
-
-            if (seenDates.contains(day.getDate())) {
-                throw new EventValidationException(
-                        "Duplicate date found: " + day.getDate(),
-                        EventCreationStage.SCHEDULE
-                );
-            }
-            seenDates.add(day.getDate());
 
             if (day.getDayOrder() == null) {
                 day.setDayOrder(i + 1);
             }
         }
 
-        // Ensure chronological order
-        List<LocalDate> sortedDates = days.stream()
-                .map(EventDayRequest::getDate)
-                .sorted()
-                .collect(Collectors.toList());
+        // Check chronological order
+        List<LocalDate> sorted = days.stream().map(EventDayRequest::getDate).sorted().collect(Collectors.toList());
+        List<LocalDate> provided = days.stream().map(EventDayRequest::getDate).collect(Collectors.toList());
 
-        List<LocalDate> providedDates = days.stream()
-                .map(EventDayRequest::getDate)
-                .collect(Collectors.toList());
-
-        if (!sortedDates.equals(providedDates)) {
+        if (!sorted.equals(provided)) {
             throw new EventValidationException("Days must be in chronological order", EventCreationStage.SCHEDULE);
-        }
-    }
-
-    // ========================================================================
-    // LOCATION VALIDATION
-    // ========================================================================
-
-    public void validateLocation(UpdateEventLocationRequest request, EventFormat format)
-            throws EventValidationException {
-        log.debug("Validating location update for format: {}", format);
-
-        if (format == EventFormat.IN_PERSON) {
-            validateVenue(request.getVenue(), true);
-        } else if (format == EventFormat.ONLINE) {
-            validateVirtualDetails(request.getVirtualDetails(), true);
-        } else if (format == EventFormat.HYBRID) {
-            validateVenue(request.getVenue(), true);
-            validateVirtualDetails(request.getVirtualDetails(), true);
         }
     }
 
@@ -213,12 +243,11 @@ public class EventValidations {
         }
 
         if (venue.getAddress() != null && venue.getAddress().length() > 500) {
-            throw new EventValidationException("Venue address must not exceed 500 characters", EventCreationStage.LOCATION_DETAILS);
+            throw new EventValidationException("Address must not exceed 500 characters", EventCreationStage.LOCATION_DETAILS);
         }
     }
 
-    private void validateVirtualDetails(VirtualDetailsRequest details, boolean required)
-            throws EventValidationException {
+    private void validateVirtualDetails(VirtualDetailsRequest details, boolean required) throws EventValidationException {
         if (details == null) {
             if (required) {
                 throw new EventValidationException("Virtual details are required", EventCreationStage.LOCATION_DETAILS);
@@ -233,119 +262,12 @@ public class EventValidations {
         if (details.getMeetingLink() != null && details.getMeetingLink().length() > 500) {
             throw new EventValidationException("Meeting link must not exceed 500 characters", EventCreationStage.LOCATION_DETAILS);
         }
-
-        if (details.getMeetingId() != null && details.getMeetingId().length() > 100) {
-            throw new EventValidationException("Meeting ID must not exceed 100 characters", EventCreationStage.LOCATION_DETAILS);
-        }
-
-        if (details.getPasscode() != null && details.getPasscode().length() > 100) {
-            throw new EventValidationException("Passcode must not exceed 100 characters", EventCreationStage.LOCATION_DETAILS);
-        }
     }
 
-    // ========================================================================
-    // MEDIA VALIDATION
-    // ========================================================================
-
-    public void validateMedia(MediaRequest request) throws EventValidationException {
-        log.debug("Validating media update");
-
-        if (request == null) {
-            return;
+    private void checkStageCompleted(EventEntity event, EventCreationStage stage) throws EventValidationException {
+        if (!event.isStageCompleted(stage)) {
+            throw new EventValidationException(stage.name() + " must be completed before publishing", stage);
         }
-
-        if (request.getBanner() != null && request.getBanner().length() > 500) {
-            throw new EventValidationException("Banner URL must not exceed 500 characters", EventCreationStage.MEDIA);
-        }
-
-        if (request.getThumbnail() != null && request.getThumbnail().length() > 500) {
-            throw new EventValidationException("Thumbnail URL must not exceed 500 characters", EventCreationStage.MEDIA);
-        }
-
-        if (request.getGallery() != null && request.getGallery().size() > 20) {
-            throw new EventValidationException("Gallery cannot have more than 20 images", EventCreationStage.MEDIA);
-        }
-    }
-
-    // ========================================================================
-    // ATTACHMENT VALIDATION (Product/Shop)
-    // ========================================================================
-
-    public void validateProductAttachment(UUID productId) throws EventValidationException {
-        log.debug("Validating product attachment: {}", productId);
-
-        var product = productRepo.findByProductIdAndIsDeletedFalseAndStatus(productId, ProductStatus.ACTIVE);
-
-        if (product.isEmpty()) {
-            var anyProduct = productRepo.findById(productId);
-            if (anyProduct.isEmpty() || anyProduct.get().getIsDeleted()) {
-                throw new EventValidationException("Product not found: " + productId, EventCreationStage.LINKS);
-            } else {
-                throw new EventValidationException(
-                        "Product is not active (status: " + anyProduct.get().getStatus() + ")",
-                        EventCreationStage.LINKS
-                );
-            }
-        }
-    }
-
-    public void validateShopAttachment(UUID shopId) throws EventValidationException {
-        log.debug("Validating shop attachment: {}", shopId);
-
-        var shop = shopRepo.findByShopIdAndIsDeletedFalseAndStatus(shopId, ShopStatus.ACTIVE);
-
-        if (shop.isEmpty()) {
-            var anyShop = shopRepo.findById(shopId);
-            if (anyShop.isEmpty() || anyShop.get().getIsDeleted()) {
-                throw new EventValidationException("Shop not found: " + shopId, EventCreationStage.LINKS);
-            } else {
-                throw new EventValidationException(
-                        "Shop is not active (status: " + anyShop.get().getStatus() + ")",
-                        EventCreationStage.LINKS
-                );
-            }
-        }
-    }
-
-    public void validateLinkedProductsCount(int currentCount) throws EventValidationException {
-        if (currentCount >= 50) {
-            throw new EventValidationException("Cannot link more than 50 products", EventCreationStage.LINKS);
-        }
-    }
-
-    public void validateLinkedShopsCount(int currentCount) throws EventValidationException {
-        if (currentCount >= 20) {
-            throw new EventValidationException("Cannot link more than 20 shops", EventCreationStage.LINKS);
-        }
-    }
-
-    // ========================================================================
-    // PUBLISH VALIDATION (Final check before publishing)
-    // ========================================================================
-
-    public void validateForPublish(EventEntity event) throws EventValidationException {
-        log.debug("Validating event for publish: {}", event.getId());
-
-        // Check required stages
-        if (!event.isStageCompleted(EventCreationStage.BASIC_INFO)) {
-            throw new EventValidationException("Basic info must be completed", EventCreationStage.BASIC_INFO);
-        }
-
-        if (!event.isStageCompleted(EventCreationStage.SCHEDULE)) {
-            throw new EventValidationException("Schedule must be completed", EventCreationStage.SCHEDULE);
-        }
-
-        if (!event.isStageCompleted(EventCreationStage.LOCATION_DETAILS)) {
-            throw new EventValidationException("Location must be completed", EventCreationStage.LOCATION_DETAILS);
-        }
-
-        // Validate entity data
-        validateEventData(event);
-
-        // Validate tickets
-        ticketValidations.validateEventHasRequiredTickets(event);
-
-        log.debug("Event validation for publish passed");
     }
 
     private void validateEventData(EventEntity event) throws EventValidationException {
@@ -361,38 +283,30 @@ public class EventValidations {
             throw new EventValidationException("Event schedule is incomplete", EventCreationStage.SCHEDULE);
         }
 
+        if (event.getStartDateTime().isBefore(ZonedDateTime.now())) {
+            throw new EventValidationException(
+                    "Cannot publish event with start date in the past",
+                    EventCreationStage.SCHEDULE
+            );
+        }
+
+        if (event.getEndDateTime().isBefore(event.getStartDateTime())) {
+            throw new EventValidationException(
+                    "End date cannot be before start date",
+                    EventCreationStage.SCHEDULE
+            );
+        }
+
         EventFormat format = event.getEventFormat();
 
-        if (format == EventFormat.IN_PERSON || format == EventFormat.HYBRID) {
-            if (event.getVenue() == null || event.getVenue().getName() == null) {
-                throw new EventValidationException("Venue is missing", EventCreationStage.LOCATION_DETAILS);
-            }
+        if ((format == EventFormat.IN_PERSON || format == EventFormat.HYBRID) &&
+                (event.getVenue() == null || event.getVenue().getName() == null)) {
+            throw new EventValidationException("Venue is missing", EventCreationStage.LOCATION_DETAILS);
         }
 
-        if (format == EventFormat.ONLINE || format == EventFormat.HYBRID) {
-            if (event.getVirtualDetails() == null || event.getVirtualDetails().getMeetingLink() == null) {
-                throw new EventValidationException("Virtual details are missing", EventCreationStage.LOCATION_DETAILS);
-            }
-        }
-    }
-
-    // ========================================================================
-    // HELPER METHODS
-    // ========================================================================
-
-    private EventsCategoryEntity validateCategoryExists(UUID categoryId) throws EventValidationException {
-        return eventsCategoryRepository.findById(categoryId)
-                .orElseThrow(() -> new EventValidationException(
-                        "Category not found: " + categoryId,
-                        EventCreationStage.BASIC_INFO
-                ));
-    }
-
-    private void validateTimezone(String timezone) throws EventValidationException {
-        try {
-            ZoneId.of(timezone);
-        } catch (Exception e) {
-            throw new EventValidationException("Invalid timezone: " + timezone, EventCreationStage.SCHEDULE);
+        if ((format == EventFormat.ONLINE || format == EventFormat.HYBRID) &&
+                (event.getVirtualDetails() == null || event.getVirtualDetails().getMeetingLink() == null)) {
+            throw new EventValidationException("Virtual details are missing", EventCreationStage.LOCATION_DETAILS);
         }
     }
 }
