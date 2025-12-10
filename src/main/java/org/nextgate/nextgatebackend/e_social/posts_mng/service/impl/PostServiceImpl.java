@@ -854,7 +854,7 @@ public class PostServiceImpl implements PostService {
                 mediaData.setId(UUID.randomUUID().toString());
                 mediaData.setMediaType(mediaRequest.getMediaType());
                 mediaData.setOriginalUrl(mediaRequest.getMediaUrl());
-                mediaData.setPlaceholderBase64(null);
+                mediaData.setPlaceholderBase64(mediaRequest.getPlaceholderBase64());
                 mediaData.setWidth(mediaRequest.getWidth());
                 mediaData.setHeight(mediaRequest.getHeight());
                 mediaData.setDuration(mediaRequest.getDuration());
