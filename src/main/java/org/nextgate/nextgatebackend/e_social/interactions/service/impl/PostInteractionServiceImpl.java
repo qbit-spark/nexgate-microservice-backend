@@ -15,10 +15,19 @@ import org.nextgate.nextgatebackend.e_social.posts_mng.entity.*;
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PostRepostEntity;
 import org.nextgate.nextgatebackend.e_social.posts_mng.enums.CollaboratorStatus;
 import org.nextgate.nextgatebackend.e_social.posts_mng.enums.PostStatus;
+import org.nextgate.nextgatebackend.e_social.posts_mng.enums.PostVisibility;
 import org.nextgate.nextgatebackend.e_social.posts_mng.enums.RepostPermission;
+import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.PostResponse;
 import org.nextgate.nextgatebackend.e_social.posts_mng.repo.*;
+import org.nextgate.nextgatebackend.e_social.posts_mng.utils.PostVisibilityUtil;
+import org.nextgate.nextgatebackend.e_social.posts_mng.utils.mapper.PostResponseMapper;
 import org.nextgate.nextgatebackend.e_social.user_relationships.follow_system.enums.FollowStatus;
 import org.nextgate.nextgatebackend.e_social.user_relationships.follow_system.repo.FollowRepository;
+import org.nextgate.nextgatebackend.e_social.user_relationships.privacy_controls.entity.BlockEntity;
+import org.nextgate.nextgatebackend.e_social.user_relationships.privacy_controls.repo.BlockRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -26,6 +35,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -41,6 +51,9 @@ public class PostInteractionServiceImpl implements PostInteractionService {
     private final AccountRepo accountRepo;
     private final FollowRepository followRepository;
     private final PostCollaboratorRepository postCollaboratorRepository;
+    private final PostResponseMapper postResponseMapper;
+    private final BlockRepository blockRepository;
+    private final PostVisibilityUtil postVisibilityUtil;
 
     @Override
     @Transactional
@@ -213,6 +226,64 @@ public class PostInteractionServiceImpl implements PostInteractionService {
         }
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Page<PostResponse> getMyBookmarks(int page, int size) {
+        AccountEntity user = getAuthenticatedAccount();
+        UUID viewerId = user.getId();
+
+        Page<PostBookmarkEntity> bookmarks = postBookmarkRepository
+                .findByUserIdOrderByCreatedAtDesc(user.getId(), PageRequest.of(page, size));
+
+        List<PostResponse> posts = bookmarks.getContent().stream()
+                .map(bookmark -> postRepository.findByIdAndIsDeletedFalse(bookmark.getPostId()).orElse(null))
+                .filter(post -> post != null && post.getStatus() == PostStatus.PUBLISHED)
+                .filter(post -> postVisibilityUtil.canViewPost(post, viewerId))
+                .map(postResponseMapper::toPostResponse)
+                .toList();
+
+        return new PageImpl<>(posts, bookmarks.getPageable(), bookmarks.getTotalElements());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<PostResponse> getMyReposts(int page, int size) {
+        AccountEntity user = getAuthenticatedAccount();
+        UUID viewerId = user.getId();
+
+        Page<PostRepostEntity> reposts = postRepostRepository
+                .findByUserIdOrderByCreatedAtDesc(user.getId(), PageRequest.of(page, size));
+
+        List<PostResponse> posts = reposts.getContent().stream()
+                .map(repost -> postRepository.findByIdAndIsDeletedFalse(repost.getPostId()).orElse(null))
+                .filter(post -> post != null && post.getStatus() == PostStatus.PUBLISHED)
+                .filter(post -> postVisibilityUtil.canViewPost(post, viewerId))
+                .map(postResponseMapper::toPostResponse)
+                .toList();
+
+        return new PageImpl<>(posts, reposts.getPageable(), reposts.getTotalElements());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<PostResponse> getUserReposts(UUID userId, int page, int size) {
+        AccountEntity viewer = getAuthenticatedAccountOrNull();
+        UUID viewerId = viewer != null ? viewer.getId() : null;
+
+        Page<PostRepostEntity> reposts = postRepostRepository
+                .findByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(page, size));
+
+        List<PostResponse> posts = reposts.getContent().stream()
+                .map(repost -> postRepository.findByIdAndIsDeletedFalse(repost.getPostId()).orElse(null))
+                .filter(post -> post != null && post.getStatus() == PostStatus.PUBLISHED)
+                .filter(post -> postVisibilityUtil.canViewPost(post, viewerId))
+                .map(postResponseMapper::toPostResponse)
+                .toList();
+
+        return new PageImpl<>(posts, reposts.getPageable(), reposts.getTotalElements());
+    }
+
+
     private boolean canRepost(PostEntity post, AccountEntity user) {
         RepostPermission whoCanRepost = post.getWhoCanRepost();
 
@@ -240,8 +311,7 @@ public class PostInteractionServiceImpl implements PostInteractionService {
                             post.getAuthorId(),
                             FollowStatus.ACCEPTED
                     );
-            case DISABLED ->
-                    false;
+            case DISABLED -> false;
             default -> false;
         };
     }

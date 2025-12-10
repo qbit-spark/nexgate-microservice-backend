@@ -1,6 +1,8 @@
 package org.nextgate.nextgatebackend.e_social.interactions.repo;
 
 import org.nextgate.nextgatebackend.e_social.interactions.entity.PostBookmarkEntity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -17,4 +19,6 @@ public interface PostBookmarkRepository extends JpaRepository<PostBookmarkEntity
     long countByPostId(UUID postId);
 
     void deleteByPostId(UUID postId);
+
+    Page<PostBookmarkEntity> findByUserIdOrderByCreatedAtDesc(UUID userId, Pageable pageable);
 }

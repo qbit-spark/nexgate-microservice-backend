@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.nextgate.nextgatebackend.e_social.interactions.service.PostInteractionService;
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PostCommentEntity;
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PostEntity;
+import org.nextgate.nextgatebackend.e_social.posts_mng.enums.PostVisibility;
 import org.nextgate.nextgatebackend.e_social.posts_mng.payloads.*;
 import org.nextgate.nextgatebackend.e_social.posts_mng.service.CommentService;
 import org.nextgate.nextgatebackend.e_social.posts_mng.service.FeedService;
@@ -12,6 +13,9 @@ import org.nextgate.nextgatebackend.e_social.posts_mng.service.PollService;
 import org.nextgate.nextgatebackend.e_social.posts_mng.service.PostService;
 import org.nextgate.nextgatebackend.e_social.posts_mng.utils.mapper.CommentResponseMapper;
 import org.nextgate.nextgatebackend.e_social.posts_mng.utils.mapper.PostResponseMapper;
+import org.nextgate.nextgatebackend.e_social.user_relationships.follow_system.enums.FollowStatus;
+import org.nextgate.nextgatebackend.e_social.user_relationships.follow_system.repo.FollowRepository;
+import org.nextgate.nextgatebackend.e_social.user_relationships.privacy_controls.repo.BlockRepository;
 import org.nextgate.nextgatebackend.globeresponsebody.GlobeSuccessResponseBuilder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -38,6 +42,7 @@ public class PostController {
     private final CommentService commentService;
     private final CommentResponseMapper commentResponseMapper;
     private final FeedService feedService;
+
 
     @PostMapping
     public ResponseEntity<GlobeSuccessResponseBuilder> createPost(
@@ -579,6 +584,21 @@ public class PostController {
         return ResponseEntity.ok(successResponse);
     }
 
+    @GetMapping("/bookmarks")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getMyBookmarks(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        Page<PostResponse> bookmarks = interactionService.getMyBookmarks(page - 1, size);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Bookmarks retrieved successfully",
+                bookmarks
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
     @PostMapping("/{postId}/repost")
     public ResponseEntity<GlobeSuccessResponseBuilder> repostPost(
             @PathVariable UUID postId,
@@ -608,6 +628,37 @@ public class PostController {
         return ResponseEntity.ok(successResponse);
     }
 
+    @GetMapping("/my-reposts")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getMyReposts(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        Page<PostResponse> reposts = interactionService.getMyReposts(page - 1, size);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "Reposts retrieved successfully",
+                reposts
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
+    @GetMapping("/users/{userId}/reposts")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getUserReposts(
+            @PathVariable UUID userId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        Page<PostResponse> reposts = interactionService.getUserReposts(userId, page - 1, size);
+
+        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
+                "User reposts retrieved successfully",
+                reposts
+        );
+
+        return ResponseEntity.ok(successResponse);
+    }
+
     @PostMapping("/{postId}/view")
     public ResponseEntity<GlobeSuccessResponseBuilder> recordView(@PathVariable UUID postId) {
 
@@ -621,9 +672,9 @@ public class PostController {
         return ResponseEntity.ok(successResponse);
     }
 
+     // ============================================
+    // COMMENT ENDPOINTS
     // ============================================
-   // COMMENT ENDPOINTS
-   // ============================================
 
     @PostMapping("/{postId}/comments")
     public ResponseEntity<GlobeSuccessResponseBuilder> createComment(
@@ -782,14 +833,13 @@ public class PostController {
     // FEED/TIMELINE ENDPOINTS
     // ============================================
 
-    @GetMapping("/users/{userId}/timeline")
-    public ResponseEntity<GlobeSuccessResponseBuilder> getUserTimeline(
-            @PathVariable UUID userId,
+    @GetMapping("/my-timeline")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getMyTimeline(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
 
         Pageable pageable = PageRequest.of(page - 1, size);
-        Page<TimelineItemResponse> timelinePage = feedService.getUserTimeline(userId, pageable);
+        Page<TimelineItemResponse> timelinePage = feedService.getUserTimeline(pageable);
 
         GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
                 "Timeline retrieved successfully",
@@ -846,4 +896,5 @@ public class PostController {
 
         return ResponseEntity.ok(successResponse);
     }
+
 }

@@ -41,23 +41,21 @@ public class FeedServiceImpl implements FeedService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<TimelineItemResponse> getUserTimeline(UUID userId, Pageable pageable) {
+    public Page<TimelineItemResponse> getUserTimeline(Pageable pageable) {
         AccountEntity currentUser = getAuthenticatedAccountOrNull();
         UUID currentUserId = currentUser != null ? currentUser.getId() : null;
 
-        // Validate user exists
-        if (!accountRepo.existsById(userId)) {
-            throw new IllegalArgumentException("User not found");
-        }
 
         // Get user's original posts
         List<PostEntity> userPosts = postRepository.findByAuthorIdAndIsDeletedFalseAndStatus(
-                userId,
+                currentUserId,
                 PostStatus.PUBLISHED
         );
 
         // Get user's reposts
-        List<PostRepostEntity> userReposts = postRepostRepository.findAllByUserId(userId);
+        List<PostRepostEntity> userReposts = postRepostRepository.findAllByUserId(
+                currentUserId
+        );
 
         // Combine and create timeline items
         List<TimelineItemResponse> timelineItems = new ArrayList<>();
