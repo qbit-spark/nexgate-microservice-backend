@@ -310,7 +310,7 @@ public class InstallmentAgreementEntity {
         if (fulfillmentTiming == FulfillmentTiming.IMMEDIATE) {
             return true;  // Ship after down payment
         }
-        // AFTER_PAYMENT: ship only if completed
+        // AFTER_FIRST_PAYMENT: ship only if completed
         return isCompleted();
     }
 

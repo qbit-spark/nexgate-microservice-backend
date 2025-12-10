@@ -46,7 +46,7 @@ public class InstallmentImmediateOrderListener {
         try {
             // Check if order should be created
             if (!event.isRequiresImmediateOrder()) {
-                log.info("AFTER_PAYMENT fulfillment - no order needed now");
+                log.info("AFTER_FIRST_PAYMENT fulfillment - no order needed now");
                 return;
             }
 

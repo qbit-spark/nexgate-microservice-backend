@@ -234,7 +234,7 @@ public class InstallmentServiceImpl implements InstallmentService {
 
         } else {
 
-            log.info("Fulfillment: AFTER_PAYMENT");
+            log.info("Fulfillment: AFTER_FIRST_PAYMENT");
             log.info("  → Inventory will be held");
             log.info("  → Order will be created after final payment");
         }
@@ -631,7 +631,7 @@ public class InstallmentServiceImpl implements InstallmentService {
             log.info("  Progress: {}%", String.format("%.1f", agreement.getAmountPaidPercentage()));
 
         } else {
-            log.info("Order Status: Not yet created (AFTER_PAYMENT fulfillment)");
+            log.info("Order Status: Not yet created (AFTER_FIRST_PAYMENT fulfillment)");
         }
 
         // ========================================
@@ -1199,10 +1199,10 @@ public class InstallmentServiceImpl implements InstallmentService {
         // ========================================
         // STEP 8: HANDLE FULFILLMENT
         // ========================================
-        if (agreement.getFulfillmentTiming() == FulfillmentTiming.AFTER_PAYMENT &&
+        if (agreement.getFulfillmentTiming() == FulfillmentTiming.AFTER_FIRST_PAYMENT &&
                 agreement.getOrderId() == null) {
 
-            log.info("Fulfillment type: AFTER_PAYMENT");
+            log.info("Fulfillment type: AFTER_FIRST_PAYMENT");
             log.info("Order should be created now (via event)");
 
             try {
@@ -1572,10 +1572,10 @@ public class InstallmentServiceImpl implements InstallmentService {
 
         log.info("✓ Agreement marked as COMPLETED");
 
-        if (agreement.getFulfillmentTiming() == FulfillmentTiming.AFTER_PAYMENT &&
+        if (agreement.getFulfillmentTiming() == FulfillmentTiming.AFTER_FIRST_PAYMENT &&
                 agreement.getOrderId() == null) {
 
-            log.info("Fulfillment Type: AFTER_PAYMENT");
+            log.info("Fulfillment Type: AFTER_FIRST_PAYMENT");
             log.info("Order should be created now (via event)");
 
             // Publish event for order creation

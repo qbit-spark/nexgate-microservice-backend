@@ -235,16 +235,50 @@ public class PostResponse {
     @AllArgsConstructor
     @NoArgsConstructor
     public static class AttachedInstallmentPlan {
+        // Plan identification
         private UUID id;
+        private String planName;
+        private boolean isFeatured;
+
+        // Product info
         private UUID productId;
         private String productName;
         private String productImageUrl;
-        private Double monthlyAmount;
-        private int duration;
-        private Double totalAmount;
-        private Double interestRate;
-        private Double downPayment;
+        private BigDecimal productPrice;
+
+        // Shop info
+        private UUID shopId;
+        private String shopName;
+
+        // Payment breakdown
+        private BigDecimal amountPerPayment;
+        private Integer numberOfPayments;
+        private String paymentFrequency;
+        private String frequencyDisplay;
+
+        // Duration
+        private Integer durationDays;
+        private String durationDisplay;
+
+        // Down payment
+        private Integer downPaymentPercent;
+        private BigDecimal downPaymentAmount;
+
+        // Interest
+        private BigDecimal apr;
         private boolean isInterestFree;
+
+        // Totals
+        private BigDecimal totalAmount;
+        private BigDecimal interestAmount;
+
+        // Fulfillment
+        private String fulfillmentTiming;
+        private String fulfillmentDisplay;
+
+        // Grace period
+        private Integer paymentStartDelayDays;
+        private String graceDisplay;
     }
 
     @Getter

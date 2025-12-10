@@ -7,7 +7,11 @@ import lombok.RequiredArgsConstructor;
 import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.authentication_service.repo.AccountRepo;
 import org.nextgate.nextgatebackend.e_commerce.group_purchase_mng.repo.GroupPurchaseInstanceRepo;
+import org.nextgate.nextgatebackend.e_commerce.installment_purchase.entity.InstallmentPlanEntity;
+import org.nextgate.nextgatebackend.e_commerce.installment_purchase.enums.FulfillmentTiming;
+import org.nextgate.nextgatebackend.e_commerce.installment_purchase.enums.PaymentFrequency;
 import org.nextgate.nextgatebackend.e_commerce.installment_purchase.repo.InstallmentPlanRepo;
+import org.nextgate.nextgatebackend.e_commerce.products_mng_service.products.entity.ProductEntity;
 import org.nextgate.nextgatebackend.e_commerce.products_mng_service.products.repo.ProductRepo;
 import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng.enums.ShopStatus;
 import org.nextgate.nextgatebackend.e_commerce.shops_mng_service.shops.shops_mng.repo.ShopRepo;
@@ -30,6 +34,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -445,29 +450,156 @@ public class PostResponseMapper {
         return groups;
     }
 
+
+
     private List<PostResponse.AttachedInstallmentPlan> mapAttachedInstallmentPlans(PostEntity post) {
         List<PostResponse.AttachedInstallmentPlan> plans = new ArrayList<>();
 
         postInstallmentPlanRepository.findByPostId(post.getId()).forEach(postPlan -> {
             installmentPlanRepo.findById(postPlan.getPlanId()).ifPresent(plan -> {
-                PostResponse.AttachedInstallmentPlan attachedPlan = new PostResponse.AttachedInstallmentPlan();
-                attachedPlan.setId(plan.getPlanId());
-                attachedPlan.setProductId(plan.getProduct() != null ? plan.getProduct().getProductId() : null);
-
-                if (plan.getProduct() != null && plan.getProduct().getProductId() != null) {
-                    productRepo.findById(plan.getProduct().getProductId()).ifPresent(product -> {
-                        attachedPlan.setProductName(product.getProductName());
-                        attachedPlan.setProductImageUrl(product.getProductImages() != null && !product.getProductImages().isEmpty()
-                                ? product.getProductImages().getFirst()
-                                : null);
-                    });
+                if (plan.getIsActive() && plan.getProduct() != null) {
+                    plans.add(mapInstallmentPlan(plan));
                 }
-
-                plans.add(attachedPlan);
             });
         });
 
         return plans;
+    }
+
+    private PostResponse.AttachedInstallmentPlan mapInstallmentPlan(InstallmentPlanEntity plan) {
+        PostResponse.AttachedInstallmentPlan attached = new PostResponse.AttachedInstallmentPlan();
+
+        ProductEntity product = plan.getProduct();
+        BigDecimal productPrice = product.getPrice();
+
+        // Plan identification
+        attached.setId(plan.getPlanId());
+        attached.setPlanName(plan.getPlanName());
+        attached.setFeatured(plan.getIsFeatured());
+
+        // Product info
+        attached.setProductId(product.getProductId());
+        attached.setProductName(product.getProductName());
+        attached.setProductImageUrl(getFirstProductImage(product));
+        attached.setProductPrice(productPrice);
+
+        // Shop info
+        if (plan.getShop() != null) {
+            attached.setShopId(plan.getShop().getShopId());
+            attached.setShopName(plan.getShop().getShopName());
+        }
+
+        // Payment schedule
+        attached.setNumberOfPayments(plan.getNumberOfPayments());
+        attached.setPaymentFrequency(plan.getPaymentFrequency().name());
+        attached.setFrequencyDisplay(getFrequencyDisplay(plan.getPaymentFrequency()));
+
+        // Duration
+        attached.setDurationDays(plan.getCalculatedDurationDays());
+        attached.setDurationDisplay(plan.getCalculatedDurationDisplay());
+
+        // Down payment calculation
+        Integer downPercent = plan.getMinDownPaymentPercent();
+        attached.setDownPaymentPercent(downPercent);
+
+        BigDecimal downPaymentAmount = productPrice
+                .multiply(BigDecimal.valueOf(downPercent))
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        attached.setDownPaymentAmount(downPaymentAmount);
+
+        // Interest
+        BigDecimal apr = plan.getApr();
+        attached.setApr(apr);
+        attached.setInterestFree(apr.compareTo(BigDecimal.ZERO) == 0);
+
+        // Calculate totals
+        BigDecimal remainingAfterDown = productPrice.subtract(downPaymentAmount);
+        BigDecimal interestAmount = calculateInterest(
+                remainingAfterDown,
+                apr,
+                plan.getCalculatedDurationDays()
+        );
+        attached.setInterestAmount(interestAmount);
+        attached.setTotalAmount(productPrice.add(interestAmount));
+
+        // Amount per payment (excluding down payment)
+        BigDecimal totalPayments = remainingAfterDown.add(interestAmount);
+        BigDecimal amountPerPayment = totalPayments
+                .divide(BigDecimal.valueOf(plan.getNumberOfPayments()), 2, RoundingMode.HALF_UP);
+        attached.setAmountPerPayment(amountPerPayment);
+
+        // Fulfillment
+        attached.setFulfillmentTiming(plan.getFulfillmentTiming().name());
+        attached.setFulfillmentDisplay(getFulfillmentDisplay(plan.getFulfillmentTiming()));
+
+        // Grace period
+        attached.setPaymentStartDelayDays(plan.getPaymentStartDelayDays());
+        attached.setGraceDisplay(getGraceDisplay(plan.getPaymentStartDelayDays()));
+
+        return attached;
+    }
+
+    private String getFirstProductImage(ProductEntity product) {
+        if (product.getProductImages() != null && !product.getProductImages().isEmpty()) {
+            return product.getProductImages().getFirst();
+        }
+        return null;
+    }
+
+    private String getFrequencyDisplay(PaymentFrequency frequency) {
+        return switch (frequency) {
+            case DAILY -> "per day";
+            case WEEKLY -> "per week";
+            case BI_WEEKLY -> "every 2 weeks";
+            case SEMI_MONTHLY -> "twice a month";
+            case MONTHLY -> "per month";
+            case QUARTERLY -> "per quarter";
+            case CUSTOM_DAYS -> "per payment";
+        };
+    }
+
+    private String getFulfillmentDisplay(FulfillmentTiming timing) {
+        return switch (timing) {
+            case  AFTER_FIRST_PAYMENT  -> "Ships after down payment";
+            case IMMEDIATE -> "Ships immediately";
+        };
+    }
+
+    private String getGraceDisplay(Integer days) {
+        if (days == null || days == 0) {
+            return "First payment today";
+        }
+        if (days == 1) {
+            return "First payment tomorrow";
+        }
+        if (days == 7) {
+            return "First payment in 1 week";
+        }
+        if (days == 14) {
+            return "First payment in 2 weeks";
+        }
+        if (days == 30) {
+            return "First payment in 1 month";
+        }
+        return "First payment in " + days + " days";
+    }
+
+    private BigDecimal calculateInterest(BigDecimal principal, BigDecimal apr, Integer durationDays) {
+        if (apr == null || apr.compareTo(BigDecimal.ZERO) == 0 || durationDays == null) {
+            return BigDecimal.ZERO;
+        }
+
+        // Simple interest: I = P × R × T
+        // Where T is in years (durationDays / 365)
+        BigDecimal years = BigDecimal.valueOf(durationDays)
+                .divide(BigDecimal.valueOf(365), 10, RoundingMode.HALF_UP);
+
+        BigDecimal rate = apr.divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP);
+
+        return principal
+                .multiply(rate)
+                .multiply(years)
+                .setScale(2, RoundingMode.HALF_UP);
     }
 
     private PostResponse.ExternalLink mapExternalLink(PostEntity post) {

@@ -491,7 +491,7 @@ public class CustomerInstallmentServiceImpl implements CustomerInstallmentServic
             log.info("Total Payments: {}", agreement.getNumberOfPayments());
 
 
-            //Todo: Here is critical place bro.. we handle when installment is completed depend in fulfilment (IMMEDIATE, OR AFTER_PAYMENT)
+            //Todo: Here is critical place bro.. we handle when installment is completed depend in fulfilment (IMMEDIATE, OR AFTER_FIRST_PAYMENT)
             installmentService.handleAgreementCompletion(agreement);
 
         }else {
