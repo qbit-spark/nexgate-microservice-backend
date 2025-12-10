@@ -5,6 +5,7 @@ import org.nextgate.nextgatebackend.authentication_service.entity.AccountEntity;
 import org.nextgate.nextgatebackend.authentication_service.repo.AccountRepo;
 import org.nextgate.nextgatebackend.e_social.interactions.entity.PostBookmarkEntity;
 import org.nextgate.nextgatebackend.e_social.interactions.entity.PostLikeEntity;
+import org.nextgate.nextgatebackend.e_social.interactions.entity.PostRepostEntity;
 import org.nextgate.nextgatebackend.e_social.interactions.entity.PostViewEntity;
 import org.nextgate.nextgatebackend.e_social.interactions.repo.PostBookmarkRepository;
 import org.nextgate.nextgatebackend.e_social.interactions.repo.PostLikeRepository;
@@ -12,7 +13,6 @@ import org.nextgate.nextgatebackend.e_social.interactions.repo.PostRepostReposit
 import org.nextgate.nextgatebackend.e_social.interactions.repo.PostViewRepository;
 import org.nextgate.nextgatebackend.e_social.interactions.service.PostInteractionService;
 import org.nextgate.nextgatebackend.e_social.posts_mng.entity.*;
-import org.nextgate.nextgatebackend.e_social.posts_mng.entity.PostRepostEntity;
 import org.nextgate.nextgatebackend.e_social.posts_mng.enums.CollaboratorStatus;
 import org.nextgate.nextgatebackend.e_social.posts_mng.enums.PostStatus;
 import org.nextgate.nextgatebackend.e_social.posts_mng.enums.PostVisibility;
