@@ -560,7 +560,7 @@ public class PostResponseMapper {
 
     private String getFulfillmentDisplay(FulfillmentTiming timing) {
         return switch (timing) {
-            case  AFTER_PAYMENT  -> "Ships after down payment";
+            case  AFTER_PAYMENT  -> "Ships after full payment";
             case IMMEDIATE -> "Ships immediately";
         };
     }
