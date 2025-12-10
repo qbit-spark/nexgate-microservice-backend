@@ -31,6 +31,9 @@ import org.nextgate.nextgatebackend.globe_crypto.RSAKeys;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.AccessDeniedException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.EventValidationException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -191,6 +194,29 @@ public class EventServiceImpl implements EventsService {
         return event;
     }
 
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<EventEntity> getMyEvents(int page, int size) throws ItemNotFoundException {
+        log.debug("Fetching events for organizer, page: {}, size: {}", page, size);
+
+        AccountEntity currentUser = getAuthenticatedAccount();
+        Pageable pageable = PageRequest.of(page - 1, size);
+
+        return eventsRepo.findByOrganizerAndIsDeletedFalseOrderByCreatedAtDesc(currentUser, pageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<EventEntity> getMyEventsByStatus(EventStatus status, int page, int size)
+            throws ItemNotFoundException {
+        log.debug("Fetching events with status: {}, page: {}, size: {}", status, page, size);
+
+        AccountEntity currentUser = getAuthenticatedAccount();
+        Pageable pageable = PageRequest.of(page - 1, size);
+
+        return eventsRepo.findByOrganizerAndStatusAndIsDeletedFalseOrderByCreatedAtDesc(currentUser, status, pageable);
+    }
 
     /**
      * Build EventEntity from CreateEventRequest

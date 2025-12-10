@@ -1,12 +1,15 @@
 package org.nextgate.nextgatebackend.e_events.events_mng.events_core.service;
 
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.EventEntity;
+import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventStatus;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventSubmissionAction;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.payloads.CreateEventRequest;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.AccessDeniedException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.EventValidationException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.ItemNotFoundException;
+import org.springframework.data.domain.Page;
 
+import java.util.List;
 import java.util.UUID;
 
 public interface EventsService {
@@ -17,4 +20,10 @@ public interface EventsService {
             throws ItemNotFoundException, AccessDeniedException, EventValidationException;
 
     EventEntity getEventById(UUID eventId) throws ItemNotFoundException, AccessDeniedException;
+
+
+    Page<EventEntity> getMyEvents(int page, int size) throws ItemNotFoundException;
+
+    Page<EventEntity> getMyEventsByStatus(EventStatus status, int page, int size)
+            throws ItemNotFoundException;
 }
