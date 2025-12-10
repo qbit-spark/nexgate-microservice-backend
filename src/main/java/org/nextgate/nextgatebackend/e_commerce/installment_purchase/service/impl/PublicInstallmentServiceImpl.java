@@ -446,7 +446,7 @@ public class PublicInstallmentServiceImpl implements PublicInstallmentService {
     private String buildFulfillmentDescription(InstallmentPlanEntity plan) {
         return switch (plan.getFulfillmentTiming()) {
             case IMMEDIATE -> "Product ships immediately after down payment";
-            case AFTER_FIRST_PAYMENT -> "Product ships after final payment is completed";
+            case AFTER_PAYMENT -> "Product ships after final payment is completed";
         };
     }
 

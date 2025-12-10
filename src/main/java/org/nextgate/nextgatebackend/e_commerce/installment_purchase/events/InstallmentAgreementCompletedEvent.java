@@ -12,7 +12,7 @@ import java.util.UUID;
  * and marked as COMPLETED.
  *
  * Triggers:
- * - Order creation (for AFTER_FIRST_PAYMENT fulfillment)
+ * - Order creation (for AFTER_PAYMENT fulfillment)
  * - Notification to customer
  * - Analytics tracking
  */

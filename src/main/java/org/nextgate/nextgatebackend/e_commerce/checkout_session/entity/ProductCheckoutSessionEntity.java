@@ -772,7 +772,7 @@ public class ProductCheckoutSessionEntity implements PayableCheckoutSession {
         // Timing
         private LocalDateTime firstPaymentDate;
         private Integer paymetnStartDelayDays;
-        private String fulfillmentTiming;        // IMMEDIATE or AFTER_FIRST_PAYMENT
+        private String fulfillmentTiming;        // IMMEDIATE or AFTER_PAYMENT
 
         // Full schedule preview
         private List<PaymentScheduleItem> schedule;

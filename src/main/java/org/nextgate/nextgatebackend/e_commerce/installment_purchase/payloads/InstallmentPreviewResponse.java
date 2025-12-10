@@ -90,7 +90,7 @@ public class InstallmentPreviewResponse {
     // FULFILLMENT INFO
     // ========================================
 
-    private String fulfillmentTiming;       // "IMMEDIATE" or "AFTER_FIRST_PAYMENT"
+    private String fulfillmentTiming;       // "IMMEDIATE" or "AFTER_PAYMENT"
     private String fulfillmentDescription;  // Human-readable
 
     // ========================================

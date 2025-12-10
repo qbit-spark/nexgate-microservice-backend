@@ -73,7 +73,7 @@ public class ProductPostPaymentHandler implements PostPaymentHandler {
         if (agreement.getOrderId() != null) {
             log.info("  Order Created: {} (IMMEDIATE fulfillment)", agreement.getOrderId());
         } else {
-            log.info("  Order: Not created yet (AFTER_FIRST_PAYMENT fulfillment)");
+            log.info("  Order: Not created yet (AFTER_PAYMENT fulfillment)");
         }
     }
 

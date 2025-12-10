@@ -22,7 +22,7 @@ import java.util.UUID;
 
 /**
  * Listens for InstallmentAgreementCompletedEvent and creates orders
- * for AFTER_FIRST_PAYMENT fulfillment timing.
+ * for AFTER_PAYMENT fulfillment timing.
  *
  * Flow:
  * 1. User completes final payment (or early payoff)
@@ -74,15 +74,15 @@ public class InstallmentCompletionOrderListener {
             log.info("  Existing Order ID: {}", agreement.getOrderId());
 
             // ========================================
-            // 2. CHECK IF AFTER_FIRST_PAYMENT FULFILLMENT
+            // 2. CHECK IF AFTER_PAYMENT FULFILLMENT
             // ========================================
-            if (agreement.getFulfillmentTiming() != FulfillmentTiming.AFTER_FIRST_PAYMENT) {
+            if (agreement.getFulfillmentTiming() != FulfillmentTiming.AFTER_PAYMENT) {
                 log.info("✓ Fulfillment is IMMEDIATE - order already created");
                 log.info("  Existing Order ID: {}", agreement.getOrderId());
                 return;
             }
 
-            log.info("✓ Fulfillment is AFTER_FIRST_PAYMENT - order should be created now");
+            log.info("✓ Fulfillment is AFTER_PAYMENT - order should be created now");
 
             // ========================================
             // 3. IDEMPOTENCY CHECK
@@ -118,7 +118,7 @@ public class InstallmentCompletionOrderListener {
             // ========================================
             // 4. CREATE ORDER WITH RETRY
             // ========================================
-            log.info("Creating order for AFTER_FIRST_PAYMENT fulfillment...");
+            log.info("Creating order for AFTER_PAYMENT fulfillment...");
 
             boolean orderCreated = createOrderWithRetry(
                     agreement.getCheckoutSessionId(),
@@ -128,7 +128,7 @@ public class InstallmentCompletionOrderListener {
 
             if (orderCreated) {
                 log.info("╔════════════════════════════════════════════════════════════╗");
-                log.info("║   ✓ ORDER CREATED SUCCESSFULLY FOR AFTER_FIRST_PAYMENT          ║");
+                log.info("║   ✓ ORDER CREATED SUCCESSFULLY FOR AFTER_PAYMENT          ║");
                 log.info("╚════════════════════════════════════════════════════════════╝");
                 log.info("Agreement: {}", agreement.getAgreementNumber());
                 log.info("Customer: {}", agreement.getCustomer().getEmail());

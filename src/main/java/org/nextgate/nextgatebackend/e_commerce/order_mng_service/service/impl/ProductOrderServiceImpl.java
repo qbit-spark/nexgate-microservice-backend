@@ -606,11 +606,11 @@ public class ProductOrderServiceImpl implements ProductOrderService {
         // ========================================
         // 2. VALIDATE FULFILLMENT TIMING
         // ========================================
-        if (agreement.getFulfillmentTiming() == FulfillmentTiming.AFTER_FIRST_PAYMENT &&
+        if (agreement.getFulfillmentTiming() == FulfillmentTiming.AFTER_PAYMENT &&
                 !agreement.isCompleted()) {
             throw new BadRequestException(
                     "Cannot create order - agreement not fully paid. " +
-                            "Fulfillment timing: AFTER_FIRST_PAYMENT requires completion.");
+                            "Fulfillment timing: AFTER_PAYMENT requires completion.");
         }
 
         log.info("✓ Fulfillment validation passed");
