@@ -227,26 +227,22 @@ public class EventCheckoutServiceImpl implements EventCheckoutService {
     }
 
     private void holdTickets(TicketEntity ticket, Integer quantity, LocalDateTime holdExpiration) {
-        if (!ticket.getIsUnlimited()) {
-            Integer available = ticket.getQuantityAvailable();
-            ticket.setQuantitySold(ticket.getQuantitySold() + quantity);
-            ticketRepo.save(ticket);
-            log.debug("Held {} tickets until {}", quantity, holdExpiration);
-        }
+        ticket.setQuantitySold(ticket.getQuantitySold() + quantity);
+        ticketRepo.save(ticket);
+        log.debug("Held {} tickets until {}", quantity, holdExpiration);
     }
 
     private void releaseTickets(EventCheckoutSessionEntity session) {
         TicketEntity ticket = ticketRepo.findById(session.getTicketDetails().getTicketTypeId())
                 .orElse(null);
 
-        if (ticket != null && !ticket.getIsUnlimited()) {
+        if (ticket != null) {
             Integer quantity = session.getTicketDetails().getTotalQuantity();
             ticket.setQuantitySold(Math.max(0, ticket.getQuantitySold() - quantity));
             ticketRepo.save(ticket);
             log.debug("Released {} tickets", quantity);
         }
     }
-
     private EventCheckoutResponse mapToResponse(
             EventCheckoutSessionEntity session,
             EventEntity event,

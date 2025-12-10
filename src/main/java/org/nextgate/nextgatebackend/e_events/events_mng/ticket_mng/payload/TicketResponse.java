@@ -40,7 +40,6 @@ public class TicketResponse {
     private Integer ticketsSold;
     private Integer ticketsRemaining;
     private Integer ticketsAvailable;
-    private Boolean isUnlimited;
     private Boolean isSoldOut;
 
     // ========== SALES PERIOD ==========

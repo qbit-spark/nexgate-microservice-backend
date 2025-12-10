@@ -28,7 +28,6 @@ public class TicketSummaryResponse {
     private Integer totalTickets;
     private Integer ticketsSold;
     private Integer ticketsAvailable;
-    private Boolean isUnlimited;
     private Boolean isSoldOut;
 
     // For HYBRID events

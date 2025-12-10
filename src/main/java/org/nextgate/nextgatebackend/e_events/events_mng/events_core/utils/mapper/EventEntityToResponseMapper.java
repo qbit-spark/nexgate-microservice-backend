@@ -176,7 +176,6 @@ public class EventEntityToResponseMapper {
                 .totalTickets(ticket.getTotalQuantity())
                 .ticketsSold(ticket.getQuantitySold())
                 .ticketsAvailable(ticket.getQuantityAvailable())
-                .isUnlimited(ticket.getIsUnlimited())
                 .isSoldOut(ticket.isSoldOut())
                 .attendanceMode(ticket.getAttendanceMode())
                 .status(ticket.getStatus())

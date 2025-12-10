@@ -66,15 +66,12 @@ public class TicketEntity {
 
     // ========== QUANTITY MANAGEMENT ==========
     @Column(name = "total_quantity")
-    private Integer totalQuantity; // null if unlimited
+    private Integer totalQuantity;
 
     @Column(name = "quantity_sold", nullable = false)
     @Builder.Default
     private Integer quantitySold = 0;
 
-    @Column(name = "is_unlimited", nullable = false)
-    @Builder.Default
-    private Boolean isUnlimited = false;
 
     // ========== SALES PERIOD (Optional) ==========
     @Column(name = "sales_start_date_time")
@@ -160,9 +157,6 @@ public class TicketEntity {
      * Get remaining quantity (calculated field)
      */
     public Integer getQuantityRemaining() {
-        if (isUnlimited) {
-            return null; // Unlimited tickets
-        }
         return totalQuantity - quantitySold;
     }
 
@@ -177,9 +171,6 @@ public class TicketEntity {
      * Check if ticket is sold out
      */
     public boolean isSoldOut() {
-        if (isUnlimited) {
-            return false;
-        }
         return quantitySold >= totalQuantity;
     }
 
@@ -235,9 +226,6 @@ public class TicketEntity {
      * Validate capacity can be reduced
      */
     public boolean canReduceCapacityTo(Integer newCapacity) {
-        if (isUnlimited) {
-            return false; // Cannot set capacity on unlimited tickets
-        }
         return newCapacity >= quantitySold;
     }
 }

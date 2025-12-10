@@ -210,16 +210,27 @@ public class TicketServiceImpl implements TicketService {
      */
     private TicketEntity buildTicketEntity(CreateTicketRequest request, EventEntity event, AccountEntity creator) {
 
-        TicketEntity.TicketEntityBuilder builder = TicketEntity.builder().event(event).name(request.getName()).description(request.getDescription()).price(request.getPrice()).isUnlimited(request.getIsUnlimited() != null ? request.getIsUnlimited() : false).quantitySold(0).salesStartDateTime(request.getSalesStartDateTime()).salesEndDateTime(request.getSalesEndDateTime()).minQuantityPerOrder(request.getMinQuantityPerOrder() != null ? request.getMinQuantityPerOrder() : 1).maxQuantityPerOrder(request.getMaxQuantityPerOrder()).maxQuantityPerUser(request.getMaxQuantityPerUser()).checkInValidUntil(request.getCheckInValidUntil()).customCheckInDate(request.getCustomCheckInDate()).attendanceMode(request.getAttendanceMode()).inclusiveItems(request.getInclusiveItems() != null ? request.getInclusiveItems() : List.of()).isHidden(request.getIsHidden() != null ? request.getIsHidden() : false).status(TicketStatus.ACTIVE).isDeleted(false).createdBy(creator);
-
-        // Handle quantity based on an unlimited flag
-        if (request.getIsUnlimited() != null && request.getIsUnlimited()) {
-            builder.totalQuantity(null); // Unlimited
-        } else {
-            builder.totalQuantity(request.getTotalQuantity());
-        }
-
-        return builder.build();
+        return TicketEntity.builder()
+                .event(event)
+                .name(request.getName())
+                .description(request.getDescription())
+                .price(request.getPrice())
+                .totalQuantity(request.getTotalQuantity())
+                .quantitySold(0)
+                .salesStartDateTime(request.getSalesStartDateTime())
+                .salesEndDateTime(request.getSalesEndDateTime())
+                .minQuantityPerOrder(request.getMinQuantityPerOrder() != null ? request.getMinQuantityPerOrder() : 1)
+                .maxQuantityPerOrder(request.getMaxQuantityPerOrder())
+                .maxQuantityPerUser(request.getMaxQuantityPerUser())
+                .checkInValidUntil(request.getCheckInValidUntil())
+                .customCheckInDate(request.getCustomCheckInDate())
+                .attendanceMode(request.getAttendanceMode())
+                .inclusiveItems(request.getInclusiveItems() != null ? request.getInclusiveItems() : List.of())
+                .isHidden(request.getIsHidden() != null ? request.getIsHidden() : false)
+                .status(TicketStatus.ACTIVE)
+                .isDeleted(false)
+                .createdBy(creator)
+                .build();
     }
 
     /**
