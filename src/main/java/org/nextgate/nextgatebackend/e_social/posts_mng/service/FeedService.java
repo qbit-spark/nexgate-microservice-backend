@@ -8,12 +8,4 @@ import java.util.UUID;
 
 public interface FeedService {
 
-    // User's own timeline (profile view)
-    Page<TimelineItemResponse> getUserTimeline(Pageable pageable);
-
-    // Following feed (home feed)
-    Page<TimelineItemResponse> getFollowingFeed(Pageable pageable);
-
-    // Explore/public feed
-    Page<TimelineItemResponse> getExploreFeed(Pageable pageable);
 }

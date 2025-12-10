@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +26,7 @@ import java.util.*;
 public class FileServiceImpl implements FileService {
 
     private final MinioService minioService;
+    private final BlurHashServiceImpl blurHashService;
 
     private static final long MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
 
@@ -48,7 +50,7 @@ public class FileServiceImpl implements FileService {
         for (MultipartFile file : files) {
             try {
                 validateFile(file);
-                FileResponse fileResponse = uploadSingleFile(accountId, directory, file);
+                FileResponse fileResponse = uploadSingleFile(accountId, directory, file); // ✅ Already has BlurHash
                 uploadedFiles.add(fileResponse);
                 totalSize += file.getSize();
                 successfulUploads++;
@@ -60,9 +62,9 @@ public class FileServiceImpl implements FileService {
             }
         }
 
-        String message = successfulUploads > 0 ?
-                successfulUploads + " files uploaded successfully" :
-                "No files were uploaded";
+        String message = successfulUploads > 0
+                ? successfulUploads + " files uploaded successfully"
+                : "No files were uploaded";
 
         if (failedUploads > 0) {
             message += ", " + failedUploads + " failed";
@@ -81,25 +83,84 @@ public class FileServiceImpl implements FileService {
 
         return response;
     }
-
     @Override
     public FileResponse uploadSingleFile(UUID accountId, FileDirectory directory, MultipartFile file) {
         validateFile(file);
 
         try {
-            // Generate unique filename
             String originalFilename = file.getOriginalFilename();
             String fileExtension = getFileExtension(originalFilename);
             String uniqueFilename = UUID.randomUUID().toString() + fileExtension;
+            byte[] fileBytes = file.getBytes();
+            String contentType = file.getContentType();
 
-            // Upload to MinIO
-            String objectKey = minioService.uploadFile(accountId, directory.getPath(), uniqueFilename, file);
+            boolean isImage = IMAGE_TYPES.contains(contentType);
+            boolean isVideo = VIDEO_TYPES.contains(contentType);
 
-            // Generate permanent public URL (all files are public in ecommerce)
+            // Parallel tasks
+            CompletableFuture<String> uploadFuture = CompletableFuture.supplyAsync(() ->
+                    minioService.uploadFile(accountId, directory.getPath(), uniqueFilename, file)
+            );
+
+            CompletableFuture<String> blurHashFuture = CompletableFuture.supplyAsync(() -> {
+                if (isImage) {
+                    return blurHashService.generateBlurHash(fileBytes);
+                }
+                return null;
+            });
+
+            CompletableFuture<String> checksumFuture = CompletableFuture.supplyAsync(() ->
+                    generateChecksum(fileBytes)
+            );
+
+            CompletableFuture<int[]> dimensionsFuture = CompletableFuture.supplyAsync(() -> {
+                if (isImage) {
+                    return getImageDimensions(fileBytes);
+                }
+                return null;
+            });
+
+            // Wait for all
+            CompletableFuture.allOf(uploadFuture, blurHashFuture, checksumFuture, dimensionsFuture).join();
+
+            String objectKey = uploadFuture.get();
+            String blurHash = blurHashFuture.get();
+            String checksum = checksumFuture.get();
+            int[] dimensions = dimensionsFuture.get();
+
             String permanentUrl = generatePublicUrl(accountId, objectKey);
 
-            // Create comprehensive file response
-            FileResponse response = createFileResponse(file, originalFilename, uniqueFilename, objectKey, directory, permanentUrl, accountId);
+            // Build response
+            FileResponse response = new FileResponse();
+            response.setFileName(uniqueFilename);
+            response.setOriginalFileName(originalFilename);
+            response.setObjectKey(objectKey);
+            response.setDirectory(directory);
+            response.setContentType(contentType);
+            response.setFileSize(file.getSize());
+            response.setFileSizeFormatted(formatFileSize(file.getSize()));
+            response.setPermanentUrl(permanentUrl);
+            response.setFileExtension(fileExtension);
+            response.setFileType(determineFileType(contentType));
+            response.setIsImage(isImage);
+            response.setIsVideo(isVideo);
+            response.setIsDocument(DOCUMENT_TYPES.contains(contentType));
+            response.setIsAudio(AUDIO_TYPES.contains(contentType));
+            response.setChecksum(checksum);
+            response.setBlurHash(blurHash);
+            response.setUploadedAt(LocalDateTime.now());
+            response.setUploadedBy(accountId.toString());
+            response.setIsPublic(true);
+
+            if (dimensions != null) {
+                response.setWidth(dimensions[0]);
+                response.setHeight(dimensions[1]);
+                response.setDimensions(dimensions[0] + "x" + dimensions[1]);
+            }
+
+            if (isImage) {
+                response.setThumbnailUrl(permanentUrl);
+            }
 
             log.info("File uploaded successfully: {} for account: {}", originalFilename, accountId);
             return response;
@@ -316,5 +377,17 @@ public class FileServiceImpl implements FileService {
         // Generate direct MinIO URL without expiration - all files are public
         String bucketName = minioService.getBucketName(accountId);
         return String.format(files_server_url+"/%s/%s", bucketName, objectKey);
+    }
+
+    private int[] getImageDimensions(byte[] imageBytes) {
+        try {
+            BufferedImage image = ImageIO.read(new ByteArrayInputStream(imageBytes));
+            if (image != null) {
+                return new int[]{image.getWidth(), image.getHeight()};
+            }
+        } catch (IOException e) {
+            log.warn("Failed to read image dimensions", e);
+        }
+        return null;
     }
 }

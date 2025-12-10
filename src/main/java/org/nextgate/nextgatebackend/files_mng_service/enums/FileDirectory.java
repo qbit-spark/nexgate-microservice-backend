@@ -6,12 +6,16 @@ import lombok.Getter;
 public enum FileDirectory {
     PROFILE("profile"),
     CATEGORIES("categories"),
-    SHOPS("shops_mng");
+    SHOPS("shops"),
+    PRODUCTS("products"),
+    POSTS("posts"),
+    EVENTS("events"),
+    MESSAGES("messages"),
+    DOCUMENTS("documents");
 
     private final String path;
 
     FileDirectory(String path) {
         this.path = path;
     }
-
 }

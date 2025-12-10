@@ -830,56 +830,9 @@ public class PostController {
     }
 
     // ============================================
-    // FEED/TIMELINE ENDPOINTS
+    // FEED/TIMELINE ENDPOINTS HERE....
     // ============================================
 
-    @GetMapping("/my-timeline")
-    public ResponseEntity<GlobeSuccessResponseBuilder> getMyTimeline(
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int size) {
-
-        Pageable pageable = PageRequest.of(page - 1, size);
-        Page<TimelineItemResponse> timelinePage = feedService.getUserTimeline(pageable);
-
-        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
-                "Timeline retrieved successfully",
-                timelinePage
-        );
-
-        return ResponseEntity.ok(successResponse);
-    }
-
-    @GetMapping("/feed/following")
-    public ResponseEntity<GlobeSuccessResponseBuilder> getFollowingFeed(
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int size) {
-
-        Pageable pageable = PageRequest.of(page - 1, size);
-        Page<TimelineItemResponse> feedPage = feedService.getFollowingFeed(pageable);
-
-        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
-                "Following feed retrieved successfully",
-                feedPage
-        );
-
-        return ResponseEntity.ok(successResponse);
-    }
-
-    @GetMapping("/feed/explore")
-    public ResponseEntity<GlobeSuccessResponseBuilder> getExploreFeed(
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int size) {
-
-        Pageable pageable = PageRequest.of(page - 1, size);
-        Page<TimelineItemResponse> feedPage = feedService.getExploreFeed(pageable);
-
-        GlobeSuccessResponseBuilder successResponse = GlobeSuccessResponseBuilder.success(
-                "Explore feed retrieved successfully",
-                feedPage
-        );
-
-        return ResponseEntity.ok(successResponse);
-    }
 
     @PostMapping("/quote/{quotedPostId}")
     public ResponseEntity<GlobeSuccessResponseBuilder> createQuotePost(
