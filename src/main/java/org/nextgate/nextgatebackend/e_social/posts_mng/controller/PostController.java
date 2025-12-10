@@ -246,7 +246,6 @@ public class PostController {
         return ResponseEntity.ok(successResponse);
     }
 
-    //Todo: The installment plan response is not cool
     @PostMapping("/draft/attach-plan/{planId}")
     public ResponseEntity<GlobeSuccessResponseBuilder> attachInstallmentPlanToDraft(
             @PathVariable UUID planId) {
