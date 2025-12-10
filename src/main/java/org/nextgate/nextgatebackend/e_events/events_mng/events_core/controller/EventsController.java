@@ -6,8 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.entity.EventEntity;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventStatus;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.enums.EventSubmissionAction;
-import org.nextgate.nextgatebackend.e_events.events_mng.events_core.payloads.CreateEventRequest;
-import org.nextgate.nextgatebackend.e_events.events_mng.events_core.payloads.EventResponse;
+import org.nextgate.nextgatebackend.e_events.events_mng.events_core.payloads.*;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.service.EventsService;
 import org.nextgate.nextgatebackend.e_events.events_mng.events_core.utils.mapper.EventEntityToResponseMapper;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.AccessDeniedException;
@@ -30,24 +29,164 @@ public class EventsController {
     private final EventsService eventsService;
     private final EventEntityToResponseMapper eventMapper;
 
-    @PostMapping
-    public ResponseEntity<GlobeSuccessResponseBuilder> createEvent(
-            @Valid @RequestBody CreateEventRequest createEventRequest)
-            throws ItemNotFoundException, AccessDeniedException, EventValidationException {
 
-        log.info("Creating event as draft");
+    @PostMapping("/draft")
+    public ResponseEntity<GlobeSuccessResponseBuilder> createEventDraft(
+            @Valid @RequestBody CreateEventDraftRequest request)
+            throws ItemNotFoundException, EventValidationException {
 
-        EventEntity createdEvent = eventsService.createEvent(createEventRequest);
-        EventResponse eventResponse = eventMapper.toResponse(createdEvent);
+        EventEntity draft = eventsService.createEventDraft(request);
+        EventResponse response = eventMapper.toResponse(draft);
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(GlobeSuccessResponseBuilder.builder()
                         .success(true)
                         .httpStatus(HttpStatus.CREATED)
-                        .message("Event saved as draft successfully")
-                        .data(eventResponse)
+                        .message("Event draft created")
+                        .data(response)
                         .build());
     }
+
+    @GetMapping("/draft")
+    public ResponseEntity<GlobeSuccessResponseBuilder> getMyDraft() throws ItemNotFoundException {
+        EventEntity draft = eventsService.getMyCurrentEventDraft();
+
+        return ResponseEntity.ok(GlobeSuccessResponseBuilder.builder()
+                .success(true)
+                .httpStatus(HttpStatus.OK)
+                .message(draft != null ? "Draft retrieved" : "No draft found")
+                .data(draft != null ? eventMapper.toResponse(draft) : null)
+                .build());
+    }
+
+    @DeleteMapping("/draft")
+    public ResponseEntity<GlobeSuccessResponseBuilder> discardDraft() throws ItemNotFoundException {
+        eventsService.discardEventDraft();
+
+        return ResponseEntity.ok(GlobeSuccessResponseBuilder.builder()
+                .success(true)
+                .httpStatus(HttpStatus.OK)
+                .message("Draft discarded")
+                .build());
+    }
+
+    @PatchMapping("/draft/basic-info")
+    public ResponseEntity<GlobeSuccessResponseBuilder> updateBasicInfo(
+            @Valid @RequestBody UpdateEventBasicInfoRequest request)
+            throws ItemNotFoundException, EventValidationException {
+
+        EventEntity draft = eventsService.updateDraftBasicInfo(request);
+
+        return ResponseEntity.ok(GlobeSuccessResponseBuilder.builder()
+                .success(true)
+                .httpStatus(HttpStatus.OK)
+                .message("Basic info updated")
+                .data(eventMapper.toResponse(draft))
+                .build());
+    }
+
+    @PatchMapping("/draft/schedule")
+    public ResponseEntity<GlobeSuccessResponseBuilder> updateSchedule(
+            @Valid @RequestBody ScheduleRequest request)
+            throws ItemNotFoundException, EventValidationException {
+
+        EventEntity draft = eventsService.updateDraftSchedule(request);
+
+        return ResponseEntity.ok(GlobeSuccessResponseBuilder.builder()
+                .success(true)
+                .httpStatus(HttpStatus.OK)
+                .message("Schedule updated")
+                .data(eventMapper.toResponse(draft))
+                .build());
+    }
+
+    @PatchMapping("/draft/location")
+    public ResponseEntity<GlobeSuccessResponseBuilder> updateLocation(
+            @Valid @RequestBody UpdateEventLocationRequest request)
+            throws ItemNotFoundException, EventValidationException {
+
+        EventEntity draft = eventsService.updateDraftLocation(request);
+
+        return ResponseEntity.ok(GlobeSuccessResponseBuilder.builder()
+                .success(true)
+                .httpStatus(HttpStatus.OK)
+                .message("Location updated")
+                .data(eventMapper.toResponse(draft))
+                .build());
+    }
+
+    @PatchMapping("/draft/media")
+    public ResponseEntity<GlobeSuccessResponseBuilder> updateMedia(
+            @Valid @RequestBody MediaRequest request) throws ItemNotFoundException {
+
+        EventEntity draft = eventsService.updateDraftMedia(request);
+
+        return ResponseEntity.ok(GlobeSuccessResponseBuilder.builder()
+                .success(true)
+                .httpStatus(HttpStatus.OK)
+                .message("Media updated")
+                .data(eventMapper.toResponse(draft))
+                .build());
+    }
+
+    @PostMapping("/draft/products/{productId}")
+    public ResponseEntity<GlobeSuccessResponseBuilder> attachProduct(
+            @PathVariable UUID productId)
+            throws ItemNotFoundException, EventValidationException {
+
+        EventEntity draft = eventsService.attachProductToDraft(productId);
+
+        return ResponseEntity.ok(GlobeSuccessResponseBuilder.builder()
+                .success(true)
+                .httpStatus(HttpStatus.OK)
+                .message("Product attached")
+                .data(eventMapper.toResponse(draft))
+                .build());
+    }
+
+    @DeleteMapping("/draft/products/{productId}")
+    public ResponseEntity<GlobeSuccessResponseBuilder> removeProduct(
+            @PathVariable UUID productId) throws ItemNotFoundException {
+
+        EventEntity draft = eventsService.removeProductFromDraft(productId);
+
+        return ResponseEntity.ok(GlobeSuccessResponseBuilder.builder()
+                .success(true)
+                .httpStatus(HttpStatus.OK)
+                .message("Product removed")
+                .data(eventMapper.toResponse(draft))
+                .build());
+    }
+
+    @PostMapping("/draft/shops/{shopId}")
+    public ResponseEntity<GlobeSuccessResponseBuilder> attachShop(
+            @PathVariable UUID shopId)
+            throws ItemNotFoundException, EventValidationException {
+
+        EventEntity draft = eventsService.attachShopToDraft(shopId);
+
+        return ResponseEntity.ok(GlobeSuccessResponseBuilder.builder()
+                .success(true)
+                .httpStatus(HttpStatus.OK)
+                .message("Shop attached")
+                .data(eventMapper.toResponse(draft))
+                .build());
+    }
+
+    @DeleteMapping("/draft/shops/{shopId}")
+    public ResponseEntity<GlobeSuccessResponseBuilder> removeShop(
+            @PathVariable UUID shopId) throws ItemNotFoundException {
+
+        EventEntity draft = eventsService.removeShopFromDraft(shopId);
+
+        return ResponseEntity.ok(GlobeSuccessResponseBuilder.builder()
+                .success(true)
+                .httpStatus(HttpStatus.OK)
+                .message("Shop removed")
+                .data(eventMapper.toResponse(draft))
+                .build());
+    }
+
 
     @PatchMapping("/{eventId}/publish")
     public ResponseEntity<GlobeSuccessResponseBuilder> publishEvent(@PathVariable UUID eventId)

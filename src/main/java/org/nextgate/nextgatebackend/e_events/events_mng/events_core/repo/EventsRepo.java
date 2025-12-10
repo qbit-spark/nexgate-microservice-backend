@@ -92,4 +92,11 @@ public interface EventsRepo extends JpaRepository<EventEntity, UUID> {
             AccountEntity organizer,
             Pageable pageable
     );
+
+    Optional<EventEntity> findByOrganizerAndStatusAndIsDeletedFalse(
+            AccountEntity organizer,
+            EventStatus status
+    );
+
+    boolean existsByOrganizerAndStatusAndIsDeletedFalse(AccountEntity organizer, EventStatus status);
 }
