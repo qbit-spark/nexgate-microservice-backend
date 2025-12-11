@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("api/v1/shops/ratings/{shopId}")
+@RequestMapping("api/v1/e-commerce/shops/ratings/{shopId}")
 @RequiredArgsConstructor
 public class ShopRatingController {
 

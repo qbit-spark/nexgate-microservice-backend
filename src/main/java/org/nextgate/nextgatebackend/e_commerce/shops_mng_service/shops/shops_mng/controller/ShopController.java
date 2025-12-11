@@ -32,7 +32,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("api/v1/shops")
+@RequestMapping("api/v1/e-commerce/shops")
 @RequiredArgsConstructor
 public class ShopController {
 

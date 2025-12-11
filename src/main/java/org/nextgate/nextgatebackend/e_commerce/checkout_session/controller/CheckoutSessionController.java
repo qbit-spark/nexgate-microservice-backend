@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("api/v1/checkout-sessions")
+@RequestMapping("api/v1/e-commerce/checkout-sessions")
 @RequiredArgsConstructor
 public class CheckoutSessionController {
 
