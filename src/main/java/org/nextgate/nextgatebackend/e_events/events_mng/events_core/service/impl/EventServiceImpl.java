@@ -86,6 +86,7 @@ public class EventServiceImpl implements EventsService {
                 .createdBy(currentUser)
                 .status(EventStatus.DRAFT)
                 .currentStage(EventCreationStage.BASIC_INFO)
+                .description(request.getDescription())
                 .isDeleted(false)
                 .completedStages(new ArrayList<>())
                 .build();

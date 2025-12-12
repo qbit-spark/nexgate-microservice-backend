@@ -34,4 +34,7 @@ public class CreateEventDraftRequest {
     @NotNull(message = "Event format is required")
     private EventFormat eventFormat;
 
+    @Size(max = 5000)
+    private String description;
+
 }
