@@ -168,13 +168,14 @@ public class EventServiceImpl implements EventsService {
         EventEntity draft = getMyDraftOrThrow();
         AccountEntity currentUser = getAuthenticatedAccount();
 
-        // Clear existing days
-        draft.getDays().clear();
-        eventsRepo.saveAndFlush(draft);
+        // Remove existing days properly
+        if (!draft.getDays().isEmpty()) {
+            draft.getDays().clear();
+        }
 
         if (schedule.getDays() != null && !schedule.getDays().isEmpty()) {
             List<EventDayEntity> eventDays = mapEventDays(schedule.getDays(), draft);
-            draft.setDays(eventDays);
+            draft.getDays().addAll(eventDays);
 
             EventDayEntity firstDay = eventDays.getFirst();
             EventDayEntity lastDay = eventDays.getLast();
