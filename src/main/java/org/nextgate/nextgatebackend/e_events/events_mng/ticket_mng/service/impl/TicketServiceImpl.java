@@ -13,6 +13,7 @@ import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.enums.Attenda
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.enums.TicketStatus;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.payload.CreateTicketRequest;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.payload.UpdateTicketCapacityRequest;
+import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.payload.UpdateTicketRequest;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.payload.UpdateTicketStatusRequest;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.repo.TicketRepo;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.service.TicketService;
@@ -81,6 +82,92 @@ public class TicketServiceImpl implements TicketService {
 
         log.info("Ticket created successfully with ID: {} for event: {}", savedTicket.getId(), eventId);
         return savedTicket;
+    }
+
+
+    @Override
+    @Transactional
+    public TicketEntity updateTicket(UUID ticketId, UpdateTicketRequest request)
+            throws ItemNotFoundException, AccessDeniedException, EventValidationException {
+
+        log.info("Updating ticket: {}", ticketId);
+
+        AccountEntity currentUser = getAuthenticatedAccount();
+
+        TicketEntity ticket = ticketTypeRepo.findByIdAndIsDeletedFalse(ticketId)
+                .orElseThrow(() -> new ItemNotFoundException("Ticket not found with ID: " + ticketId));
+
+        EventEntity event = ticket.getEvent();
+
+        // CRITICAL: Validate event is DRAFT
+        ticketValidations.validateEventIsDraft(event);
+
+        validateUserCanManageTickets(currentUser, event);
+        ticketValidations.validateTicketForUpdate(request, ticket);
+
+        // Update only if provided, otherwise keep existing
+        if (request.getName() != null) {
+            ticket.setName(request.getName());
+        }
+
+        if (request.getDescription() != null) {
+            ticket.setDescription(request.getDescription());
+        }
+
+        if (request.getPrice() != null) {
+            ticket.setPrice(request.getPrice());
+        }
+
+        if (request.getTotalQuantity() != null) {
+            ticket.setTotalQuantity(request.getTotalQuantity());
+        }
+
+        if (request.getSalesStartDateTime() != null) {
+            ticket.setSalesStartDateTime(request.getSalesStartDateTime());
+        }
+
+        if (request.getSalesEndDateTime() != null) {
+            ticket.setSalesEndDateTime(request.getSalesEndDateTime());
+        }
+
+        if (request.getMinQuantityPerOrder() != null) {
+            ticket.setMinQuantityPerOrder(request.getMinQuantityPerOrder());
+        }
+
+        if (request.getMaxQuantityPerOrder() != null) {
+            ticket.setMaxQuantityPerOrder(request.getMaxQuantityPerOrder());
+        }
+
+        if (request.getMaxQuantityPerUser() != null) {
+            ticket.setMaxQuantityPerUser(request.getMaxQuantityPerUser());
+        }
+
+        if (request.getCheckInValidUntil() != null) {
+            ticket.setCheckInValidUntil(request.getCheckInValidUntil());
+        }
+
+        if (request.getCustomCheckInDate() != null) {
+            ticket.setCustomCheckInDate(request.getCustomCheckInDate());
+        }
+
+        if (request.getAttendanceMode() != null) {
+            ticket.setAttendanceMode(request.getAttendanceMode());
+        }
+
+        if (request.getInclusiveItems() != null) {
+            ticket.setInclusiveItems(request.getInclusiveItems());
+        }
+
+        if (request.getIsHidden() != null) {
+            ticket.setIsHidden(request.getIsHidden());
+        }
+
+        ticket.setUpdatedBy(currentUser);
+
+        TicketEntity updatedTicket = ticketTypeRepo.save(ticket);
+
+        log.info("Ticket updated successfully: {}", ticketId);
+        return updatedTicket;
     }
 
     @Override

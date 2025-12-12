@@ -3,6 +3,7 @@ package org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.service;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.entity.TicketEntity;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.payload.CreateTicketRequest;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.payload.UpdateTicketCapacityRequest;
+import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.payload.UpdateTicketRequest;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.payload.UpdateTicketStatusRequest;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.AccessDeniedException;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.EventValidationException;
@@ -19,6 +20,14 @@ public interface TicketService {
      * User must be event organizer or EVENT_MANAGER
      */
     TicketEntity createTicket(UUID eventId, CreateTicketRequest request)
+            throws ItemNotFoundException, AccessDeniedException, EventValidationException;
+
+    // Add to TicketService interface
+    /**
+     * Update ticket details including attendance mode
+     * Only works for DRAFT events
+     */
+    TicketEntity updateTicket(UUID ticketId, UpdateTicketRequest request)
             throws ItemNotFoundException, AccessDeniedException, EventValidationException;
 
     /**

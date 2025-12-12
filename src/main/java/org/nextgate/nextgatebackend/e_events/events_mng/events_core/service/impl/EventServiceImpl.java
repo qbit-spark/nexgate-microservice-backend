@@ -80,11 +80,13 @@ public class EventServiceImpl implements EventsService {
                 .slug(generateUniqueSlug(request.getTitle()))
                 .category(category)
                 .eventFormat(request.getEventFormat())
-                .eventVisibility(EventVisibility.PUBLIC)
+                .eventVisibility(Optional.ofNullable(request.getEventVisibility())
+                        .orElse(EventVisibility.PUBLIC))
                 .organizer(currentUser)
                 .createdBy(currentUser)
                 .status(EventStatus.DRAFT)
                 .currentStage(EventCreationStage.BASIC_INFO)
+                .description(request.getDescription())
                 .isDeleted(false)
                 .completedStages(new ArrayList<>())
                 .build();
@@ -166,13 +168,14 @@ public class EventServiceImpl implements EventsService {
         EventEntity draft = getMyDraftOrThrow();
         AccountEntity currentUser = getAuthenticatedAccount();
 
-        // Clear existing days
-        draft.getDays().clear();
-        eventsRepo.saveAndFlush(draft);
+        // Remove existing days properly
+        if (!draft.getDays().isEmpty()) {
+            draft.getDays().clear();
+        }
 
         if (schedule.getDays() != null && !schedule.getDays().isEmpty()) {
             List<EventDayEntity> eventDays = mapEventDays(schedule.getDays(), draft);
-            draft.setDays(eventDays);
+            draft.getDays().addAll(eventDays);
 
             EventDayEntity firstDay = eventDays.getFirst();
             EventDayEntity lastDay = eventDays.getLast();
@@ -400,6 +403,7 @@ public class EventServiceImpl implements EventsService {
             throw new EventValidationException("Failed to publish event: " + e.getMessage(), EventCreationStage.REVIEW);
         }
     }
+
     @Override
     @Transactional(readOnly = true)
     public EventEntity getEventById(UUID eventId) throws ItemNotFoundException, AccessDeniedException {
@@ -445,7 +449,6 @@ public class EventServiceImpl implements EventsService {
 
         return eventsRepo.findByOrganizerAndStatusAndIsDeletedFalseOrderByCreatedAtDesc(currentUser, status, pageable);
     }
-
 
 
     /**
@@ -519,7 +522,6 @@ public class EventServiceImpl implements EventsService {
         log.debug("Successfully mapped {} event days", eventDays.size());
         return eventDays;
     }
-
 
 
     /**

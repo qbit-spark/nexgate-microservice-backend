@@ -10,11 +10,13 @@ import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.enums.Attenda
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.enums.CheckInValidityType;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.enums.TicketStatus;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.payload.CreateTicketRequest;
+import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.payload.UpdateTicketRequest;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.repo.TicketRepo;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.EventValidationException;
 import org.springframework.stereotype.Service;
 
 import java.time.ZonedDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -58,6 +60,186 @@ public class TicketValidations {
 
         log.debug("Ticket validation passed for event: {}", event.getId());
     }
+
+    // Update TicketValidations.validateTicketForUpdate
+    public void validateTicketForUpdate(UpdateTicketRequest request, TicketEntity ticket)
+            throws EventValidationException {
+
+        log.debug("Validating ticket update for ticket: {}", ticket.getId());
+
+        EventEntity event = ticket.getEvent();
+
+        // Only validate fields that are being updated
+        if (request.getTotalQuantity() != null) {
+            validateQuantityFieldsForUpdate(request.getTotalQuantity());
+        }
+
+        if (request.getMinQuantityPerOrder() != null ||
+                request.getMaxQuantityPerOrder() != null ||
+                request.getMaxQuantityPerUser() != null) {
+            validatePurchaseLimitsForUpdate(request, ticket);
+        }
+
+        if (request.getSalesStartDateTime() != null || request.getSalesEndDateTime() != null) {
+            validateSalesPeriodForUpdate(request, ticket, event);
+        }
+
+        if (request.getCheckInValidUntil() != null || request.getCustomCheckInDate() != null) {
+            validateTicketValidityForUpdate(request, ticket, event);
+        }
+
+        if (request.getAttendanceMode() != null) {
+            validateAttendanceModeForUpdate(request.getAttendanceMode(), event);
+        }
+
+        if (request.getName() != null || request.getAttendanceMode() != null) {
+            String nameToCheck = request.getName() != null ? request.getName() : ticket.getName();
+            AttendanceMode modeToCheck = request.getAttendanceMode() != null ?
+                    request.getAttendanceMode() : ticket.getAttendanceMode();
+            validateTicketNameUniqueForUpdate(event, nameToCheck, modeToCheck, ticket.getId());
+        }
+
+        if (request.getInclusiveItems() != null) {
+            validateInclusiveItemsForUpdate(request.getInclusiveItems());
+        }
+
+        log.debug("Ticket update validation passed");
+    }
+
+    private void validateQuantityFieldsForUpdate(Integer totalQuantity) throws EventValidationException {
+        if (totalQuantity < 1) {
+            throw new EventValidationException("Total quantity must be at least 1");
+        }
+        if (totalQuantity > 1_000_000) {
+            throw new EventValidationException("Total quantity exceeds maximum allowed (1,000,000)");
+        }
+    }
+
+    private void validatePurchaseLimitsForUpdate(UpdateTicketRequest request, TicketEntity ticket)
+            throws EventValidationException {
+
+        Integer min = request.getMinQuantityPerOrder() != null ?
+                request.getMinQuantityPerOrder() : ticket.getMinQuantityPerOrder();
+        Integer maxPerOrder = request.getMaxQuantityPerOrder() != null ?
+                request.getMaxQuantityPerOrder() : ticket.getMaxQuantityPerOrder();
+        Integer maxPerUser = request.getMaxQuantityPerUser() != null ?
+                request.getMaxQuantityPerUser() : ticket.getMaxQuantityPerUser();
+
+        if (min != null && min < 1) {
+            throw new EventValidationException("Minimum quantity per order must be at least 1");
+        }
+
+        if (maxPerOrder != null && min != null && maxPerOrder < min) {
+            throw new EventValidationException("Maximum quantity per order must be >= minimum");
+        }
+
+        if (maxPerUser != null && maxPerOrder != null && maxPerUser < maxPerOrder) {
+            throw new EventValidationException("Maximum quantity per user must be >= maximum per order");
+        }
+
+        if (maxPerUser != null && min != null && maxPerOrder == null && maxPerUser < min) {
+            throw new EventValidationException("Maximum quantity per user must be >= minimum per order");
+        }
+
+        if (maxPerOrder != null && maxPerOrder > 100) {
+            throw new EventValidationException("Maximum quantity per order cannot exceed 100");
+        }
+
+        if (maxPerUser != null && maxPerUser > 1000) {
+            throw new EventValidationException("Maximum quantity per user cannot exceed 1000");
+        }
+    }
+
+    private void validateSalesPeriodForUpdate(UpdateTicketRequest request, TicketEntity ticket, EventEntity event)
+            throws EventValidationException {
+
+        ZonedDateTime salesStart = request.getSalesStartDateTime() != null ?
+                request.getSalesStartDateTime() : ticket.getSalesStartDateTime();
+        ZonedDateTime salesEnd = request.getSalesEndDateTime() != null ?
+                request.getSalesEndDateTime() : ticket.getSalesEndDateTime();
+        ZonedDateTime eventStart = event.getStartDateTime();
+
+        if (salesStart != null && salesEnd != null) {
+            if (salesEnd.isBefore(salesStart) || salesEnd.isEqual(salesStart)) {
+                throw new EventValidationException("Sales end date must be after sales start date");
+            }
+        }
+
+        if (salesStart != null && eventStart != null && salesStart.isAfter(eventStart)) {
+            throw new EventValidationException("Sales start date cannot be after event start date");
+        }
+
+        if (salesEnd != null && eventStart != null && salesEnd.isAfter(eventStart)) {
+            throw new EventValidationException("Sales end date cannot be after event start date");
+        }
+    }
+
+    private void validateTicketValidityForUpdate(UpdateTicketRequest request, TicketEntity ticket, EventEntity event)
+            throws EventValidationException {
+
+        CheckInValidityType validityType = request.getCheckInValidUntil() != null ?
+                request.getCheckInValidUntil() : ticket.getCheckInValidUntil();
+        ZonedDateTime customValidUntil = request.getCustomCheckInDate() != null ?
+                request.getCustomCheckInDate() : ticket.getCustomCheckInDate();
+
+        if (validityType == CheckInValidityType.CUSTOM) {
+            if (customValidUntil == null) {
+                throw new EventValidationException("Custom valid until date is required when validity type is CUSTOM");
+            }
+
+            if (customValidUntil.isBefore(event.getStartDateTime())) {
+                throw new EventValidationException("Custom valid until date cannot be before event start date");
+            }
+
+            if (event.getEndDateTime() != null) {
+                ZonedDateTime maxValidUntil = event.getEndDateTime().plusYears(1);
+                if (customValidUntil.isAfter(maxValidUntil)) {
+                    throw new EventValidationException("Custom valid until date cannot be more than 1 year after event end");
+                }
+            }
+        }
+    }
+
+    private void validateAttendanceModeForUpdate(AttendanceMode attendanceMode, EventEntity event)
+            throws EventValidationException {
+
+        if (event.getEventFormat() == EventFormat.HYBRID && attendanceMode == null) {
+            throw new EventValidationException("Attendance mode (IN_PERSON or ONLINE) is required for HYBRID events");
+        }
+    }
+
+    private void validateTicketNameUniqueForUpdate(EventEntity event, String ticketName,
+                                                   AttendanceMode attendanceMode, UUID ticketId) throws EventValidationException {
+
+        boolean exists = ticketTypeRepo.existsByEventAndNameAndAttendanceModeAndIdNotAndIsDeletedFalse(
+                event, ticketName, attendanceMode, ticketId);
+
+        if (exists) {
+            if (attendanceMode != null) {
+                throw new EventValidationException(
+                        "A ticket with name '" + ticketName + "' and attendance mode '" +
+                                attendanceMode + "' already exists for this event");
+            } else {
+                throw new EventValidationException("A ticket with name '" + ticketName + "' already exists for this event");
+            }
+        }
+    }
+
+    private void validateInclusiveItemsForUpdate(List<String> inclusiveItems) throws EventValidationException {
+        if (inclusiveItems.size() > 50) {
+            throw new EventValidationException("Cannot have more than 50 inclusive items per ticket");
+        }
+
+        for (String item : inclusiveItems) {
+            if (item == null || item.isBlank()) {
+                throw new EventValidationException("Inclusive items cannot be null or empty");
+            }
+            if (item.length() > 200) {
+                throw new EventValidationException("Inclusive item text cannot exceed 200 characters");
+            }
+        }
+    }
+
 
     /**
      * Validate event is in DRAFT status (tickets can only be created for draft events)
