@@ -4,11 +4,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.entity.TicketEntity;
-import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.payload.CreateTicketRequest;
-import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.payload.TicketResponse;
-import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.payload.TicketSummaryResponse;
-import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.payload.UpdateTicketCapacityRequest;
-import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.payload.UpdateTicketStatusRequest;
+import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.payload.*;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.service.TicketService;
 import org.nextgate.nextgatebackend.e_events.events_mng.ticket_mng.utils.TicketEntityToResponseMapper;
 import org.nextgate.nextgatebackend.globeadvice.exceptions.AccessDeniedException;
@@ -40,6 +36,25 @@ public class TicketController {
         TicketResponse response = ticketMapper.toResponse(ticket);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(GlobeSuccessResponseBuilder.builder().success(true).httpStatus(HttpStatus.CREATED).message("Ticket created successfully").data(response).build());
+    }
+
+    @PutMapping("/{ticketId}")
+    public ResponseEntity<GlobeSuccessResponseBuilder> updateTicket(
+            @PathVariable UUID ticketId,
+            @Valid @RequestBody UpdateTicketRequest request)
+            throws ItemNotFoundException, AccessDeniedException, EventValidationException {
+
+
+        TicketEntity ticket = ticketService.updateTicket(ticketId, request);
+        TicketResponse response = ticketMapper.toResponse(ticket);
+
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(GlobeSuccessResponseBuilder.builder()
+                        .success(true)
+                        .httpStatus(HttpStatus.OK)
+                        .message("Ticket updated successfully")
+                        .data(response)
+                        .build());
     }
 
     @GetMapping("/{eventId}")
