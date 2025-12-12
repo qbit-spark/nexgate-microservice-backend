@@ -29,6 +29,8 @@ public class CreateEventDraftRequest {
     @NotNull(message = "Category is required")
     private UUID categoryId;
 
+    private EventVisibility eventVisibility;
+
     @NotNull(message = "Event format is required")
     private EventFormat eventFormat;
 
