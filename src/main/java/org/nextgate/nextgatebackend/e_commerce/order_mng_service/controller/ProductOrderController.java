@@ -34,7 +34,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/orders")
+@RequestMapping("/api/v1/e-commerce/orders")
 @RequiredArgsConstructor
 @Slf4j
 public class ProductOrderController {

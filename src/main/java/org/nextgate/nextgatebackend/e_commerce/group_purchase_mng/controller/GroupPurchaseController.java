@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/group-purchases")
+@RequestMapping("api/v1/e-commerce/group-purchases")
 @RequiredArgsConstructor
 @Slf4j
 public class GroupPurchaseController {

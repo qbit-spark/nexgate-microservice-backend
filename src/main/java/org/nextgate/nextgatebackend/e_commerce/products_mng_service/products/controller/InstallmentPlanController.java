@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("api/v1/products/{shopId}/{productId}/installment-plans")
+@RequestMapping("api/e-commerce/v1/products/{shopId}/{productId}/installment-plans")
 @RequiredArgsConstructor
 public class InstallmentPlanController {
 

@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/installments")
+@RequestMapping("/api/v1/e-commerce/installments")
 @RequiredArgsConstructor
 @Slf4j
 public class InstallmentController {

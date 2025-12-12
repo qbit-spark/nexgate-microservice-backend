@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("api/v1/shops/categories")
+@RequestMapping("api/v1/e-commerce/shops/categories")
 @RequiredArgsConstructor
 public class ShopCategoryController {
 
